@@ -14,11 +14,13 @@ import { BreakGlassPage } from './screens/BreakGlassPage';
 import { HackathonBar } from './components/HackathonBar';
 import { I18nProvider } from './i18n/I18n';
 import { SignIn } from './screens/SignIn';
+import { Landing } from './screens/Landing';
 
 function Gate() {
   const { status } = useAuth();
   if (status === 'loading') return <p style={{ padding: 24 }} role="status">Loading…</p>;
-  if (status === 'signedOut') return <SignIn />;
+  // Signed out: the root explains the app; every other address (including a link to a patient) goes straight to sign-in.
+  if (status === 'signedOut') return <Routes><Route index element={<Landing />} /><Route path="*" element={<SignIn />} /></Routes>;
   return (
     <Routes>
       <Route element={<Shell />}>

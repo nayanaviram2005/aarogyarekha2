@@ -10,3 +10,4 @@ quarantine/
 .seed-credentials.local.json
 .claude/
 docs/
+.agents/

@@ -44,6 +44,7 @@ import { OfflinePage } from './screens/OfflinePage';
 import { ReferralsPage } from './screens/ReferralsPage';
 import { ScenariosPage } from './screens/ScenariosPage';
 import { SignIn } from './screens/SignIn';
+import { Landing } from './screens/Landing';
 import { NO_FILTER } from './lib/queueFilter';
 
 const empty = () => vi.fn().mockResolvedValue([]);
@@ -67,6 +68,7 @@ const summary = { encounter: { id: 'e1', scenario: 'chronic_checkin', language: 
 const visitSummary = (status: string, queue: string) => ({ encounter: { id: 'e1', status, scenario: 'opd_queue', language: 'en' }, symptoms: [], vitals: [], reviews: [], followUps: [], queue: { urgency_code: 'orange', status: queue, entered_at: '2026-10-08T05:00:00Z' } }) as never;
 const PAGES: [string, React.ReactElement][] = [
   ['sign in', <SignIn />],
+  ['landing page', <Landing />],
   ['consent form', <ConsentForm api={api} patientId="p" onRecorded={() => {}} />],
   ['consent form for reminders', <ConsentForm api={api} patientId="p" purpose="reminders" onRecorded={() => {}} />],
   ['register patient', <RegisterPatientForm api={api} onRegistered={() => {}} onCancel={() => {}} />],

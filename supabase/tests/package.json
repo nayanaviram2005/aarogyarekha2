@@ -1,0 +1,7 @@
+{
+  "name": "aarogyarekha-schema-tests",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node validate.mjs" },
+  "devDependencies": { "@electric-sql/pglite": "^0.5.8" }
+}

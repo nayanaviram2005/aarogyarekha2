@@ -1,0 +1,81 @@
+// Danger-sign flags taken from a published six-level GP triage chart ("Triage chart", General Practice Triage System,
+// gptriage.info, Medics for Life 2016). We use the CHART'S LIST OF FLAGS AND ITS URGENCY LEVELS, re-worded in our own plain
+// language and re-labelled with review-priority words. Nothing here is a diagnosis or a treatment.
+//
+// How its six priorities map onto our four tiers (a build-team choice, for a clinician to confirm or change):
+//   chart priority 1 (ambulance)                    -> tier 1 (red)
+//   chart priority 2 (emergency department)         -> tier 2 (orange)
+//   chart priorities 3, 4 and 5 (discuss now,
+//     within 30 minutes, come in now)               -> tier 3 (yellow)
+//   chart priority 6 (appointment today)            -> tier 4 (green, the default, so no flag is needed)
+//
+// Honest limits: it is an Australian telephone-triage chart for a GP practice, written for a call-taker, not for Indian primary
+// care. A flag is only as good as the answer to its question, and the answer comes from whoever is asking. No clinician has
+// reviewed this list or the tier mapping. It is part of PROPOSED v0.2.0 and is not in use until that is registered and approved.
+//
+// Two chart entries are not copied as written: "severe pain for any reason" appears at priority 1 and again at priority 3; we keep
+// the existing adult/child severe-pain flags at tier 3. "Death of a patient" is not a triage flag.
+import type { FloorRule, Population, Tier } from './types.js';
+
+const SRC = (p: number) => `GP triage chart (Medics for Life 2016), priority ${p}, re-worded. Australian GP chart, not validated for Indian facilities; needs clinical review`;
+type Row = [id: string, sign: string, tier: Tier, population: Population, label: string, question: string];
+const level = (p: number, rows: Row[]): FloorRule[] => rows.map(([id, sign, tier, population, label, question]) => ({ id: `GT${p}-${id}`, sign, tier, population, label, question, source: SRC(p) }));
+
+export const CHART_FLAGS: FloorRule[] = [
+  ...level(1, [
+    ['01', 'weapon_injury', 1, 'any', 'Stabbing, shooting or assault with a weapon', 'Was the patient stabbed, shot or hit with a weapon?'],
+    ['02', 'venomous_bite_or_sting', 1, 'any', 'Bite or sting from a snake, large spider or other venomous creature', 'Was the patient bitten or stung by a snake, a large spider or another creature that may be venomous?'],
+    ['03', 'serious_chest_pain', 1, 'any', 'Chest pain lasting over 20 minutes, or with sweating, breathlessness or spreading', 'Is there chest pain that lasts over 20 minutes, or comes with sweating or shortness of breath, or spreads to the arm, jaw or back?'],
+    ['04', 'fainting_or_sudden_collapse', 1, 'any', 'Fainting, sudden collapse or unexplained fall', 'Did the patient faint, suddenly collapse, or fall for no clear reason?'],
+    ['05', 'first_or_repeated_seizures', 1, 'any', 'First fit, or fits one after another', 'Has the patient had a fit for the first time, or fits again and again?'],
+    ['06', 'severe_palpitations', 1, 'any', 'Severe racing or irregular heartbeat', 'Is the heart racing or beating irregularly while the patient feels very unwell?'],
+    ['07', 'serious_accident_or_big_fall', 1, 'any', 'Serious road accident, or a fall from a height', 'Was there a serious road accident, or a fall from higher than the patient\'s own height?'],
+    ['08', 'overdose_poisoning_or_self_harm', 1, 'any', 'Overdose, poisoning, or an attempt to end life', 'Has the patient taken an overdose or a poison, or tried to harm themselves?'],
+    ['09', 'severe_burn', 1, 'any', 'Burn larger than the patient\'s hand, or a deep burn', 'Is the burn larger than the patient\'s hand, or deep, black or charred?'],
+    ['10', 'sudden_weakness_or_numbness', 1, 'any', 'Sudden weakness, numbness or paralysis of the face, arm or leg', 'Did weakness, numbness or drooping of the face, an arm or a leg start suddenly?'],
+    ['11', 'suspected_severe_allergy', 1, 'any', 'Suspected severe allergic reaction', 'After a sting, medicine or food, is there swelling of the face or throat, wheezing, or collapse?'],
+    ['12', 'suspected_spinal_injury', 1, 'any', 'Suspected spinal injury', 'After an injury, could the neck or back be broken: pain there, numbness, or unable to move?'],
+    ['13', 'vomiting_blood', 1, 'any', 'Vomiting blood', 'Is the patient vomiting blood?'],
+    ['14', 'fall_in_older_person', 1, 'any', 'Fall in a person over 65, even from standing', 'Is the patient over 65 and has fallen, even from standing?'],
+  ]),
+  ...level(2, [
+    ['01', 'sudden_severe_abdominal_or_back_pain', 2, 'any', 'Sudden severe pain in the abdomen or back', 'Did severe pain start suddenly in the belly or the back?'],
+    ['02', 'object_stuck_in_body', 2, 'any', 'Object stuck in the body', 'Is there an object stuck in any part of the body?'],
+    ['03', 'deformed_bone_or_joint', 2, 'any', 'Bone or joint out of shape or out of place', 'Does a bone or joint look out of shape or out of its normal place?'],
+    ['04', 'burn_to_face_or_genitals', 2, 'any', 'Burn to the face or genitals', 'Is there a burn on the face or the private parts?'],
+    ['05', 'wound_with_exposed_tissue_or_numbness', 2, 'any', 'Cut with exposed tissue, or numbness or coldness beyond it', 'Does a cut show the tissue underneath, or is the part beyond it numb or cold?'],
+    ['06', 'deep_cut_needing_stitches', 2, 'any', 'Deep cut that may need stitches', 'Is there a deep cut that may need stitches, especially on the face?'],
+    ['07', 'object_stuck_in_eye', 2, 'any', 'Object stuck in the eye', 'Is there an object stuck in the eye?'],
+    ['08', 'severe_flu_or_coughing_blood', 2, 'any', 'Severe flu-like illness, or coughing up blood', 'Is the flu-like illness severe, or is the patient coughing up blood?'],
+    ['09', 'head_injury_with_warning_signs', 2, 'any', 'Head injury with blackout, dizziness that stays, or vomiting', 'After a head injury, was there a blackout, dizziness that does not go, or vomiting?'],
+    ['10', 'unable_to_pass_urine', 2, 'any', 'Unable to pass urine', 'Is the patient unable to pass urine?'],
+    ['11', 'pain_in_pregnancy', 2, 'pregnant', 'Pain during pregnancy', 'Is the patient having pain during pregnancy?'],
+    ['12', 'high_fever_despite_medicine', 2, 'any', 'High fever that continues despite medicine', 'Does the high fever continue even after fever medicine?'],
+    ['13', 'severe_testicular_pain', 2, 'any', 'Severe pain in a testicle', 'Is there severe pain in a testicle?'],
+    ['14', 'sudden_confusion_or_speech_difficulty', 2, 'any', 'Sudden change in mental state, or difficulty speaking', 'Did the patient suddenly become confused or find it hard to speak?'],
+    ['15', 'sudden_vision_change', 2, 'any', 'Sudden change in vision', 'Did the patient\'s vision suddenly change?'],
+    ['16', 'unusual_severe_headache', 2, 'any', 'Unusual or severe headache', 'Is this an unusual or severe headache for this patient?'],
+    ['17', 'child_not_passing_urine', 2, 'child_under_5', 'Young child who has stopped passing urine', 'Has the child stopped passing urine?'],
+    ['18', 'back_pain_with_nerve_signs', 2, 'any', 'Back pain with numbness, weakness, or loss of bladder or bowel control', 'With the back pain, is there numbness or weakness in a leg, or loss of control of urine or stool?'],
+  ]),
+  ...level(3, [
+    ['01', 'medicine_reaction', 3, 'any', 'Bad reaction to a medicine', 'Did the patient react badly to a medicine?'],
+    ['02', 'recent_fit_now_over', 3, 'any', 'Fit that has now stopped', 'Did the patient have a fit that has now stopped?'],
+    ['03', 'eye_injury', 3, 'any', 'Injury to the eye', 'Is there an injury to the eye?'],
+    ['04', 'fever_in_young_infant', 3, 'child_under_5', 'Fever in a baby of 3 months or younger', 'Is the baby 3 months old or younger and hot to touch?'],
+    ['05', 'wound_not_controlled', 3, 'any', 'Cut that keeps bleeding, is long, or shows white or yellow material', 'Does the cut keep bleeding, is it longer than 2 cm, or does it show white or yellow material?'],
+    ['06', 'limb_injury_warning_signs', 3, 'any', 'Injured limb that is out of shape, pale, numb, or cannot take weight', 'Is the injured arm or leg out of shape, paler than the other, numb, or unable to take weight?'],
+    ['07', 'mental_health_crisis', 3, 'any', 'Severe distress, extreme anxiety, or thoughts of self-harm', 'Is the patient in severe distress or extremely anxious, or having thoughts of self-harm?'],
+    ['08', 'carer_very_worried', 3, 'child_under_5', 'Parent or carer is very worried', 'Is the parent or carer very worried about the child?'],
+    ['09', 'persistent_vomiting', 3, 'any', 'Vomiting that keeps happening', 'Does the vomiting keep happening?'],
+    ['10', 'possible_meningitis_concern', 3, 'any', 'Family or carer fears meningitis', 'Does the family or carer fear this could be meningitis?'],
+    ['11', 'urgent_test_result', 3, 'any', 'Test result marked urgent', 'Has a test result come back marked as urgent?'],
+    ['12', 'limb_pain_without_injury', 3, 'any', 'Pain in an arm or leg with no injury', 'Is there pain in an arm or leg without any injury?'],
+    ['13', 'post_operative_bleeding', 3, 'any', 'Bleeding after an operation', 'Is there bleeding after a recent operation?'],
+    ['14', 'swollen_limb', 3, 'any', 'Swollen arm or leg', 'Is an arm or a leg swollen?'],
+    ['15', 'missed_or_run_out_medicine', 3, 'any', 'Missed doses, or has run out of a regular medicine', 'Has the patient missed doses, or run out of a regular medicine?'],
+    ['16', 'adult_vomiting_diarrhoea_over_3_days', 3, 'adult', 'Adult with vomiting or loose stools for more than 3 days', 'Has the adult had vomiting or loose stools for more than 3 days?'],
+    ['17', 'sudden_rash', 3, 'any', 'Sudden rash', 'Did a rash appear suddenly?'],
+    ['18', 'young_or_older_unwell_over_2_days', 3, 'any', 'Child under 3, or person over 65, unwell for over 2 days', 'Is this a child under 3 or a person over 65 with fever, vomiting, loose stools or cough for more than 2 days?'],
+  ]),
+];

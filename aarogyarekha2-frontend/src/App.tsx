@@ -1,0 +1,43 @@
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { AuthProvider, useAuth } from './auth/AuthProvider';
+import { EncounterPage } from './screens/EncounterPage';
+import { HomePage } from './screens/HomePage';
+import { IntakePage } from './screens/IntakePage';
+import { Shell } from './screens/Shell';
+import { ScenariosPage } from './screens/ScenariosPage';
+import { CampBatchPage } from './screens/CampBatchPage';
+import { OfflinePage } from './screens/OfflinePage';
+import { SettingsPage } from './screens/SettingsPage';
+import { AdminPage } from './screens/AdminPage';
+import { ReferralsPage } from './screens/ReferralsPage';
+import { BreakGlassPage } from './screens/BreakGlassPage';
+import { HackathonBar } from './components/HackathonBar';
+import { I18nProvider } from './i18n/I18n';
+import { SignIn } from './screens/SignIn';
+
+function Gate() {
+  const { status } = useAuth();
+  if (status === 'loading') return <p style={{ padding: 24 }} role="status">Loading…</p>;
+  if (status === 'signedOut') return <SignIn />;
+  return (
+    <Routes>
+      <Route element={<Shell />}>
+        <Route index element={<HomePage />} />
+        <Route path="intake" element={<IntakePage />} />
+        <Route path="scenarios" element={<ScenariosPage />} />
+        <Route path="camp" element={<CampBatchPage />} />
+        <Route path="offline" element={<OfflinePage />} />
+        <Route path="admin" element={<AdminPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="referrals" element={<ReferralsPage />} />
+        <Route path="emergency" element={<BreakGlassPage />} />
+        <Route path="encounters/:id" element={<EncounterPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
+  );
+}
+
+export default function App() {
+  return <BrowserRouter><I18nProvider><AuthProvider><div className="app-root"><HackathonBar /><Gate /></div></AuthProvider></I18nProvider></BrowserRouter>;
+}

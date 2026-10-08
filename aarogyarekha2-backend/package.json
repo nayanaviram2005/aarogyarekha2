@@ -1,0 +1,51 @@
+{
+  "name": "aarogyarekha2-backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file=../.env --import tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "ruleset:register": "node --env-file=../.env --import tsx scripts/register-ruleset.ts",
+    "test:live": "node --env-file=../.env --import tsx scripts/access-matrix.ts",
+    "test:intake": "node --env-file=../.env --import tsx scripts/intake-live.ts",
+    "test:features": "node --env-file=../.env --import tsx scripts/features-live.ts",
+    "ruleset:approve-demo": "node --env-file=../.env --import tsx scripts/approve-demo-rules.ts",
+    "ai:smoke": "node --env-file=../.env --import tsx scripts/ai-smoke.ts",
+    "reminders:run": "node --env-file=../.env --import tsx scripts/run-reminders.ts",
+    "bundle:scan": "node --import tsx scripts/bundle-scan.ts",
+    "eval:report": "node --import tsx scripts/eval-report.ts",
+    "retention:dry": "node --env-file=../.env --import tsx scripts/run-retention.ts",
+    "retention:apply": "node --env-file=../.env --import tsx scripts/run-retention.ts --apply"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.3.0",
+    "@fastify/helmet": "^13.1.1",
+    "@fastify/multipart": "^10.1.2",
+    "@fastify/rate-limit": "^11.2.0",
+    "@pdf-lib/fontkit": "^1.1.1",
+    "@supabase/supabase-js": "^2.117.2",
+    "fastify": "^5.12.5",
+    "jpeg-js": "^0.4.4",
+    "pdfjs-dist": "^6.4.299",
+    "pg": "^8.23.1",
+    "pngjs": "^7.0.0",
+    "regenerator-runtime": "^0.14.1",
+    "secure-json-parse": "^4.1.0",
+    "tesseract.js": "^7.0.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@medplum/core": "^4.5.2",
+    "@medplum/definitions": "^4.5.2",
+    "@types/fhir": "^0.0.44",
+    "@types/node": "^26.6.4",
+    "@types/pg": "^8.23.1",
+    "@types/pngjs": "^6.0.5",
+    "pdf-lib": "^1.17.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}

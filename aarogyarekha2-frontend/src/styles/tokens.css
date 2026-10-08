@@ -1,0 +1,33 @@
+/* "Ward Chart" design tokens. See docs/02-design-language.md.
+   Colour is reserved for urgency and state. No gradients, no shadows, no blur. Sans-serif only; no monospace. */
+:root {
+  --ink: #15232d;
+  --ink-2: #4a5b67;
+  --paper: #eef1f3;
+  --panel: #ffffff;
+  --rule: #cbd3d9;
+  --rule-strong: #8e9ba5;
+  --action: #0e4a55;
+  --action-ink: #ffffff;
+  --action-tint: #e2eef0;
+
+  --urg-red: #b42318;      --urg-red-tint: #fbe9e7;
+  --urg-orange: #b54708;   --urg-orange-tint: #fdebd5;
+  --urg-yellow: #8a5a00;   --urg-yellow-tint: #fbf1c7;
+  --urg-green: #1b6b3f;    --urg-green-tint: #e3f2e8;
+  --draft: #5b6770;
+
+  --font: 'Public Sans', 'Noto Sans Devanagari', 'Noto Sans Oriya', system-ui, 'Segoe UI', Arial, sans-serif;
+
+  --fs-12: 0.75rem;
+  --fs-13: 0.8125rem;
+  --fs-14: 0.875rem;
+  --fs-16: 1rem;
+  --fs-20: 1.25rem;
+  --fs-26: 1.625rem;
+
+  --radius: 2px;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+  --topbar-h: 48px;
+  --legal-h: 32px;
+}

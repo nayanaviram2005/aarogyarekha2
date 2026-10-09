@@ -5,10 +5,6 @@ import { Banner } from './Provenance';
 
 const KIND_LABEL: Record<NoteKind, string> = { comment: 'Note', escalation: 'Needs a senior look', feedback_up: 'Assessment was helpful', feedback_down: 'Assessment was not helpful' };
 
-/**
- * Notes between reviewers: a comment, an escalation ("please look at this now"), and feedback on the draft assessment.
- * None of these changes a priority. To change a priority, use Change priority in the review panel.
- */
 export function NotesPanel({ api, encounterId, assessmentId, canWrite, disabled }: { api: Api; encounterId: string; assessmentId: string | null; canWrite: boolean; disabled?: boolean }) {
   const [notes, setNotes] = useState<ReviewerNote[] | null>(null);
   const [error, setError] = useState<Error | null>(null);

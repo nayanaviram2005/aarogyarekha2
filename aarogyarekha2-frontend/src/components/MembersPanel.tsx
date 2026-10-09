@@ -8,7 +8,6 @@ const ROLES: MemberRole[] = ['health_worker', 'nurse', 'doctor', 'medical_office
 const OP: Record<string, string> = { set_role: 'Role set', deactivate: 'Removed' };
 const isRole = (r: string): r is MemberRole => (ROLES as string[]).includes(r);
 
-/** Who works at this facility and in what role. Facility administrators are made by the platform administrator, not here. */
 export function MembersPanel({ api }: { api: Api }) {
   const [members, setMembers] = useState<MemberView[] | null>(null);
   const [changes, setChanges] = useState<MemberChangeView[]>([]);

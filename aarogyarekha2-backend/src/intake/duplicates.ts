@@ -1,5 +1,3 @@
-// Before registering someone new, check whether they are probably already registered. A false "duplicate" only costs one extra
-// tap (the nurse confirms), while a missed one splits a person's record in two, so the match is deliberately generous on age.
 import type { PatientBrief } from '../deps.js';
 
 export const normName = (s: string): string =>
@@ -20,7 +18,7 @@ export function possibleDuplicates(existing: PatientBrief[], n: NewPersonKey, no
     if (p.sex !== 'unknown' && n.sex !== 'unknown' && p.sex !== n.sex) return false;
     if (n.birthDate && p.birth_date) return n.birthDate === p.birth_date;
     const pAge = yearsOld(p, now);
-    if (nAge === null || pAge === null) return true;           // not enough to tell them apart: ask
+    if (nAge === null || pAge === null) return true;
     return Math.abs(nAge - pAge) <= 1;
   });
 }

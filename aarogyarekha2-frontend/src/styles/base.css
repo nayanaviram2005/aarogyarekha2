@@ -9,11 +9,10 @@ body {
   font-family: var(--font);
   font-size: var(--fs-14);
   line-height: 1.45;
-  font-variant-numeric: tabular-nums;     /* aligned numbers without a monospace face */
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Indic scripts need more line height or the matras collide. */
 [lang='hi'], [lang='or'] { line-height: 1.7; }
 
 h1, h2, h3, h4 { margin: 0; font-weight: 600; line-height: 1.25; }

@@ -1,12 +1,7 @@
-// Database side of the reminder worker. System path (database connection), not a user's session.
 import type { DueReminder, ReminderStore } from './core.js';
 
 interface Queryable { query(sql: string, params?: unknown[]): Promise<{ rows: any[]; rowCount?: number | null }> }
 
-/**
- * Claiming marks the rows 'sent' in the SAME statement that selects them (skip locked), so two runners can never pick the same
- * reminder and a reminder is never sent twice. If sending then fails, markFailed flips it to 'failed'. At-most-once on purpose.
- */
 export function makeReminderStore(db: Queryable): ReminderStore {
   return {
     async claimDue(now: Date, limit: number): Promise<DueReminder[]> {
@@ -27,7 +22,6 @@ export function makeReminderStore(db: Queryable): ReminderStore {
       return r.rows.map(x => ({ id: x.id, channel: x.channel, dueAt: new Date(x.due_at).toISOString(), facilityName: x.facility_name, language: x.language ?? 'en', phone: x.phone ?? null, consentActive: x.consent_active === true }));
     },
     async markSent(id: string, at: Date) {
-      // Already 'sent' from the claim. Move a repeating schedule on to its next date, counted from the last due date.
       await db.query(
         `update public.followup_schedules s set next_due_at = s.next_due_at + (s.cadence_days || ' days')::interval
          where s.id = (select schedule_id from public.reminders where id = $1) and s.cadence_days is not null and s.next_due_at is not null and s.next_due_at <= $2::timestamptz`, [id, at.toISOString()]);

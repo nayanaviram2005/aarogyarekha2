@@ -7,7 +7,7 @@ describe('summarizeTrend', () => {
   it('no readings of that kind gives nothing', () => { expect(summarizeTrend([p(1, 1, 'pulse_bpm')], 'bp_systolic_mmhg')).toBeNull(); expect(summarizeTrend([], 'x')).toBeNull(); });
   it('one reading is "single"', () => { const s = summarizeTrend([p(140, 1)], 'bp_systolic_mmhg')!; expect(s).toMatchObject({ n: 1, direction: 'single', previous: null, min: 140, max: 140 }); });
   it('compares the latest with the AVERAGE of the earlier ones, whatever order they arrive in', () => {
-    const s = summarizeTrend([p(160, 5), p(120, 1), p(130, 2), p(140, 3)], 'bp_systolic_mmhg')!;     // earlier mean 130, latest 160
+    const s = summarizeTrend([p(160, 5), p(120, 1), p(130, 2), p(140, 3)], 'bp_systolic_mmhg')!;
     expect(s.latest.value).toBe(160); expect(s.previous!.value).toBe(140); expect(s.direction).toBe('higher'); expect(s.min).toBe(120); expect(s.max).toBe(160); expect(s.points.map(x => x.value)).toEqual([120, 130, 140, 160]);
   });
   it('lower and steady', () => {

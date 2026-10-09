@@ -253,7 +253,7 @@ describe('encounter lifecycle', () => {
 
 describe('assessment', () => {
   beforeEach(() => {
-    s.facts = { birth_date: '2023-06-01', age_years_reported: null, sex: 'male', pregnancyOngoing: false };   // a young child
+    s.facts = { birth_date: '2023-06-01', age_years_reported: null, sex: 'male', pregnancyOngoing: false };
   });
 
   it('runs the engine on the stored facts and returns the tier, the reason, and ranked follow-up questions', async () => {

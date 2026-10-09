@@ -1,9 +1,3 @@
-// Voice to text for the complaint box. A recording is identifiable and cannot be redacted, so:
-//  * needs triage consent AND the patient's separate consent to an outside AI service (external_ai_processing),
-//  * the recording is never stored: it lives in memory for this request only,
-//  * only real audio containers under 2 MB are accepted (type read from the bytes),
-//  * the call is logged (size only) BEFORE the transcript is handed back; if that log fails the transcript is dropped,
-//  * the result is a draft. Nothing is saved here. A person reads, edits and saves it as an ordinary symptom.
 import type { RouteCtx, RouteHelpers } from './intake.js';
 import { AiError } from '../ai/provider.js';
 import { MAX_AUDIO_BYTES, sniffAudio, type SttLanguage } from '../ai/stt.js';

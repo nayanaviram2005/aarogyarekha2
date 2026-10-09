@@ -1,12 +1,6 @@
--- 0004 triage. Algorithm-agnostic: the approved algorithms are specified separately [OPEN].
--- The schema stores WHAT was concluded, WHY (signals), and WHICH versioned rule set produced it.
--- It stores no diagnosis. Assessments are immutable; humans act through review_actions.
-
--- Urgency levels are DATA, not an enum, so the approved algorithm can change them without DDL.
--- Seed values are PLACEHOLDERS (4-level scale) pending the algorithm spec.
 create table public.urgency_levels (
   code  text primary key check (code ~ '^[a-z][a-z0-9_]{1,30}$'),
-  rank  smallint not null unique,       -- 1 = most urgent
+  rank  smallint not null unique,
   label text not null
 );
 insert into public.urgency_levels (code, rank, label) values
@@ -20,7 +14,7 @@ create table public.triage_rule_sets (
   name            text not null,
   version         text not null,
   status          text not null default 'draft' check (status in ('draft', 'approved', 'retired')),
-  source_citation text,                              -- the published/validated algorithm this encodes
+  source_citation text,
   definition      jsonb not null check (jsonb_typeof(definition) = 'object'),
   approved_by     uuid references auth.users(id) on delete set null,
   approved_at     timestamptz,
@@ -36,8 +30,8 @@ create table public.triage_assessments (
   rule_set_id       uuid references public.triage_rule_sets(id) on delete restrict,
   basis             public.assessment_basis not null,
   urgency_code      text not null references public.urgency_levels(code),
-  note              jsonb not null check (jsonb_typeof(note) = 'object'),  -- structured, non-diagnostic summary
-  input_fingerprint text not null,                   -- sha256 of the evidence snapshot -> reproducibility
+  note              jsonb not null check (jsonb_typeof(note) = 'object'),
+  input_fingerprint text not null,
   engine_version    text not null,
   created_at        timestamptz not null default now(),
   unique (encounter_id, version),
@@ -47,7 +41,6 @@ create index triage_assessments_encounter_idx on public.triage_assessments (enco
 create trigger trg_assessments_immutable before update or delete on public.triage_assessments
   for each row execute function app.forbid_mutation();
 
--- Only an APPROVED rule set may back an assessment.
 create or replace function app.require_approved_rule_set()
 returns trigger language plpgsql set search_path = '' as $$
 begin
@@ -67,7 +60,7 @@ create table public.triage_signals (
   kind           public.signal_kind not null,
   source         public.signal_source not null,
   weight         smallint,
-  display_text   text,                               -- non-diagnostic wording; guarded in the API tier
+  display_text   text,
   evidence       jsonb not null default '{}'::jsonb check (jsonb_typeof(evidence) = 'object'),
   created_at     timestamptz not null default now()
 );
@@ -75,10 +68,6 @@ create index triage_signals_assessment_idx on public.triage_signals (assessment_
 create trigger trg_signals_immutable before update or delete on public.triage_signals
   for each row execute function app.forbid_mutation();
 
--- Every call to an external triage input (e.g. DXGPT). Hard guards:
---   * a live `external_ai_processing` consent is REQUIRED (NOT NULL FK),
---   * only de-identified payloads may be sent (CHECK),
---   * raw provider output is NOT stored; only the sanitised, non-diagnostic features.  [OPEN: policy]
 create table public.external_signal_runs (
   id                 uuid primary key default gen_random_uuid(),
   encounter_id       uuid not null references public.encounters(id) on delete restrict,
@@ -92,7 +81,7 @@ create table public.external_signal_runs (
   http_status        integer,
   latency_ms         integer check (latency_ms >= 0),
   sanitized_output   jsonb,
-  reliability_passed boolean not null default false,  -- may count as PRIMARY only when true
+  reliability_passed boolean not null default false,
   reliability_detail jsonb not null default '{}'::jsonb,
   created_at         timestamptz not null default now()
 );
@@ -116,7 +105,6 @@ create index queue_items_board_idx on public.queue_items (facility_id, status, u
 create trigger trg_queue_touch before update on public.queue_items
   for each row execute function app.touch_updated_at();
 
--- Human decisions. Append-only; this is the clinical accountability record.
 create table public.review_actions (
   id               uuid primary key default gen_random_uuid(),
   encounter_id     uuid not null references public.encounters(id) on delete restrict,

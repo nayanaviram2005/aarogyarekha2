@@ -9,11 +9,6 @@ const PLAIN_DETAIL: Record<StepKey, string> = {
   visit: 'Call the patient in, finish the visit, or send a referral.',
 };
 
-/**
- * The one place the selected step happens. It shows the step's own heading and then its content, in the same spot, so nothing is
- * split between a card on top and a section further down. When the step on screen is the recommended one, the heading says what to
- * do now; when it is another step (to look at or change something), a link says where the next step is.
- */
 export function StepPanel({ j, selected, onSelect, assessing, editable, onAssess, children }: {
   j: Journey; selected: StepKey; onSelect: (k: StepKey) => void; assessing: boolean; editable: boolean; onAssess: () => void; children: React.ReactNode;
 }) {

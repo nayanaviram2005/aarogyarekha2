@@ -122,7 +122,7 @@ describe('ReferralPanel: before a referral exists', () => {
     const api = fakeApi(); const onChanged = vi.fn();
     render(<ReferralPanel {...props} api={api} onChanged={onChanged} />);
     await screen.findByRole('button', { name: 'Save referral draft' });
-    expect(screen.getByLabelText('Request priority')).toHaveValue('asap');                       // orange suggests as soon as possible
+    expect(screen.getByLabelText('Request priority')).toHaveValue('asap');
     await userEvent.selectOptions(screen.getByLabelText('Refer to'), 'f2');
     await userEvent.type(screen.getByLabelText('Reason for referral'), 'Needs an obstetrician.');
     await userEvent.click(screen.getByRole('button', { name: 'Save referral draft' }));

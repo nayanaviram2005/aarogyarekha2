@@ -1,6 +1,3 @@
-// DEVELOPMENT-ONLY demo data source. Everything here is synthetic and lives in memory. It exists so the screens can be
-// built and shown without a login, a database or an approved rule set. It is loaded only when import.meta.env.DEV is true
-// (see src/api-provider.tsx), so it is not part of a production build. The UI shows a visible DEMO flag whenever it is active.
 import { ApiError } from '../lib/api';
 import type { Api, DoneEntry, MemberView, ReviewerNote, HistoryEntry, BoardReferral, ReferralStatus, Followup, DocumentMeta, ExtractedField, Extraction, AssessResponse, FhirBundle, ReferralMeta, ReferralView, DecisionLogEntry, EncounterSummary, FollowUp, PatientBrief, QueueEntry, Tier, TriageContext, UrgencyCode } from '../lib/types';
 
@@ -177,7 +174,6 @@ export function createDemoApi(opts: { rulesApproved: boolean }): Api {
     memberChanges: async () => wait([{ at: ago(120), facilityId: 'f1', op: 'set_role', role: 'doctor', previous: 'none', actor: 'Demo Admin', target: 'Dr. Rao' }]),
     addMember: async b => { demoMembers.push({ userId: 'm' + demoMembers.length, facilityId: 'f1', role: b.role, active: true, since: new Date().toISOString(), name: b.email.split('@')[0]!, email: b.email, isSelf: false, canChange: true }); return wait({ userId: 'm', role: b.role, previous: 'none' }); },
     setMemberRole: async (id, role) => { const m = demoMembers.find(x => x.userId === id); if (m) { m.role = role; m.active = true; } return wait({ userId: id, role, previous: 'nurse' }); },
-    // Demo mode has no platform administrator, so these are never reached from the screen.
     platformFacilities: async () => wait([]),
     createFacility: async () => wait({ id: 'demo-facility' }),
     setFacilityActive: async (id, active) => wait({ id, active }),
@@ -217,7 +213,6 @@ export function createDemoApi(opts: { rulesApproved: boolean }): Api {
     },
     readRecord: async file => {
       if (!/.(pdf|jpe?g|png)$/i.test(file.name)) throw new ApiError(400, 'Only PDF, JPEG and PNG files are accepted.');
-      // Demo mode cannot read files, and never invents a patient from one.
       return wait({ identity: {}, rows: 0, readable: false, note: 'Demo mode does not read files. Sign in to the real system to read records.', averageConfidence: null });
     },
     recordContext: async id => {
@@ -232,7 +227,7 @@ export function createDemoApi(opts: { rulesApproved: boolean }): Api {
     documentFile: async () => wait({ blob: new Blob([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='), c => c.charCodeAt(0))], { type: 'image/png' }), filename: 'document.png' }),
     extractDocument: async id => {
       const fields: ExtractedField[] = SAMPLE_ROWS.map(([name, v, unit, range, flag], i) => ({ id: id + '-f' + i, name, printedLine: `${name.replace(/_/g, ' ')} ${v} ${unit} ${range}${flag ? ' ' + flag.charAt(0).toUpperCase() : ''}`, valueText: String(v), valueNum: v, unit, referenceRange: range, printedFlag: flag, confidence: i === 3 ? 0.55 : 0.91, verified: false, verifiedAt: null }));
-      fields.forEach((f, i) => { if (i === 3) { f.agreement = 'differ'; f.secondRead = String((f.valueNum ?? 0) + 8); } else { f.agreement = 'agree'; f.secondRead = String(f.valueNum); } });      // demo: a second reader
+      fields.forEach((f, i) => { if (i === 3) { f.agreement = 'differ'; f.secondRead = String((f.valueNum ?? 0) + 8); } else { f.agreement = 'agree'; f.secondRead = String(f.valueNum); } });
       const x: Extraction = { id: 'ex-' + id, documentId: id, engine: 'demo reader', status: 'completed', language: 'en', averageConfidence: 0.85, error: null, createdAt: new Date().toISOString(), fields };
       extractions.set(id, x); return wait(x);
     },

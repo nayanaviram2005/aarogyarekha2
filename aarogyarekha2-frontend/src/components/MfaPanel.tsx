@@ -2,10 +2,6 @@ import { useEffect, useState, type FormEvent } from 'react';
 import type { MfaApi } from '../lib/types';
 import { Banner } from './Provenance';
 
-/**
- * Second sign-in step for people who change priorities or send records out. Either type the code from the authenticator app
- * the account already has, or set one up first (scan the picture, then type the code it shows).
- */
 export function MfaPanel({ mfa, onVerified }: { mfa: MfaApi; onVerified: () => void }) {
   const [phase, setPhase] = useState<'loading' | 'code' | 'setup' | 'scan'>('loading');
   const [setup, setSetup] = useState<{ factorId: string; qr: string; secret: string } | null>(null);

@@ -1,5 +1,3 @@
-// Database side of "People and roles". System path: the route has checked the caller; the database functions (migration 0016)
-// check again, so a bug or a bypass here still cannot give anyone a role they should not have.
 import { MemberError, type MemberAdmin } from '../deps.js';
 
 interface Queryable { query(sql: string, params?: unknown[]): Promise<{ rows: any[] }> }

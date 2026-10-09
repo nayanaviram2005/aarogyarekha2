@@ -7,7 +7,6 @@ import { Banner } from './Provenance';
 
 const SEX: { value: PatientBrief['sex']; label: string }[] = [{ value: 'female', label: 'Female' }, { value: 'male', label: 'Male' }, { value: 'other', label: 'Other' }, { value: 'unknown', label: 'Not stated' }];
 
-/** Builds the request from the typed fields, or returns a plain-words problem. Exported for the camp batch screen. */
 export function buildRegistration(f: { fullName: string; sex: PatientBrief['sex']; age: string; birthDate: string; language: string; phone?: string; village?: string }): RegisterInput | string {
   const name = f.fullName.trim();
   if (!name) return 'Enter the patient\'s name.';
@@ -24,13 +23,11 @@ export function buildRegistration(f: { fullName: string; sex: PatientBrief['sex'
   return out;
 }
 
-/** Register a new patient. If someone with the same name and age already exists, show them and ask before making a second record. */
 export function RegisterPatientForm({ api, onRegistered, onUseExisting, onCancel, identity }: { api: Api; onRegistered: (p: PatientBrief) => void; onUseExisting?: (m: DuplicateMatch) => void; onCancel?: () => void; identity?: RecordIdentity | null }) {
   const [f, setF] = useState({ fullName: '', sex: 'unknown' as PatientBrief['sex'], age: '', birthDate: '', language: 'en', phone: '', village: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dups, setDups] = useState<DuplicateMatch[] | null>(null);
-  // Details read from uploaded records fill only what is still empty.
   useEffect(() => { if (identity) setF(x => applyIdentity(x, identity)); }, [identity]);
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => { setF(x => ({ ...x, [k]: v })); setDups(null); };
 

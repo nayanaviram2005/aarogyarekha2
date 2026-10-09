@@ -42,7 +42,6 @@ import { useQueue } from './queueContext';
 
 const EDITABLE = new Set(['draft', 'submitted', 'in_review']);
 
-/** The most open questions shown at once. The list is ranked by how much an answer could change the priority, so the first ones matter most. */
 const QUESTION_LIMIT = 12;
 
 export function EncounterPage() {
@@ -61,7 +60,7 @@ export function EncounterPage() {
   }, [api, id]);
 
   useEffect(() => { setLoading(true); setSummary(null); void load(); }, [load]);
-  useEffect(() => { if (summary) pushRecent(sessionStorage, { encounterId: summary.encounter.id, ref: summary.patient.public_ref }); }, [summary?.encounter.id]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (summary) pushRecent(sessionStorage, { encounterId: summary.encounter.id, ref: summary.patient.public_ref }); }, [summary?.encounter.id]);
   const changed = useCallback(async () => { await Promise.all([load(), queue.refresh()]); }, [load, queue]);
 
   const center = loading ? <p className="muted" role="status">Loading…</p>
@@ -85,7 +84,6 @@ function Workspace({ summary: s, onChanged }: { summary: EncounterSummary; onCha
   const { refresh: refreshQueue } = useQueue();
   const { t } = useI18n();
 
-  // Effective priority = what is in force now (a reviewer may have changed what the rules produced).
   const effUrgency = (s.queue?.urgency_code ?? a?.urgency_code ?? null) as UrgencyCode | null;
   const effTier = tierOfUrgency(effUrgency);
   const isReview = (r: { action: string }) => r.action === 'approve' || r.action === 'override_urgency';
@@ -111,11 +109,9 @@ function Workspace({ summary: s, onChanged }: { summary: EncounterSummary; onCha
   const [submitting, setSubmitting] = useState(false);
   const [submitErr, setSubmitErr] = useState<string | null>(null);
   const setDraft = (code: string, d: Draft | null) => setDrafts(prev => { const next = { ...prev }; if (d) next[code] = d; else delete next[code]; return next; });
-  // Only questions the CURRENT assessment lists (an older, longer list may still be stored); the rest stay hidden until the next assessment.
   const open = orderForAudience(s.followUps.filter(f => f.status === 'open' && f.field_code && (pt.size === 0 || pt.has(f.field_code)))
     .map((f, i) => ({ f, i, p: pt.get(f.field_code!) ?? null, fieldCode: f.field_code, potentialTier: pt.get(f.field_code!) ?? null })), audience);
   const done = s.followUps.filter(f => f.status !== 'open');
-  // Only answers to questions that are still open and complete count. They are all saved together when the reviewer submits.
   const openCodes = new Set(open.map(o => o.f.field_code!));
   const pending = Object.fromEntries(Object.entries(drafts).filter(([code, d]) => openCodes.has(code) && draftReady(code, d)));
   const pendingCount = Object.keys(pending).length;
@@ -125,15 +121,13 @@ function Workspace({ summary: s, onChanged }: { summary: EncounterSummary; onCha
     try { await submitDrafts(api, s.encounter.id, pending); setDrafts({}); setAnsweredSince(c => c + 1); }
     catch (er) { setSubmitErr((er as Error).message); setSubmitting(false); return; }
     setSubmitting(false);
-    await assess(true);                                                     // the patient is assessed again with the new answers (shows its own error if it fails)
+    await assess(true);
   }
   const vitals = latestVitals(s.vitals);
   const signs = Object.entries(s.triageContext.signs ?? {});
-  // Where this patient is in the triage-desk journey, and the one thing to do next (the card at the top).
   const jr = journey({ consent: s.consentActive, status: s.encounter.status, hasAssessment: !!a, recorded: s.symptoms.length > 0 || vitals.length > 0 || !!s.encounter.chief_complaint_original,
     openQuestions: open.length, signedOff: !!currentReview, queueStatus: s.queue?.status ?? null, canReview: canReviewAt(me, s.encounter.facility_id) });
-  // The step on screen. It follows the recommended step as the patient moves along, and the person can open any other step to look at or change it.
-  useEffect(() => { setSel(jr.recommended ?? 'visit'); }, [jr.next]);          // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setSel(jr.recommended ?? 'visit'); }, [jr.next]);
 
   return (
     <>
@@ -337,7 +331,6 @@ function Workspace({ summary: s, onChanged }: { summary: EncounterSummary; onCha
 }
 
 const word = (u: string | null) => TIER_WORD[tierOfUrgency(u) ?? 4].toLowerCase();
-/** "Confirmed urgent" / "Changed from urgent to immediate". */
 export function reviewSentence(r: { action: string; from_urgency_code: string | null; to_urgency_code: string | null }): string {
   return r.action === 'approve' ? `Confirmed ${word(r.to_urgency_code)}` : `Changed from ${word(r.from_urgency_code)} to ${word(r.to_urgency_code)}`;
 }

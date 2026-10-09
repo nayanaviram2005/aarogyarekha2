@@ -1,7 +1,6 @@
 import { buildCaseSummary } from '../lib/caseSummary';
 import type { EncounterSummary } from '../lib/types';
 
-/** The story so far in a few lines, from recorded facts only. The full table of events is the next section. */
 export function CaseSummary({ summary }: { summary: EncounterSummary }) {
   const lines = buildCaseSummary(summary);
   return (

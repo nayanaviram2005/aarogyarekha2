@@ -1,4 +1,3 @@
-// Database side of the administrator and emergency-access screens.
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { BreakGlassError, type AdminStore, type Analytics, type Spread, type SystemAdmin } from '../deps.js';
 import type { AuditRow } from './suspicious.js';
@@ -10,7 +9,6 @@ interface TxSource extends Queryable { connect?: () => Promise<Tx> }
 const CLINICAL = ['health_worker', 'nurse', 'doctor', 'medical_officer'];
 const iso = (v: unknown) => new Date(v as string).toISOString();
 
-/** System path. Route code has already checked who is calling; these functions only do the database work. */
 const num = (v: unknown) => (v === null || v === undefined ? null : Math.round(Number(v) * 10) / 10);
 const spread = (r: { n: unknown; median: unknown; p90: unknown } | undefined): Spread => ({ n: Number(r?.n ?? 0), median: num(r?.median), p90: num(r?.p90) });
 
@@ -79,7 +77,6 @@ export function makeSystemAdmin(db: TxSource): SystemAdmin {
   };
 }
 
-/** The caller's own session (row-level security): an administrator only ever gets rows from their own facilities. */
 export function makeAdminStore(sb: SupabaseClient): AdminStore {
   return {
     async recentAudit(sinceIso, limit) {

@@ -1,15 +1,3 @@
--- 0016 Managing who works at a facility and in what role, atomically and with the rules in the database.
---
--- A facility administrator may add a person, change their role, or remove them. These two functions do each change in ONE
--- transaction and re-check everything themselves, so they are safe even if the API is bypassed or buggy:
---   * the actor must be an ACTIVE facility administrator at that facility (or a platform administrator),
---   * a facility administrator can only give clinical roles (health worker, nurse, doctor, medical officer). Making someone a
---     facility administrator, or changing or removing an administrator, is for a platform administrator only,
---   * nobody can change their own role or remove themselves (a platform administrator can, so a facility is never locked out),
---   * the person must already have an account and a profile,
---   * a person has ONE active role at a facility: setting a role turns off their other roles there,
---   * every change writes an audit entry that holds ids and the role name only.
--- SQLSTATEs the API turns into plain words: 42501 not allowed · P0002 no such person or facility · 22023 bad input
 create or replace function app.set_member_role(p_actor uuid, p_facility uuid, p_user uuid, p_role public.app_role)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
@@ -56,7 +44,6 @@ begin
   return jsonb_build_object('deactivated', v_n, 'previous', v_prev);
 end $$;
 
--- The same lesson as 0012 and 0013: functions are PUBLIC-executable by default. Only the service role may call these.
 revoke all on function app.set_member_role(uuid, uuid, uuid, public.app_role) from public, anon, authenticated;
 grant execute on function app.set_member_role(uuid, uuid, uuid, public.app_role) to service_role;
 revoke all on function app.deactivate_member(uuid, uuid, uuid) from public, anon, authenticated;

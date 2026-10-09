@@ -1,12 +1,6 @@
--- 0002 identity, tenancy, patients, consent.
--- Replaces legacy Mongo `users` (one mixed collection holding credentials + PHI).
--- Credentials live ONLY in Supabase Auth (auth.users). Nothing here stores a password,
--- OTP, reset token, or QR image.
-
--- ---------------------------------------------------------------- facilities (tenant + referral directory)
 create table public.facilities (
   id          uuid primary key default gen_random_uuid(),
-  code        text unique,                         -- external registry id (e.g. HFR) when known  [OPEN: registry]
+  code        text unique,
   name        text not null check (length(btrim(name)) > 0),
   type        public.facility_type not null,
   state       text,
@@ -19,14 +13,13 @@ create table public.facilities (
 create trigger trg_facilities_touch before update on public.facilities
   for each row execute function app.touch_updated_at();
 
-create table public.facility_capabilities (       -- what a facility can receive on referral
+create table public.facility_capabilities (
   facility_id uuid not null references public.facilities(id) on delete cascade,
   capability  text not null check (capability ~ '^[a-z][a-z0-9_]{1,62}$'),
   primary key (facility_id, capability)
 );
 
--- ---------------------------------------------------------------- staff identity
-create table public.platform_admins (             -- manages facilities; NO patient-data access
+create table public.platform_admins (
   user_id    uuid primary key references auth.users(id) on delete cascade,
   created_at timestamptz not null default now()
 );
@@ -36,9 +29,9 @@ create table public.profiles (
   display_name              text not null check (length(btrim(display_name)) > 0),
   phone                     text check (phone is null or phone ~ '^\+?[0-9]{10,15}$'),
   preferred_language        text not null default 'en' check (preferred_language ~ '^[a-z]{2,3}(-[A-Za-z0-9]+)*$'),
-  registration_council      text,                  -- clinical registration (doctors/nurses)
+  registration_council      text,
   registration_no           text,
-  credential_reset_required boolean not null default false,  -- set for migrated legacy accounts
+  credential_reset_required boolean not null default false,
   created_at                timestamptz not null default now(),
   updated_at                timestamptz not null default now()
 );
@@ -57,17 +50,16 @@ create table public.memberships (
 create index memberships_user_idx on public.memberships (user_id) where is_active;
 create index memberships_facility_idx on public.memberships (facility_id) where is_active;
 
--- ---------------------------------------------------------------- patients
 create table public.patients (
   id                     uuid primary key default gen_random_uuid(),
   public_ref             text not null unique default app.gen_public_ref(),
   registered_facility_id uuid not null references public.facilities(id) on delete restrict,
-  user_id                uuid unique references auth.users(id) on delete set null,  -- only if patient self-serves
+  user_id                uuid unique references auth.users(id) on delete set null,
   full_name              text not null check (length(btrim(full_name)) > 0),
   preferred_language     text not null default 'en' check (preferred_language ~ '^[a-z]{2,3}(-[A-Za-z0-9]+)*$'),
   sex                    public.sex_code not null default 'unknown',
   birth_date             date check (birth_date is null or birth_date <= current_date),
-  age_years_reported     smallint check (age_years_reported between 0 and 130),  -- camps often record age only
+  age_years_reported     smallint check (age_years_reported between 0 and 130),
   phone                  text check (phone is null or phone ~ '^\+?[0-9]{10,15}$'),
   address_line           text,
   village_town           text,
@@ -86,7 +78,6 @@ create index patients_phone_idx on public.patients (phone) where phone is not nu
 create trigger trg_patients_touch before update on public.patients
   for each row execute function app.touch_updated_at();
 
--- Deliberately NO 'aadhaar' system: do not store Aadhaar numbers.  [OPEN: confirm w/ legal]
 create table public.patient_identifiers (
   id         uuid primary key default gen_random_uuid(),
   patient_id uuid not null references public.patients(id) on delete restrict,
@@ -98,8 +89,6 @@ create table public.patient_identifiers (
 );
 create index patient_identifiers_patient_idx on public.patient_identifiers (patient_id);
 
--- Opaque card/QR credential. QR encodes a random token; only its SHA-256 is stored.
--- (Legacy QR embedded the raw patient id and an unauthenticated lookup returned name+email.)
 create table public.health_card_tokens (
   id           uuid primary key default gen_random_uuid(),
   patient_id   uuid not null references public.patients(id) on delete restrict,
@@ -111,7 +100,6 @@ create table public.health_card_tokens (
 );
 create index health_card_tokens_patient_idx on public.health_card_tokens (patient_id);
 
--- Patient/worker-REPORTED history. Never a clinician diagnosis unless confirmed_by is set.
 create table public.reported_history (
   id             uuid primary key default gen_random_uuid(),
   patient_id     uuid not null references public.patients(id) on delete restrict,
@@ -143,15 +131,13 @@ create index pregnancy_episodes_patient_idx on public.pregnancy_episodes (patien
 create trigger trg_pregnancy_touch before update on public.pregnancy_episodes
   for each row execute function app.touch_updated_at();
 
--- ---------------------------------------------------------------- consent & access grants
--- Replaces legacy Record.sharedWith (no expiry, no revoke, accessLevel never enforced).
 create table public.consents (
   id            uuid primary key default gen_random_uuid(),
   patient_id    uuid not null references public.patients(id) on delete restrict,
   purpose       public.consent_purpose not null,
   given_by      public.consent_party not null default 'self',
   method        public.consent_method not null,
-  notice_version text not null,                    -- which privacy notice text was shown
+  notice_version text not null,
   captured_by   uuid references auth.users(id) on delete set null,
   witness_name  text,
   granted_at    timestamptz not null default now(),
@@ -178,7 +164,6 @@ create table public.access_grants (
 create index access_grants_patient_idx on public.access_grants (patient_id);
 create index access_grants_grantee_idx on public.access_grants (grantee_facility_id) where revoked_at is null;
 
--- Emergency access: short-lived, reason mandatory, automatically audited, reviewed afterwards.
 create table public.break_glass_grants (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references auth.users(id) on delete cascade,

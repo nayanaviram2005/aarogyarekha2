@@ -1,16 +1,3 @@
-// AarogyaRekha triage engine. Layered, deterministic, explainable, ESCALATE-ONLY.
-//
-//   1. Danger-sign floors (ETAT / IMNCI / NHM)      -> tier
-//   2. Physiological score (NEWS2, adults only)      -> tier
-//   3. Pregnancy severe-range blood pressure         -> tier
-//   4. External/model hints                          -> can only RAISE urgency
-//   final tier = the MOST URGENT of all layers (smallest number). Nothing can lower it.
-//
-// Missing data never reads as "normal": unassessed signs and unrecorded vitals produce a `potentialTier` and
-// follow-up items instead of silently lowering priority. If nothing at all was assessed, the rule set's
-// insufficientDataTier applies rather than the lowest tier.
-//
-// Output is a review-priority label for a qualified person. It is not a diagnosis and not advice on treatment.
 import { createHash } from 'node:crypto';
 import type {
   DecisionLogEntry, FloorRule, Population, RuleSet, ScoreBand, Signal, Tier, TriageDecision, TriageInput,
@@ -25,8 +12,6 @@ const sortKeys = (v: unknown): unknown =>
   : v;
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 export const canonicalJson = (v: unknown) => JSON.stringify(sortKeys(v));
-/** Integrity hash of a rule set. Stamp it on every decision so a silent edit is detectable. */
-/** Covers behaviour only (thresholds, signs, tier maps). `status` and `provenance` are excluded so approving a set does not change its hash. */
 export const hashRuleSet = (r: RuleSet) => { const { status: _s, provenance: _p, integrityHash: _h, ...behaviour } = r as RuleSet & { integrityHash?: string }; return sha256(canonicalJson(behaviour)); };
 
 const LAYER_ORDER: DecisionLogEntry['layer'][] = ['floor', 'pregnancy_bp', 'news2', 'external', 'insufficient_data', 'default'];
@@ -37,7 +22,6 @@ function bandScore(bands: ScoreBand[], value: number): number {
   return bands[bands.length - 1]!.score;
 }
 
-/** true / false / 'unknown' (age or pregnancy status not known). */
 function inPopulation(pop: Population, i: TriageInput, rs: RuleSet): boolean | 'unknown' {
   switch (pop) {
     case 'any': return true;
@@ -67,7 +51,6 @@ export function triage(input: TriageInput, rs: RuleSet): TriageDecision {
   if (input.ageYears == null) unknownCtx.push('age');
   if (input.pregnant == null) unknownCtx.push('pregnancy_status');
 
-  // ---------------------------------------------------------------- 1. danger-sign floors
   for (const f of rs.floors) {
     const pop = inPopulation(f.population, input, rs);
     if (pop === false) continue;
@@ -76,11 +59,10 @@ export function triage(input: TriageInput, rs: RuleSet): TriageDecision {
       log.push({ layer: 'floor', ruleId: f.id, tier: f.tier, detail: f.label });
       signals.push({ signal_code: `red_flag.${code(f.id)}`, kind: 'red_flag', source: 'rule', weight: null, display_text: f.label, evidence: { rule: f.id, sign: f.sign, source: f.source } });
     } else if (v == null && pop === true) {
-      unassessed.push({ floor: f });          // asked nothing yet: absence of an answer is NOT "no"
+      unassessed.push({ floor: f });
     }
   }
 
-  // ---------------------------------------------------------------- 2. NEWS2 (adults)
   const n = rs.news2;
   const news2Applicable = (input.ageYears != null ? input.ageYears >= n.minAgeYears : n.applyWhenAgeUnknown === true) && input.pregnant !== true;
   const knownParams: string[] = []; const missingParams: string[] = [];
@@ -114,7 +96,6 @@ export function triage(input: TriageInput, rs: RuleSet): TriageDecision {
     }
   }
 
-  // ---------------------------------------------------------------- 3. pregnancy severe-range BP
   const pb = rs.pregnancyHypertension;
   if (input.pregnant === true) {
     const hi = (isNum(v.bp_systolic_mmhg) && v.bp_systolic_mmhg >= pb.sbp) || (isNum(v.bp_diastolic_mmhg) && v.bp_diastolic_mmhg >= pb.dbp);
@@ -124,14 +105,12 @@ export function triage(input: TriageInput, rs: RuleSet): TriageDecision {
     }
   }
 
-  // ---------------------------------------------------------------- 4. external hints: escalate-only
   for (const h of input.externalHints ?? []) {
-    if (!(Number.isInteger(h.tier) && h.tier >= 1 && h.tier <= 4)) continue;          // a hint with a tier outside 1 to 4 is malformed: ignore it, never let it set the result
+    if (!(Number.isInteger(h.tier) && h.tier >= 1 && h.tier <= 4)) continue;
     log.push({ layer: 'external', ruleId: `EXT-${code(h.code)}`, tier: h.tier, detail: `External suggestion: ${h.code}` });
     signals.push({ signal_code: `external.${code(h.code)}`, kind: 'external_hint', source: h.source, weight: null, display_text: `External suggestion: ${h.code}`, evidence: { code: h.code, tier: h.tier } });
   }
 
-  // ---------------------------------------------------------------- nothing assessed at all -> never the lowest tier
   const anyVital = Object.values(v).some(isNum) || input.consciousness != null || input.onSupplementalOxygen != null;
   const anySignAnswered = Object.values(input.signs).some(x => typeof x === 'boolean');
   const insufficientData = !anyVital && !anySignAnswered && (input.externalHints ?? []).length === 0;
@@ -142,17 +121,14 @@ export function triage(input: TriageInput, rs: RuleSet): TriageDecision {
 
   log.push({ layer: 'default', ruleId: 'DEFAULT', tier: 4, detail: 'No urgency signal found in the information recorded so far' });
 
-  // ---------------------------------------------------------------- combine: most urgent wins (ties: layer order)
   const sorted = [...log].sort((a, b) => a.tier - b.tier || LAYER_ORDER.indexOf(a.layer) - LAYER_ORDER.indexOf(b.layer));
   const winning = sorted[0]!;
   const tier = winning.tier;
 
-  // ---------------------------------------------------------------- missing information and the potential tier
-  // A potential tier is never more than `potentialTierCap` tiers more urgent than the confirmed tier.
   const capped = (pt: number): Tier | null => (pt < tier ? (Math.max(pt, tier - rs.potentialTierCap, 1) as Tier) : null);
   const relevant = input.relevantSigns ? new Set(input.relevantSigns) : null;
   for (const { floor } of unassessed) {
-    if (relevant && !relevant.has(floor.sign)) continue;                 // not worth asking for this patient (see relevance.ts)
+    if (relevant && !relevant.has(floor.sign)) continue;
     const pt = capped(floor.tier);
     missing.push({ code: `sign.${floor.sign}`, label: `Not yet assessed: ${floor.label}`, potentialTier: pt });
   }
@@ -171,9 +147,7 @@ export function triage(input: TriageInput, rs: RuleSet): TriageDecision {
   for (const m of missing) if (m.code.startsWith('context.'))
     signals.push({ signal_code: `missing.${code(m.code)}`, kind: 'missing_information', source: 'missing_data', weight: null, display_text: m.label, evidence: {} });
 
-  // Potential tier: how urgent it COULD be if missing answers came back worst-case, bounded by the cap.
   const best = missing.reduce<number>((acc, m) => (m.potentialTier != null && m.potentialTier < acc ? m.potentialTier : acc), 99);
-  // Combined worst case for NEWS2 (all missing at once) is also bounded by the same cap.
   let combined = 99;
   if (news2Applicable && missingParams.length > 0) {
     const worst = score + missingParams.reduce((s, p) => s + n.maxPerParam[p as keyof typeof n.maxPerParam], 0);
@@ -183,7 +157,6 @@ export function triage(input: TriageInput, rs: RuleSet): TriageDecision {
   const rawPotential = Math.min(best, combined);
   const potentialTier = capped(rawPotential);
 
-  // ---------------------------------------------------------------- context
   const age = input.ageYears;
   const vulnerable = (age != null && (age < rs.vulnerable.ageUnder || age >= rs.vulnerable.ageOver)) || input.pregnant === true;
   if (vulnerable) signals.push({ signal_code: 'context.vulnerable', kind: 'risk_context', source: 'rule', weight: null, display_text: input.pregnant === true ? 'Pregnant' : age != null && age < rs.vulnerable.ageUnder ? 'Young child' : 'Older adult', evidence: { ageYears: age, pregnant: input.pregnant } });

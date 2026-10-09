@@ -16,11 +16,11 @@ describe('reminderText', () => {
   it('is available in Hindi and Odia, in their own scripts, and falls back to English for anything else', () => {
     expect(reminderText('hi', 'PHC', '2026-10-20T04:30:00Z')).toMatch(/[ऀ-ॿ]/);
     expect(reminderText('or', 'PHC', '2026-10-20T04:30:00Z')).toMatch(/[଀-୿]/);
-    expect(reminderText('or', 'PHC', '2026-10-20T04:30:00Z')).not.toMatch(/[ঀ-৿]/);     // no Bengali letters by mistake
+    expect(reminderText('or', 'PHC', '2026-10-20T04:30:00Z')).not.toMatch(/[ঀ-৿]/);
     expect(reminderText('fr', 'PHC', '2026-10-20T04:30:00Z')).toMatch(/^Reminder from PHC/);
   });
   it('uses the date in India, not the server\'s time zone', () => {
-    expect(reminderText('en', 'PHC', '2026-10-19T20:00:00Z')).toContain('20 October 2026');      // 01:30 on the 20th in IST
+    expect(reminderText('en', 'PHC', '2026-10-19T20:00:00Z')).toContain('20 October 2026');
   });
 });
 

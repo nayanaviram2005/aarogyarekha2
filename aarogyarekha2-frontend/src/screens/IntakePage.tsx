@@ -45,7 +45,6 @@ function Intake() {
   const fromSwitch = (useLocation().state as { patient?: PatientBrief } | null)?.patient ?? null;
   const [patient, setPatient] = useState<PatientBrief | null>(fromSwitch);
   const [registering, setRegistering] = useState(false);
-  // Records added at intake: read to fill in the details, attached to the visit when it is created.
   const [recordFiles, setRecordFiles] = useState<RecordFile[]>([]);
   const [identity, setIdentity] = useState<RecordIdentity | null>(null);
   const [recBusy, setRecBusy] = useState(false);
@@ -68,13 +67,10 @@ function Intake() {
   const [savedId, setSavedId] = useState<string | null>(null);
   const [formErr, setFormErr] = useState<string | null>(null);
 
-  // Remembers what already succeeded, so a retry continues instead of creating duplicates.
   const done = useRef<{ encounterId: string | null; keys: Set<string> }>({ encounterId: null, keys: new Set() });
   const docIds = useRef<Record<string, string>>({});
-  // Registering a patient also starts their visit and puts them in the queue, with whatever is known so far.
   const startNow = useRef(false);
 
-  // Search as you type: a short pause after the last key, so the desk does not have to press Search.
   useEffect(() => {
     if (!api || patient) return;
     const text = q.trim(); if (text.length < 2) return;
@@ -90,7 +86,6 @@ function Intake() {
     try { setResults(await api.patients(q.trim() || undefined)); } catch (err) { setSearchErr((err as Error).message); }
   }
 
-  /** Registers the person the records are about, without retyping anything. Anything missing or doubtful opens the form, already filled in. */
   async function registerFromRecord() {
     if (!api || !identity || recBusy) return;
     setRegNote(null);
@@ -104,7 +99,6 @@ function Intake() {
     } finally { setRecBusy(false); }
   }
 
-  /** The one button on the records box: register from what was read, or, when no name could be read, open the form so it can be typed. */
   function extractAndRegister() {
     if (identity?.fullName) return registerFromRecord();
     const why = recordFiles.find(r => r.note)?.note;
@@ -113,7 +107,6 @@ function Intake() {
     return Promise.resolve();
   }
 
-  /** A patient was just registered: start their visit now (consent is asked in a pop-up if it is missing). */
   function registered(p: PatientBrief) {
     choose(p); startNow.current = true; void run(undefined, p);
   }
@@ -140,7 +133,6 @@ function Intake() {
       symptomRows.push(row);
     }
     for (const f of TEMPLATES[scenario]?.fields ?? []) { const a = (tpl[f.key] ?? '').trim(); if (a) symptomRows.push({ text: noteFor(f, a), lang: language }); }
-    // With records but no complaint or symptoms the visit is started and the records attached; the priority waits for the details.
     if (!complaint.trim() && symptomRows.length === 0 && recordFiles.length === 0 && !startNow.current) return 'Enter the main complaint or at least one symptom, or add the patient records.';
     return { vitalValues, symptomRows };
   }
@@ -160,12 +152,10 @@ function Intake() {
       ...v.symptomRows.map((s, i) => ({ key: `sym${i}`, label: `Save symptom: ${s.text}`, go: () => api.addSymptom(done.current.encounterId!, s) })),
       ...v.vitalValues.map(([kind, value]) => ({ key: `vit-${kind}`, label: `Save ${VITAL_ROWS.find(r => r.kind === kind)!.label.split(' (')[0]!.toLowerCase()}`, go: () => api.addVital(done.current.encounterId!, { kind, value }) })),
       ...(consciousness || oxygen ? [{ key: 'inputs', label: 'Save responsiveness and oxygen', go: () => api.saveInputs(done.current.encounterId!, { ...(consciousness ? { consciousness: consciousness as never } : {}), ...(oxygen ? { onSupplementalOxygen: oxygen === 'yes' } : {}) }) }] : []),
-      // A photo read by the outside AI service needs the patient's separate agreement on record (the person registering confirmed it above).
       ...(recordFiles.some(r => r.aiConsent) && staffName ? [{ key: 'ai-consent', label: 'Record the patient’s agreement to the outside AI reader', go: () => api.recordConsent(pt.id, { purpose: 'external_ai_processing', givenBy: 'self', method: 'verbal_witnessed', noticeVersion: AI_NOTICE_VERSION, witnessName: staffName }) }] : []),
       ...recordFiles.flatMap(r => [
         { key: `doc-${r.key}`, label: `Attach ${r.file.name}`, go: async () => { docIds.current[r.key] = (await api.uploadDocument(done.current.encounterId!, r.file, r.kind)).id; } },
-        // Reading is best effort: a record that cannot be read stays attached and can be read again from the patient's page.
-        { key: `read-${r.key}`, label: `Read ${r.file.name}`, go: async () => { try { await api.extractDocument(docIds.current[r.key]!, language as 'en' | 'hi' | 'or'); } catch { /* shown on the patient's page */ } } },
+        { key: `read-${r.key}`, label: `Read ${r.file.name}`, go: async () => { try { await api.extractDocument(docIds.current[r.key]!, language as 'en' | 'hi' | 'or'); } catch { } } },
       ]),
       { key: 'submit', label: 'Submit to the queue', go: () => api.submit(done.current.encounterId!) },
       ...(nothingYet ? [] : [{ key: 'assess', label: 'Assess priority', go: () => api.assess(done.current.encounterId!) }]),

@@ -1,10 +1,6 @@
 import { TIER_WORD, tierOfUrgency, vitalLabel, vitalUnit } from './format';
 import type { EncounterSummary } from './types';
 
-/**
- * Timeline of an encounter, built only from what is already recorded. Nothing is inferred, scored or summarised by a model:
- * every line is a recorded fact with its time and where it came from.
- */
 export type TimelineKind = 'record' | 'reported' | 'measured' | 'rules' | 'reviewer';
 export interface TimelineEvent { at: string; kind: TimelineKind; text: string; lang?: string }
 

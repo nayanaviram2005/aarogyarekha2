@@ -1,4 +1,3 @@
-// Migration 0017 against the real schema in an in-process Postgres.
 import type { PGlite } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { makeDb } from './helpers/pg.js';

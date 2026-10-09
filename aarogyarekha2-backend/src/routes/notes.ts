@@ -1,7 +1,3 @@
-// Reviewer notes on an encounter: comments, escalations, and feedback on the draft assessment.
-//  * only a nurse, doctor or medical officer at the encounter's facility can write (the database enforces it; the API says so plainly),
-//  * notes are append-only and NEVER change a priority: that is a review, with its own rules,
-//  * the audit entry holds the kind and ids, never the text.
 import { z } from 'zod';
 import type { RouteCtx, RouteHelpers } from './intake.js';
 import type { NotesStore } from '../deps.js';

@@ -1,7 +1,3 @@
-// The platform administrator: facilities and who administers them. No patient data is reachable from here.
-//  * only a user listed as a platform administrator may call these (checked here and again in the database functions),
-//  * every change needs a verified second factor when the deployment requires it, and is audited by the database function,
-//  * a facility administrator is appointed by email of an EXISTING account, through the same functions as people-and-roles.
 import { z } from 'zod';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { RouteCtx, RouteHelpers } from './intake.js';

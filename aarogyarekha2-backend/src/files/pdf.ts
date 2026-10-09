@@ -1,15 +1,9 @@
-// Parses a PDF with pdf.js (a real parser, so compressed object streams are visible) to count pages, find scripts and
-// attachments, and read the text layer. Nothing is executed or rendered; scripting is disabled.
 import { PDFDict, PDFDocument, PDFName, PDFStream } from 'pdf-lib';
 import { MAX_PDF_PAGES } from './safe.js';
 
 const BAD_KEYS = new Set(['JS', 'JavaScript', 'EF', 'EmbeddedFiles', 'RichMedia', 'XFA', 'Encrypt']);
 const BAD_ACTIONS = new Set(['JavaScript', 'Launch', 'GoToR', 'GoToE', 'ImportData', 'SubmitForm', 'Rendition', 'Movie', 'Sound', 'Hide', 'Thread', 'URI']);
 
-/**
- * Walks EVERY object in the file (pdf-lib decodes compressed object streams, so nothing is hidden) looking for scripts,
- * attachments, rich media, forms that submit, and launch or remote actions. URI links are refused too: a lab report has no use for them.
- */
 export async function hasActiveObjects(bytes: Buffer): Promise<boolean> {
   const d = await PDFDocument.load(bytes, { updateMetadata: false, throwOnInvalidObject: false });
   for (const [, obj] of d.context.enumerateIndirectObjects()) {
@@ -56,7 +50,6 @@ export async function inspectPdf(bytes: Buffer, opts: { readText?: boolean } = {
       for (let p = 1; p <= doc.numPages; p++) {
         const page = await doc.getPage(p);
         const tc = await page.getTextContent();
-        // Keep line structure: pdf.js marks the end of a visual line.
         let line = ''; const lines: string[] = [];
         for (const it of tc.items as { str: string; hasEOL?: boolean }[]) { line += it.str; if (it.hasEOL) { lines.push(line); line = ''; } else line += ' '; }
         if (line.trim()) lines.push(line);
@@ -68,11 +61,6 @@ export async function inspectPdf(bytes: Buffer, opts: { readText?: boolean } = {
   } finally { await task.destroy(); }
 }
 
-/**
- * Web links in a PDF (a lab's website in the footer, a QR link) are inert until someone clicks them, but nothing in a patient record should
- * be able to send staff to a web page. They are removed rather than the whole report refused. Only plain links are touched: scripts,
- * attachments, launch actions and the rest are still refused by the check above.
- */
 export async function stripLinks(bytes: Buffer): Promise<{ bytes: Buffer; removed: number }> {
   const d = await PDFDocument.load(bytes, { updateMetadata: false, throwOnInvalidObject: false });
   let removed = 0;
@@ -81,7 +69,7 @@ export async function stripLinks(bytes: Buffer): Promise<{ bytes: Buffer; remove
     const dict = obj instanceof PDFDict ? obj : obj instanceof PDFStream ? obj.dict : null;
     if (!dict) continue;
     if (isUri(dict)) { dict.delete(PDFName.of('S')); dict.delete(PDFName.of('URI')); removed++; continue; }
-    const a = dict.get(PDFName.of('A'));                                  // an action written inline inside an annotation
+    const a = dict.get(PDFName.of('A'));
     if (isUri(a)) { dict.delete(PDFName.of('A')); removed++; }
   }
   if (removed === 0) return { bytes, removed: 0 };

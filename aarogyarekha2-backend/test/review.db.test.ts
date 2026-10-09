@@ -1,4 +1,3 @@
-// Exercises app.record_review (migration 0013) against the REAL schema in an in-process Postgres.
 import type { PGlite } from '@electric-sql/pglite';
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -11,10 +10,8 @@ const U = { nurse: randomUUID(), doctor: randomUUID(), hw: randomUUID(), other: 
 const rows = async (sql: string, p: unknown[] = []) => (await db.query(sql, p as any[])).rows as any[];
 const review = (u: string, e: string, a: string, action: string, to: string | null = null, reason: string | null = null, confirm = false) =>
   rows(`select app.record_review($1::uuid, $2::uuid, $3::uuid, $4::public.review_action_type, $5, $6, $7) as r`, [u, e, a, action, to, reason, confirm]).then(r => r[0].r);
-/** Runs a call and returns the Postgres error (code, message, hint) instead of throwing. */
 const fails = async (p: Promise<unknown>) => { try { await p; return null; } catch (e) { const x = e as { code?: string; message: string; hint?: string }; return { code: x.code, message: x.message, hint: x.hint }; } };
 
-/** A fresh encounter with an assessment (rules said `urgency`) and a queue entry. */
 async function make(urgency: 'red' | 'orange' | 'yellow' | 'green' = 'orange', layer = 'floor', status = 'submitted') {
   const e = randomUUID(), a = randomUUID();
   await db.query(`insert into public.encounters (id, patient_id, facility_id, status) values ($1, $2, $3, $4)`, [e, P, F1, status]);
@@ -170,7 +167,7 @@ describe('integrity and permissions', () => {
   });
   it('a failed review changes nothing (all or nothing)', async () => {
     const { e, a } = await make('orange');
-    await fails(review(U.doctor, e, a, 'override_urgency', 'green', 'Looks fine to me, honestly'));   // refused: unconfirmed downgrade
+    await fails(review(U.doctor, e, a, 'override_urgency', 'green', 'Looks fine to me, honestly'));
     expect(await status(e)).toBe('submitted');
     expect(await queue(e)).toEqual({ urgency_code: 'orange', status: 'waiting' });
   });
@@ -185,7 +182,6 @@ describe('integrity and permissions', () => {
   });
 });
 
-// The error mapping used by the API, exercised against the REAL database errors.
 import { recordReview, ReviewError } from '../src/review/record.js';
 describe('recordReview: database errors become the right plain failures', () => {
   const pool = () => ({ connect: async () => ({ query: async (sql: string, params?: unknown[]) => ({ rows: (await db.query(sql, params as any[])).rows as any[] }), release() {} }) });

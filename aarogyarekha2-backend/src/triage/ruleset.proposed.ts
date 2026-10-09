@@ -1,19 +1,3 @@
-// PROPOSED rule set v0.2.0. It is NOT in use: the database still holds v0.1.1, and the DB refuses any assessment against a rule set that
-// has not been approved. This file exists so a clinician can read, change or reject each addition, and so the evaluation can show
-// what would change (npm run eval:report compares both).
-//
-// What it adds to v0.1.1, and why (each is the build team's suggestion, taken from the product brief or from a gap our own
-// evaluation found; none is from a published protocol list, and each needs a clinician's decision):
-//   * chest pain (any age)                      -> T2   brief: "chest pain"
-//   * stiff neck with fever (any age)           -> T2   brief: "high fever with a stiff neck"
-//   * severe bleeding anywhere (any age)        -> T1   brief: "severe bleeding"
-//   * adult major injury or burns               -> T2   v0.1.1 applies the ETAT priority signs to children under 5 only
-//   * adult possible poisoning                  -> T2   same reason
-//   * adult severe pain                         -> T3   same reason
-//   * an unknown age no longer skips the adult score (applyWhenAgeUnknown)   evaluation case M03
-//   * 50 more flags from a published six-level GP triage chart (see ruleset.chart.ts for the source, the tier mapping and its limits)
-// Not added, because they need a clinical decision on which published tool to follow: scoring for children (PEWS) and pregnancy
-// (MEOWS), raised-but-not-severe blood pressure in pregnancy, severe high blood pressure in an adult, and low oxygen in a child.
 import { CHART_FLAGS } from './ruleset.chart.js';
 import { RULESET_DRAFT } from './ruleset.draft.js';
 import type { FloorRule, RuleSet } from './types.js';

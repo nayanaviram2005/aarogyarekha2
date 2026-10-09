@@ -1,7 +1,6 @@
-// Read-only connectivity + state check. Never prints credentials.
 import pg from 'pg';
 const which = process.env.DATABASE_URL_RUNTIME === 'pooler' ? 'DATABASE_URL_POOLER' : 'DATABASE_URL_DIRECT';
-const url = process.env.DATABASE_URL_POOLER?.replace(":6543/", ":5432/") || process.env.DATABASE_URL_DIRECT; // session mode for admin checks
+const url = process.env.DATABASE_URL_POOLER?.replace(":6543/", ":5432/") || process.env.DATABASE_URL_DIRECT;
 if (!url) { console.error('No database URL set'); process.exit(1); }
 const host = new URL(url).host.replace(/^[^@]*@/, '');
 const c = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 15000 });

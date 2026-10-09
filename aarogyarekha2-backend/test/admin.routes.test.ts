@@ -94,7 +94,7 @@ describe('audit chain badge', () => {
 describe('emergency access list and review', () => {
   it('lists grants for the administrator\'s facilities only, with the record number and no patient name', async () => {
     const r = await call(await make(), 'GET', '/admin/break-glass', 'hw');
-    expect(w.listedFor).toEqual([[F1]]);                                                       // F2 is not an admin facility for this user
+    expect(w.listedFor).toEqual([[F1]]);
     expect(r.json().grants[0]).toMatchObject({ id: G, patientRef: 'AR-0001', reason: 'Unconscious on arrival', reviewed: false });
   });
   it('an administrator can mark one reviewed; a missing or already-reviewed one is 404; bad id is 400; clinician is 403', async () => {
@@ -113,7 +113,7 @@ describe('using emergency access', () => {
     expect(r.statusCode).toBe(201); expect(r.json()).toMatchObject({ id: G, patientRef: 'AR-0001', patientId: P });
     expect(w.granted).toEqual([{ userId: 'u-nurse', facilityId: F1, publicRef: 'AR-0001', reason: ok.reason }]);
     expect(w.auditLog.find(a => a.action === 'break_glass')).toMatchObject({ outcome: 'success', patientId: P, facilityId: F1 });
-    expect(JSON.stringify(w.auditLog)).not.toContain('Unconscious');                           // the reason text stays out of the audit details
+    expect(JSON.stringify(w.auditLog)).not.toContain('Unconscious');
   });
   it.each([['short reason', { publicRef: 'AR-0001', reason: 'urgent' }], ['no reason', { publicRef: 'AR-0001' }], ['bad record number', { publicRef: 'AR 0001; drop', reason: 'Unconscious on arrival' }], ['extra field', { ...ok, role: 'x' }]])('rejects %s', async (_n, body) => {
     expect((await call(await make(), 'POST', '/break-glass', 'nurse', body)).statusCode).toBe(400); expect(w.granted).toHaveLength(0);

@@ -1,11 +1,6 @@
 import { Link } from 'react-router-dom';
 import { UrgencyPlate } from '../components/Plate';
 
-/**
- * What the app is, written for the nurse, health worker or doctor who is deciding whether to use it. Shown to signed-out visitors at the root.
- * Plain facts, no promotion. Placement runs edge to edge: a two-column opening, a full-width row of settings, a dashed rule with a label, three
- * equal sample screens in one wide card, a grid of cards, a status bar and two-column questions. The samples use invented patients.
- */
 const SHEET = [
   { ref: '0412', who: '58 y, male', note: 'Chest pain with sweating, started this morning', tier: 1, tag: 'Needs sign-off' },
   { ref: '0415', who: '3 y, female', note: 'Fever for two days, drinking poorly', tier: 2, tag: 'Needs sign-off' },

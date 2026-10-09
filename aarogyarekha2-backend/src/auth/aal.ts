@@ -1,5 +1,3 @@
-// Reads the sign-in assurance level from a Supabase access token. Call ONLY after the token was verified with the auth server
-// (verifyToken does). aal2 means the user also passed a second factor (authenticator app) in this session.
 export type Aal = 'aal1' | 'aal2';
 
 export function aalOf(token: string): Aal {

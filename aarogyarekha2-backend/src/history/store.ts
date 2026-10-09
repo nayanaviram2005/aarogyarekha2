@@ -3,7 +3,6 @@ import { DbError, type HistoryRow, type HistoryStore } from '../deps.js';
 
 const COLS = 'id, patient_id, kind, text_original, lang, source, created_at, confirmed_by, confirmed_at';
 
-/** The caller's own session: row-level security decides who may read, add and confirm. */
 export function makeHistoryStore(sb: SupabaseClient, userId: string): HistoryStore {
   return {
     async list(patientId) {

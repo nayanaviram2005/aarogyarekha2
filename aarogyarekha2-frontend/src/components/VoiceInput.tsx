@@ -9,10 +9,6 @@ const MAX_SECONDS = 60;
 type Lang = 'en' | 'hi' | 'or';
 const LANG_LABEL: Record<Lang, string> = { en: 'English', hi: 'Hindi', or: 'Odia' };
 
-/**
- * Say a symptom instead of typing it. The recording is sent to an outside speech service (needs the patient's separate consent),
- * is never stored, and comes back as text that a person must read and correct before it is saved as a symptom.
- */
 export function VoiceInput({ api, encounterId, patientId, defaultLanguage, onSaved }: { api: Api; encounterId: string; patientId: string; defaultLanguage: string; onSaved: () => void }) {
   const [lang, setLang] = useState<Lang>(defaultLanguage === 'hi' || defaultLanguage === 'or' ? defaultLanguage : 'en');
   const [phase, setPhase] = useState<'idle' | 'recording' | 'sending'>('idle');

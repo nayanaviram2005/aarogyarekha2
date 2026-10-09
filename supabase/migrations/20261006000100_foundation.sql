@@ -1,14 +1,7 @@
--- 0001 foundation: private helper schema, enums, shared trigger functions.
--- Design rules (see supabase/README.md):
---  * Every table in `public` has RLS enabled (migration 0008). Default-deny.
---  * Helper functions live in schema `app`, which is NOT exposed through the Supabase API.
---  * SECURITY DEFINER functions always `set search_path = ''` and schema-qualify everything.
-
 create schema if not exists app;
 revoke all on schema app from public;
 grant usage on schema app to authenticated, service_role;
 
--- ---------------------------------------------------------------- enums
 create type public.app_role as enum
   ('health_worker', 'nurse', 'doctor', 'medical_officer', 'facility_admin');
 
@@ -60,7 +53,7 @@ create type public.review_action_type as enum
 create type public.info_audience as enum ('health_worker', 'patient');
 create type public.info_status as enum ('open', 'answered', 'dismissed');
 
-create type public.referral_priority as enum ('routine', 'urgent', 'asap', 'stat');  -- = FHIR request-priority
+create type public.referral_priority as enum ('routine', 'urgent', 'asap', 'stat');
 create type public.referral_status as enum
   ('draft', 'requested', 'accepted', 'rejected', 'in_progress', 'completed', 'cancelled');
 
@@ -74,7 +67,6 @@ create type public.audit_action as enum
    'login', 'login_failed', 'logout', 'consent_change', 'erasure');
 create type public.audit_outcome as enum ('success', 'denied', 'error');
 
--- ---------------------------------------------------------------- shared trigger functions
 create or replace function app.touch_updated_at()
 returns trigger language plpgsql set search_path = '' as $$
 begin
@@ -82,9 +74,6 @@ begin
   return new;
 end $$;
 
--- Append-only guard. UPDATE is tolerated only while the erasure routine
--- (app.erase_patient, SECURITY DEFINER) has set the transaction-local flag.
--- Defence in depth only: `authenticated` is never granted UPDATE/DELETE on these tables.
 create or replace function app.forbid_mutation()
 returns trigger language plpgsql set search_path = '' as $$
 begin
@@ -95,7 +84,6 @@ begin
     using errcode = '42501';
 end $$;
 
--- Strict variant for the audit log: no erasure bypass, ever.
 create or replace function app.forbid_mutation_strict()
 returns trigger language plpgsql set search_path = '' as $$
 begin
@@ -103,7 +91,6 @@ begin
     using errcode = '42501';
 end $$;
 
--- Short, non-guessable, human-quotable reference printed on cards. NOT an access credential.
 create or replace function app.gen_public_ref()
 returns text language sql volatile set search_path = '' as $$
   select 'AR' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 10));

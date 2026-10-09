@@ -13,7 +13,6 @@ export function AdminPage() {
   return <PaneFrame startOn="note" center={<Admin />} context={<div style={{ padding: 16 }}><p className="small muted">Administrators see activity at their own facilities. Patient names are not shown here, only record numbers and counts. A flag is a reason to ask a question, not a finding.</p></div>} />;
 }
 
-/** The audit log is chained: each entry's fingerprint includes the one before. If any entry is edited, the chain stops matching here. */
 export function ChainBadge({ chain, busy, onCheck }: { chain: ChainStatus | null; busy: boolean; onCheck: () => void }) {
   return (
     <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>

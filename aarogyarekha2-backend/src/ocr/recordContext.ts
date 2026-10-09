@@ -1,5 +1,3 @@
-// A plain summary of what the uploaded records say, for the reviewer and (verified rows only) for the AI second opinion.
-// These are TRANSCRIPTIONS of what the report printed. Nothing here decides whether a value is abnormal: it repeats the flag the lab printed.
 export interface ContextField { name: string; valueText: string | null; valueNum: number | null; unit: string | null; printedFlag: string | null; verified: boolean }
 export interface ContextDoc { id: string; kind: string; filename: string | null; createdAt: string; status: 'completed' | 'failed' | 'pending' | 'none'; fields: ContextField[] }
 
@@ -20,7 +18,6 @@ export function summariseRecords(docs: ContextDoc[]): RecordSummary {
   };
 }
 
-/** What the AI may see: rows a person has checked, as short text. Flagged rows first, at most 10. No file names, no dates, no patient details. */
 export function reportNotes(docs: ContextDoc[]): string[] {
   const rows = docs.flatMap(d => d.fields).filter(f => f.verified);
   const sorted = [...rows.filter(f => flagText(f.printedFlag)), ...rows.filter(f => !flagText(f.printedFlag))];

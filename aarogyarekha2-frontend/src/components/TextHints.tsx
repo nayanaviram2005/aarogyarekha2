@@ -1,7 +1,6 @@
 import { glossaryMatches } from '../lib/glossary';
 import { languageSuggestion } from '../lib/langDetect';
 
-/** Two small helps under what was typed: a language suggestion, and everyday words matched to plain English. Neither changes anything on its own. */
 export function TextHints({ text, language, onPickLanguage }: { text: string; language: string; onPickLanguage?: (l: 'en' | 'hi' | 'or') => void }) {
   const sug = onPickLanguage ? languageSuggestion(text, language) : null;
   const terms = glossaryMatches(text);

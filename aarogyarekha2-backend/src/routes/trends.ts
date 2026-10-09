@@ -1,5 +1,3 @@
-// A patient's blood pressure and sugar readings over time, for chronic-condition check-ins.
-// Returns the raw readings only. Any summary (latest, change, direction) is computed on screen and never says what a value means.
 import { z } from 'zod';
 import type { RouteCtx, RouteHelpers } from './intake.js';
 

@@ -1,5 +1,3 @@
-// Interface text in English, Hindi and Odia. English is the source. Hindi and Odia were written by the build team and have NOT been
-// checked by a native-speaking clinician yet: they must be reviewed before real use (listed in docs/05-frontend.md).
 export type Lang = 'en' | 'hi' | 'or';
 export const LANGS: { code: Lang; label: string }[] = [{ code: 'en', label: 'English' }, { code: 'hi', label: 'हिन्दी' }, { code: 'or', label: 'ଓଡ଼ିଆ' }];
 

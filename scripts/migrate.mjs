@@ -1,12 +1,8 @@
-// Applies supabase/migrations/*.sql in order, one transaction per file.
-// Records versions in supabase_migrations.schema_migrations (Supabase CLI compatible).
-// Usage: node --env-file=.env scripts/migrate.mjs [--dry-run]
 import pg from 'pg';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const dry = process.argv.includes('--dry-run');
-// Session mode (5432) so each file runs as a normal multi-statement transaction.
 const url = process.env.DATABASE_URL_POOLER?.replace(':6543/', ':5432/') || process.env.DATABASE_URL_DIRECT;
 const dir = 'supabase/migrations';
 const files = readdirSync(dir).filter(f => f.endsWith('.sql')).sort();

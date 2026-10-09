@@ -1,8 +1,3 @@
-// A small in-memory job queue for slow work (reading a report photo). It lets the request return at once and the screen check back.
-//
-// What it is: a limit on how many slow jobs run at once, a cap on how many may wait, and a short memory of results.
-// What it is NOT: durable. A restart loses waiting and running jobs, and the screen is told the job is unknown so the person can try again.
-// Results hold ids and plain messages only, never report text. Each job belongs to the user who started it; nobody else can see it.
 export type JobStatus = 'queued' | 'running' | 'done' | 'failed';
 export interface Job<T = unknown> { id: string; owner: string; kind: string; status: JobStatus; createdAt: number; startedAt?: number; finishedAt?: number; result?: T; error?: string }
 export interface JobQueueOptions { concurrency?: number; maxQueued?: number; retainMs?: number; timeoutMs?: number; now?: () => number; newId?: () => string }
@@ -17,7 +12,6 @@ export class JobQueue {
     this.o = { concurrency: 2, maxQueued: 20, retainMs: 10 * 60_000, timeoutMs: 120_000, now: Date.now, newId: () => crypto.randomUUID(), ...opts };
   }
 
-  /** Adds a job. Returns its id, or null when too many are already waiting. */
   submit<T>(owner: string, kind: string, run: () => Promise<T>): string | null {
     this.purge();
     if (this.waiting.length >= this.o.maxQueued) return null;
@@ -26,7 +20,6 @@ export class JobQueue {
     return job.id;
   }
 
-  /** The job, but only for the person who started it. Anyone else gets null, the same as for an unknown id. */
   get(id: string, owner: string): Job | null {
     this.purge(); const j = this.jobs.get(id);
     return j && j.owner === owner ? { ...j } : null;

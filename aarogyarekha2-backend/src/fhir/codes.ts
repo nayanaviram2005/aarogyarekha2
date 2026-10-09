@@ -1,19 +1,11 @@
-// Code systems and mappings used by the FHIR R4 projection. One place, so unverified items are easy to audit.
-//
-// VERIFY BEFORE PRODUCTION (flagged OPEN in docs/00-decisions.md):
-//  * ABHA identifier system URIs: confirm against the current NRCeS / ABDM FHIR implementation guide.
-//  * SNOMED CT is only emitted when symptom_entries.code_system says so (licence pending). Never invented here.
-
 export const SYS = {
   loinc: 'http://loinc.org',
   ucum: 'http://unitsofmeasure.org',
   snomed: 'http://snomed.info/sct',
   observationCategory: 'http://terminology.hl7.org/CodeSystem/observation-category',
   v3ActCode: 'http://terminology.hl7.org/CodeSystem/v3-ActCode',
-  // Project-local systems (example.org style placeholders until a canonical base URL is registered).
   local: 'https://aarogyarekha.example/fhir/CodeSystem',
   localId: 'https://aarogyarekha.example/fhir/identifier',
-  // ABDM identifiers  [OPEN: confirm URIs against the NRCeS IG]
   abhaNumber: 'https://healthid.ndhm.gov.in',
   abhaAddress: 'https://healthid.ndhm.gov.in/address',
 } as const;
@@ -36,7 +28,6 @@ export const VITALS: Record<Exclude<VitalKind, 'bp_systolic_mmhg' | 'bp_diastoli
   weight_kg:          { system: SYS.loinc, code: '29463-7', display: 'Body weight',                               ucum: 'kg',    ucumDisplay: 'kg',    category: 'vital-signs' },
   height_cm:          { system: SYS.loinc, code: '8302-2',  display: 'Body height',                               ucum: 'cm',    ucumDisplay: 'cm',    category: 'vital-signs' },
   blood_glucose_mgdl: { system: SYS.loinc, code: '2339-0',  display: 'Glucose [Mass/volume] in Blood',            ucum: 'mg/dL', ucumDisplay: 'mg/dL', category: 'laboratory' },
-  // MUAC: local code on purpose (not confident of the right LOINC concept; do not guess terminology).
   muac_cm:            { system: SYS.local + '/vitals', code: 'muac', display: 'Mid-upper-arm circumference',    ucum: 'cm',    ucumDisplay: 'cm',    category: 'exam' },
 };
 
@@ -45,7 +36,6 @@ export const BP_SYSTOLIC = { system: SYS.loinc, code: '8480-6', display: 'Systol
 export const BP_DIASTOLIC = { system: SYS.loinc, code: '8462-4', display: 'Diastolic blood pressure' };
 export const MMHG = { ucum: 'mm[Hg]', display: 'mmHg' };
 
-// Encounter lifecycle. Documented mapping (our statuses are review-workflow states, FHIR's are visit states).
 export const ENCOUNTER_STATUS = {
   draft: 'planned',
   submitted: 'arrived',

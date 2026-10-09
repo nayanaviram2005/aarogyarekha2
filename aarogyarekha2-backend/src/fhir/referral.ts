@@ -1,11 +1,3 @@
-// Builds the FHIR R4 DOCUMENT Bundle for a referral. The first entry is a Composition (the referral note) that references
-// everything else, so the receiving facility can open it without knowing anything about this system.
-//
-// What is deliberately absent: Condition, DiagnosticReport, CarePlan, MedicationRequest. The system is non-diagnostic and
-// never recommends treatment, so nothing in the bundle states a diagnosis. The ONLY free text written by a person is the
-// reviewer's reason for referral; everything else is recorded facts or rule-derived, labelled as such.
-//
-// Minimisation: no phone number or street address leaves the facility, only district and state.
 import type { Bundle, Composition, Consent, Encounter, Observation, Organization, Patient, Practitioner, Provenance, ServiceRequest } from 'fhir/r4';
 import { SYS } from './codes.js';
 import { toFhirEncounter, toFhirPatient, toFhirVitals, type EncounterRow, type IdentifierRow, type PatientRow, type VitalRow } from './project.js';
@@ -14,7 +6,6 @@ export const FHIR_BASE = 'https://aarogyarekha.example/fhir';
 export type ReferralPriority = 'routine' | 'urgent' | 'asap' | 'stat';
 export type UrgencyCode = 'red' | 'orange' | 'yellow' | 'green';
 
-/** Suggested FHIR request priority for a review priority. A person can change it. */
 export const PRIORITY_FOR_URGENCY: Record<UrgencyCode, ReferralPriority> = { red: 'stat', orange: 'asap', yellow: 'urgent', green: 'routine' };
 const TIER: Record<UrgencyCode, number> = { red: 1, orange: 2, yellow: 3, green: 4 };
 const WORD: Record<UrgencyCode, string> = { red: 'Immediate', orange: 'Very urgent', yellow: 'Urgent', green: 'Routine' };
@@ -25,7 +16,6 @@ export interface PersonBrief { id: string; name: string | null }
 export interface ReferralBuildInput {
   referralId: string;
   now: Date;
-  /** Final only when a reviewer has signed off the assessment and the referral is being sent. Otherwise a preview. */
   final: boolean;
   patient: PatientRow; identifiers: IdentifierRow[];
   encounter: EncounterRow;
@@ -41,7 +31,6 @@ export interface ReferralBuildInput {
     note: { tier: number; winning: { ruleId: string; detail: string }; log: { ruleId: string; detail: string }[]; missing: { label: string }[]; ruleSet: { name: string; version: string; hash: string }; vulnerable?: boolean };
   };
   effectiveUrgency: UrgencyCode;
-  /** The reviewer decision on THIS assessment, if any. */
   review: null | { reviewer: PersonBrief; at: string; action: 'approve' | 'override_urgency'; reason: string | null };
   consents: { purpose: string; granted_at: string }[];
   engineVersion: string;
@@ -62,7 +51,6 @@ const practitioner = (p: PersonBrief): Practitioner => ({ resourceType: 'Practit
 export function buildReferralBundle(i: ReferralBuildInput): Bundle {
   const nowIso = i.now.toISOString();
 
-  // Minimise: no phone, no street address, no village. District and state only.
   const patient: Patient = toFhirPatient({ ...i.patient, phone: null, address_line: null, village_town: null, pincode: null }, i.identifiers);
   const encounter: Encounter = toFhirEncounter(i.encounter);
   const observations: Observation[] = toFhirVitals(i.patient.id, i.vitals);
@@ -83,8 +71,6 @@ export function buildReferralBundle(i: ReferralBuildInput): Bundle {
     requester: ref('Practitioner', i.requester.id, i.requester.name ?? undefined),
     performer: [ref('Organization', i.to.id, i.to.name)],
     reasonCode: [{ text: i.reasonText }],
-    // The priority tier has no native FHIR home; ServiceRequest.priority is the closest, so the real tier and the rules
-    // behind it travel in an extension and are stated openly.
     ...(a ? {
       extension: [{
         url: `${SYS.local}/ext/triage-priority`,
@@ -101,7 +87,6 @@ export function buildReferralBundle(i: ReferralBuildInput): Bundle {
     } : {}),
   };
 
-  // ---------------------------------------------------------------- the referral note (Composition)
   const sections: NonNullable<Composition['section']> = [];
   sections.push({ title: 'Reason for referral', text: div(`<p>${esc(i.reasonText)}</p><p><em>Written by ${esc(i.requester.name ?? 'the referring reviewer')}.</em></p>`) });
   sections.push({ title: 'Reported complaint', text: div(`<p>${esc(i.encounter.chief_complaint_original ?? 'None recorded')}</p>${i.encounter.chief_complaint_translated ? `<p>In English: ${esc(i.encounter.chief_complaint_translated)}</p>` : ''}`) });
@@ -140,7 +125,6 @@ export function buildReferralBundle(i: ReferralBuildInput): Bundle {
     section: sections,
   };
 
-  // ---------------------------------------------------------------- provenance: who produced what, and who signed it
   const provenance: Provenance = {
     resourceType: 'Provenance', id: i.referralId + '-provenance',
     target: [ref('Composition', composition.id!), ref('ServiceRequest', serviceRequest.id!)],
@@ -170,7 +154,6 @@ export function buildReferralBundle(i: ReferralBuildInput): Bundle {
   };
 }
 
-/** Every `reference` inside the bundle must point at another entry, so a receiver can open it on its own. */
 export function unresolvedReferences(bundle: Bundle): string[] {
   const have = new Set((bundle.entry ?? []).map(e => `${e.resource?.resourceType}/${e.resource?.id}`));
   const missing: string[] = [];

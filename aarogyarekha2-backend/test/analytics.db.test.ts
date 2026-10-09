@@ -1,4 +1,3 @@
-// Administrator figures (counts and timings) against the REAL schema in an in-process Postgres.
 import type { PGlite } from '@electric-sql/pglite';
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -10,7 +9,6 @@ const F1 = randomUUID(), F2 = randomUUID(), RS = randomUUID(), U = randomUUID(),
 const sys = () => makeSystemAdmin({ query: async (sql, p) => ({ rows: (await db.query(sql, p as any[])).rows as any[] }) });
 const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
 
-/** An encounter submitted `submittedMinAgo` ago; assessed `assessAfterSec` later; reviewed `reviewAfterMin` after it joined the queue. */
 async function visit(o: { facility?: string; scenario?: string; urgency?: string; submittedMinAgo?: number; assessAfterSec?: number | null; review?: { action: 'approve' | 'override_urgency'; afterMin: number; to?: string } | null; created?: string }) {
   const e = randomUUID(), f = o.facility ?? F1; const sub = o.submittedMinAgo ?? 120;
   await db.query(`insert into public.encounters (id, patient_id, facility_id, scenario, status, submitted_at, created_at) values ($1,$2,$3,$4,'submitted',$5,$6)`, [e, PT, f, o.scenario ?? 'opd_queue', ago(sub), o.created ?? ago(sub + 5)]);
@@ -32,11 +30,11 @@ beforeAll(async () => {
   await db.query(`insert into public.triage_rule_sets (id, name, version, status, source_citation, definition, approved_at) values ($1,'t','1','approved','TEST','{}'::jsonb, now())`, [RS]);
   await visit({ urgency: 'red', assessAfterSec: 2, review: { action: 'approve', afterMin: 10 } });
   await visit({ urgency: 'orange', assessAfterSec: 4, review: { action: 'approve', afterMin: 20 } });
-  await visit({ urgency: 'orange', assessAfterSec: 6, review: { action: 'override_urgency', afterMin: 30, to: 'red' } });          // raised
-  await visit({ urgency: 'yellow', assessAfterSec: 8, review: { action: 'override_urgency', afterMin: 40, to: 'green' }, scenario: 'campus_fever' });   // lowered
-  await visit({ urgency: 'green', assessAfterSec: null, scenario: 'campus_fever' });                                                    // submitted, never assessed
-  await visit({ facility: F2, urgency: 'red', assessAfterSec: 1, review: { action: 'approve', afterMin: 5 } });                         // another facility
-  await visit({ created: ago(60 * 24 * 100), submittedMinAgo: 60 * 24 * 100, assessAfterSec: 2, review: { action: 'approve', afterMin: 9 } });   // too old for 30 days
+  await visit({ urgency: 'orange', assessAfterSec: 6, review: { action: 'override_urgency', afterMin: 30, to: 'red' } });
+  await visit({ urgency: 'yellow', assessAfterSec: 8, review: { action: 'override_urgency', afterMin: 40, to: 'green' }, scenario: 'campus_fever' });
+  await visit({ urgency: 'green', assessAfterSec: null, scenario: 'campus_fever' });
+  await visit({ facility: F2, urgency: 'red', assessAfterSec: 1, review: { action: 'approve', afterMin: 5 } });
+  await visit({ created: ago(60 * 24 * 100), submittedMinAgo: 60 * 24 * 100, assessAfterSec: 2, review: { action: 'approve', afterMin: 9 } });
 });
 
 describe('analytics', () => {

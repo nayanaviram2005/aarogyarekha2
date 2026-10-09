@@ -1,9 +1,3 @@
-// Text readers for uploaded reports. ALL OF THEM RUN LOCALLY: no page, photo or text from a patient record is sent to any
-// outside AI or OCR service. (An external vision model would receive an identifiable image, which the privacy design forbids.)
-//   pdf text layer : reads the text already inside the PDF with pdf.js. Exact, instant, offline.
-//   tesseract      : reads photos / scans with Tesseract OCR (WASM) in this process. It downloads only the LANGUAGE MODEL on first
-//                    use (no patient data); set TESSDATA_PATH to a local folder to run fully offline.
-//   mock           : fixed synthetic text for demos and tests.
 import { inspectPdf } from '../files/pdf.js';
 
 export type OcrLanguage = 'en' | 'hi' | 'or';
@@ -30,10 +24,8 @@ export type CreateWorker = (langs: string, oem: number, opts: Record<string, unk
 
 export function tesseractEngine(opts: { langPath?: string; createWorker?: CreateWorker; enhance?: boolean } = {}): ReadText {
   return async ({ bytes: original, mime, language = 'en' }) => {
-    // A cleaned copy (contrast stretched, tilt straightened) is read; the stored file is untouched. Falls back to the original on any problem.
     const bytes = opts.enhance === false ? original : enhanceImage(original, mime).bytes;
     const create = opts.createWorker ?? ((await import('tesseract.js')).createWorker as unknown as CreateWorker);
-    // English is always loaded alongside, because lab reports mix a local language with English test names and units.
     const langs = language === 'en' ? 'eng' : `${TESS_LANG[language]}+eng`;
     let worker: WorkerLike | null = null;
     try {
@@ -56,7 +48,6 @@ export const SAMPLE_REPORT = [
 ].join('\n');
 export const mockEngine = (text = SAMPLE_REPORT): ReadText => async () => ({ engine: 'mock', engineVersion: null, text, confidence: 0.95, language: 'en' });
 
-/** PDFs use the text layer; photos use Tesseract. 'mock' ignores the file and returns the synthetic sample. */
 export function chooseReader(provider: 'local' | 'mock', opts: { langPath?: string } = {}): ReadText {
   if (provider === 'mock') return mockEngine();
   const pdf = pdfTextEngine(); const img = tesseractEngine({ langPath: opts.langPath });

@@ -1,10 +1,3 @@
-// Getting patients off the queue.
-//   POST /encounters/:id/call-in    a waiting patient is called in: being seen, assigned to the caller
-//   POST /encounters/:id/complete   finish the visit with an outcome (treated here, sent home, did not wait)
-//   GET  /queue/done                who was seen or sent on in the last day, for the facilities the caller works at
-// A referral is not completed here: sending the referral already takes the patient off the queue.
-// Completing as treated or sent home needs a nurse, doctor or medical officer, the current priority already signed off, and (when the
-// deployment requires it) a verified second factor. The database functions enforce the same rules again.
 import { z } from 'zod';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { RouteCtx, RouteHelpers } from './intake.js';

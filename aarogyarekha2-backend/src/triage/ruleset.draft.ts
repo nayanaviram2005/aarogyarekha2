@@ -1,20 +1,3 @@
-// AarogyaRekha rule set v0.1.1 — DRAFT.
-//
-// Every threshold, sign list and tier mapping below was TRANSCRIBED FROM MEMORY of published protocols. None has been
-// checked against the primary documents, and none has been reviewed by a clinician. status = 'draft' keeps it that way:
-// the database (app.require_approved_rule_set) refuses to attach a draft rule set to a triage assessment.
-//
-// To approve: (1) check each `source` against the primary document and fix any difference, (2) have a qualified clinician
-// confirm the tier mapping for your facilities, (3) record approved_by / approved_at / source_citation in triage_rule_sets.
-//
-// Source families (note who owns each; only the first two are WHO):
-//   WHO ETAT   : WHO Emergency Triage, Assessment and Treatment (children). Emergency and priority signs.
-//   IMNCI      : WHO/UNICEF Integrated Management of Neonatal and Childhood Illness, India (MoHFW) adaptation. General danger signs.
-//   NHM        : India NHM maternal danger signs (aligned with WHO pregnancy danger signs).
-//   NEWS2      : National Early Warning Score 2, Royal College of Physicians (UK) 2017. NOT a WHO tool. Adults only.
-//
-// Tier mapping (ETAT/IMNCI/NHM -> our T1..T4) and the NEWS2 band -> tier mapping are LOCAL ADAPTATIONS, not published by
-// those bodies. They are deliberately conservative (escalate when unsure) and must be validated clinically.
 import type { RuleSet } from './types.js';
 
 export const RULESET_DRAFT: RuleSet = {
@@ -26,19 +9,16 @@ export const RULESET_DRAFT: RuleSet = {
   potentialTierCap: 1,
 
   floors: [
-    // ---- ETAT emergency signs (universal life threats) -> T1
     { id: 'ETAT-E1', sign: 'airway_obstructed_or_not_breathing', tier: 1, population: 'any', label: 'Airway obstructed or not breathing', question: 'Is the airway blocked, or has breathing stopped?', source: 'WHO ETAT emergency signs' },
     { id: 'ETAT-E2', sign: 'severe_respiratory_distress', tier: 1, population: 'any', label: 'Severe breathing difficulty', question: 'Is the patient struggling severely to breathe (gasping, very fast, or chest drawing in hard)?', source: 'WHO ETAT emergency signs' },
     { id: 'ETAT-E3', sign: 'central_cyanosis', tier: 1, population: 'any', label: 'Blue or grey lips or tongue', question: 'Are the lips or tongue blue or grey?', source: 'WHO ETAT emergency signs' },
     { id: 'ETAT-E4', sign: 'shock_signs', tier: 1, population: 'any', label: 'Signs of poor circulation (cold hands or feet, weak fast pulse, slow capillary refill)', question: 'Are the hands and feet cold, with a weak fast pulse or slow capillary refill?', source: 'WHO ETAT emergency signs' },
     { id: 'ETAT-E5', sign: 'unconscious_or_convulsing_now', tier: 1, population: 'any', label: 'Unconscious, or having a convulsion now', question: 'Is the patient unconscious, or having a convulsion right now?', source: 'WHO ETAT emergency signs' },
     { id: 'ETAT-E6', sign: 'severe_fluid_loss_signs', tier: 1, population: 'child_under_5', label: 'Signs of severe fluid loss with diarrhoea (lethargy, sunken eyes, very slow skin pinch)', question: 'With diarrhoea: is the child very sleepy or limp, with sunken eyes or a very slow skin pinch?', source: 'WHO ETAT emergency signs' },
-    // ---- IMNCI general danger signs (child under 5) -> T2
     { id: 'IMNCI-G1', sign: 'unable_to_drink_or_breastfeed', tier: 2, population: 'child_under_5', label: 'Unable to drink or breastfeed', question: 'Is the child unable to drink or breastfeed?', source: 'IMNCI general danger signs' },
     { id: 'IMNCI-G2', sign: 'vomits_everything', tier: 2, population: 'child_under_5', label: 'Vomits everything', question: 'Does the child vomit everything?', source: 'IMNCI general danger signs' },
     { id: 'IMNCI-G3', sign: 'convulsions_this_illness', tier: 2, population: 'child_under_5', label: 'Convulsions during this illness', question: 'Has the child had convulsions during this illness?', source: 'IMNCI general danger signs' },
     { id: 'IMNCI-G4', sign: 'lethargic', tier: 2, population: 'child_under_5', label: 'Unusually sleepy or hard to wake', question: 'Is the child unusually sleepy or hard to wake?', source: 'IMNCI general danger signs' },
-    // ---- ETAT priority signs (TPR-OOO) child under 5 -> T3
     { id: 'ETAT-P1', sign: 'tiny_infant_under_2_months', tier: 3, population: 'child_under_5', label: 'Infant under 2 months', question: 'Is the infant under 2 months old?', source: 'WHO ETAT priority signs' },
     { id: 'ETAT-P2', sign: 'very_high_fever_child', tier: 3, population: 'child_under_5', label: 'Very high fever (as judged by the health worker)', question: "Is the fever very high, in the health worker's judgement?", source: 'WHO ETAT priority signs' },
     { id: 'ETAT-P3', sign: 'major_trauma_or_burns', tier: 3, population: 'child_under_5', label: 'Major injury or burns', question: 'Has the child had a major injury or burn?', source: 'WHO ETAT priority signs' },
@@ -50,7 +30,6 @@ export const RULESET_DRAFT: RuleSet = {
     { id: 'ETAT-P9', sign: 'severe_visible_wasting', tier: 3, population: 'child_under_5', label: 'Severe visible wasting', question: 'Does the child look severely wasted (very thin)?', source: 'WHO ETAT priority signs' },
     { id: 'ETAT-P10', sign: 'swelling_both_feet', tier: 3, population: 'child_under_5', label: 'Swelling of both feet', question: 'Are both feet swollen?', source: 'WHO ETAT priority signs' },
     { id: 'ETAT-P11', sign: 'urgent_referral_in', tier: 3, population: 'child_under_5', label: 'Sent in as an urgent referral', question: 'Was the child sent in as an urgent referral?', source: 'WHO ETAT priority signs' },
-    // ---- Pregnancy danger signs
     { id: 'NHM-M1', sign: 'convulsions_in_pregnancy', tier: 1, population: 'pregnant', label: 'Convulsions in pregnancy', question: 'Is she having convulsions?', source: 'NHM maternal danger signs' },
     { id: 'NHM-M2', sign: 'heavy_vaginal_bleeding', tier: 1, population: 'pregnant', label: 'Heavy vaginal bleeding', question: 'Is she bleeding heavily from the vagina?', source: 'NHM maternal danger signs' },
     { id: 'NHM-M3', sign: 'severe_headache_blurred_vision', tier: 2, population: 'pregnant', label: 'Severe headache or blurred vision', question: 'Does she have a severe headache or blurred vision?', source: 'NHM maternal danger signs' },
@@ -81,7 +60,6 @@ export const RULESET_DRAFT: RuleSet = {
     consciousnessNotAlert: 3,
     supplementalOxygen: 2,
     maxPerParam: { resp_rate_pm: 3, spo2_pct: 3, bp_systolic_mmhg: 3, pulse_bpm: 3, temperature_c: 2, consciousness: 3, oxygen: 2 },
-    // LOCAL mapping. RCP defines low / low-medium (single 3) / medium (5-6) / high (7+) response bands, not our tiers.
     tierMap: {
       aggregateHighMin: 7, aggregateHighTier: 1,
       aggregateMediumMin: 5, aggregateMediumTier: 2,

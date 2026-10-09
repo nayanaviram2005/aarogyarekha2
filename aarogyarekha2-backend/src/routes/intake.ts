@@ -1,11 +1,3 @@
-// Intake path: record consent -> start an encounter -> add symptoms, vitals and danger-sign answers -> submit -> assess.
-//
-//  * Every write runs as the CALLER (their JWT, stamped with their user id), so row-level security decides what is allowed.
-//  * Server-side consent gate: no encounter, symptom, vital, answer or assessment without an active `care_triage` consent.
-//    The UI is not the check.
-//  * Assessment is the one system-path step. Access is verified through the caller's JWT first, so a user can never
-//    trigger an assessment for an encounter they cannot see.
-//  * Errors say what went wrong in plain words and never echo submitted values or database internals.
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { OperationOutcome } from 'fhir/r4';
 import { z } from 'zod';
@@ -32,18 +24,14 @@ export interface RouteCtx {
   base: (req: FastifyRequest) => Pick<AuditEvent, 'actor' | 'requestId' | 'ip' | 'userAgent'>;
   auditOrFail: (req: FastifyRequest, reply: FastifyReply, ev: Omit<AuditEvent, 'actor' | 'requestId' | 'ip' | 'userAgent'>) => Promise<boolean>;
   triageRuleSet: { name: string; version: string };
-  /** Sends the refusal and returns false when this action needs a second factor the caller has not verified. */
   requireMfa: (req: FastifyRequest, reply: FastifyReply, what: string) => Promise<boolean>;
   mfaRequired: boolean;
-  /** Who reads photos of reports: this server (local), the outside AI image reader (ai), or the AI first and then this server. */
   ocrPhotos: 'local' | 'ai' | 'ai_then_local';
-  /** Slow work (reading a report photo) can run here so the request returns at once. */
   jobs: import('../jobs/queue.js').JobQueue;
 }
 
 const uuid = z.string().uuid();
 const SCENARIOS = ['opd_queue', 'occupational', 'campus_fever', 'maternal_followup', 'chronic_checkin', 'health_camp', 'referral_intake', 'other'] as const;
-// Every sign any known rule set can ask about (the live version may be v0.1.1 or the proposed v0.2.0), so an answer to a new flag is never refused.
 const SIGN_CODES = new Set([...RULESET_DRAFT.floors, ...RULESET_PROPOSED.floors].map(f => f.sign));
 const EDITABLE = new Set(['draft', 'submitted', 'in_review']);
 
@@ -92,7 +80,6 @@ export interface RouteHelpers {
   openEncounter: (req: FastifyRequest, reply: FastifyReply, requireEditable: boolean) => Promise<{ enc: EncounterRow; w: UserWriter } | null>;
 }
 
-/** Registers the intake routes and returns the helpers other route files share (consent gate, plain error mapping, best-effort audit). */
 export function registerIntakeRoutes(c: RouteCtx): RouteHelpers {
   const { app, deps, authenticate, fail } = c;
 
@@ -111,7 +98,6 @@ export function registerIntakeRoutes(c: RouteCtx): RouteHelpers {
 
   const writerFor = (req: FastifyRequest): UserWriter => deps.userWriter(req.headers.authorization!.slice(7).trim(), req.user!.userId);
 
-  /** Loads the encounter as the caller (RLS), enforces consent and (optionally) that it is still open. Sends the error and returns null on failure. */
   async function openEncounter(req: FastifyRequest, reply: FastifyReply, requireEditable: boolean): Promise<{ enc: EncounterRow; w: UserWriter } | null> {
     const id = uuid.safeParse((req.params as { id: string }).id);
     if (!id.success) { fail(reply, 400, 'invalid', 'Encounter id must be a UUID.'); return null; }
@@ -126,7 +112,6 @@ export function registerIntakeRoutes(c: RouteCtx): RouteHelpers {
     return { enc, w };
   }
 
-  // ------------------------------------------------------------------ consent
   app.post('/patients/:id/consents', { preHandler: authenticate }, async (req, reply) => {
     const id = uuid.safeParse((req.params as { id: string }).id);
     if (!id.success) return fail(reply, 400, 'invalid', 'Patient id must be a UUID.');
@@ -144,7 +129,6 @@ export function registerIntakeRoutes(c: RouteCtx): RouteHelpers {
     } catch (err) { return dbFail(req, reply, err); }
   });
 
-  // ------------------------------------------------------------------ encounters
   app.post('/encounters', { preHandler: authenticate }, async (req, reply) => {
     const body = encounterBody.safeParse(req.body);
     if (!body.success) return invalid(reply, body.error);
@@ -222,7 +206,6 @@ export function registerIntakeRoutes(c: RouteCtx): RouteHelpers {
     } catch (err) { return dbFail(req, reply, err); }
   });
 
-  // ------------------------------------------------------------------ assessment
   app.post('/encounters/:id/assess', { preHandler: authenticate }, async (req, reply) => {
     const ctx = await openEncounter(req, reply, true); if (!ctx) return;
     const { enc, w } = ctx;
@@ -232,14 +215,11 @@ export function registerIntakeRoutes(c: RouteCtx): RouteHelpers {
     if (!facts || !vitals || !tctx) return fail(reply, 502, 'transient', 'The record could not be loaded. Try again.');
 
     const input = buildTriageInput(facts, vitals, tctx);
-    // Which danger-sign questions fit THIS patient: the AI picks from the signs still open (when consented and set up), a keyword fallback
-    // does a coarser job without it, and the core emergency signs are always asked. See triage/relevance.ts.
     const rs = await deps.loadRuleSet?.(c.triageRuleSet.name, c.triageRuleSet.version).catch(() => null) ?? null;
     const sum = rs ? await req.reader!.getEncounterSummary(enc.id).catch(() => null) : null;
     const wordsText = [enc.chief_complaint_translated ?? enc.chief_complaint_original ?? '', ...(sum?.symptoms ?? []).map(x => x.text_translated ?? x.text_original)].join('. ');
     const candidates = rs ? askableFloors(input, rs).map(f => ({ code: f.sign, label: f.label, question: f.question, must: CORE_SIGNS.includes(f.sign) })) : [];
-    const ai = await secondOpinion(deps, req, enc, input, facts.sex, candidates);          // never throws; the rules stand alone when it cannot run
-    // The whole list (signs and measurements) stays within QUESTION_BUDGET, so the queue's open-question count matches what is asked.
+    const ai = await secondOpinion(deps, req, enc, input, facts.sex, candidates);
     const nonSign = rs ? triage({ ...input, relevantSigns: [] }, rs).missing.filter(m => !m.code.startsWith('sign.')).length : 0;
     const relevance = rs ? selectRelevantSigns(input, rs, wordsText, ai.ask, Math.max(MIN_SIGN_QUESTIONS, QUESTION_BUDGET - nonSign)) : null;
     if (relevance) input.relevantSigns = relevance.signs;
@@ -267,7 +247,7 @@ export function registerIntakeRoutes(c: RouteCtx): RouteHelpers {
     try {
       const open = new Set(await w.listOpenInfoCodes(enc.id));
       const fresh = followUps.filter(f => !open.has(f.fieldCode));
-      if (relevance) await w.dismissInfoRequests?.(enc.id, followUps.map(f => f.fieldCode)).catch(() => 0);          // questions that no longer fit this patient
+      if (relevance) await w.dismissInfoRequests?.(enc.id, followUps.map(f => f.fieldCode)).catch(() => 0);
       if (fresh.length) await w.addInfoRequests(enc.id, fresh.map(f => ({ fieldCode: f.fieldCode, question: f.question, lang: f.lang })));
     } catch (err) { followUpsSaved = false; req.log.error({ reqId: req.id, err: (err as Error).message }, 'follow-up questions could not be saved'); }
 

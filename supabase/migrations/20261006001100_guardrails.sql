@@ -1,9 +1,3 @@
--- 0011 guardrails for FUTURE migrations.
--- 1. Any table created in `public` gets RLS enabled automatically (default-deny until a policy is written).
--- 2. New public tables/sequences are not auto-granted to anon/authenticated; functions are not PUBLIC-executable.
--- NOTE: ALTER DEFAULT PRIVILEGES affects objects created by the role running this migration. On Supabase,
--- also review default privileges of `supabase_admin` in the dashboard/SQL editor (cannot be changed from here).
-
 create or replace function app.rls_auto_enable()
 returns event_trigger language plpgsql security definer set search_path = '' as $$
 declare cmd record;

@@ -1,5 +1,3 @@
-// Gathers the AI second opinion for one assessment. Never throws: any problem becomes a status the reviewer can read, and the
-// rules result stands alone. The patient's triage consent covers it (its notice says redacted text goes to an outside service); every call is logged.
 import type { FastifyRequest } from 'fastify';
 import type { Deps } from '../deps.js';
 import type { EncounterRow } from '../fhir/project.js';
@@ -25,7 +23,6 @@ export async function secondOpinion(deps: Deps, req: FastifyRequest, enc: Encoun
     const [patient, summary] = await Promise.all([req.reader!.getPatient(enc.patient_id), req.reader!.getEncounterSummary(enc.id)]);
     if (!patient || !summary) return NO_OPINION('unavailable');
 
-    // What the uploaded reports say, from rows a person has checked. A failure to load them never stops the opinion.
     const records = await loadRecordContext(req, enc.id).catch(() => []);
     const notes = reportNotes(records);
     const words = {
@@ -43,7 +40,6 @@ export async function secondOpinion(deps: Deps, req: FastifyRequest, enc: Encoun
       else req.log.warn({ reqId: req.id, kind: err instanceof AiError ? err.kind : 'unknown' }, 'AI second opinion unavailable');
       return NO_OPINION(err instanceof AiError && err.kind === 'not_configured' ? 'not_set_up' : 'unavailable');
     }
-    // The disclosure is recorded before the result is used. If it cannot be recorded, the opinion is not used.
     try { await deps.logExternalRun({ encounterId: enc.id, consentId: ai.id, provider: run.served.provider, model: run.served.model, items: 1, chars: run.sentChars, status: 'ok', purpose: 'triage_opinion' }); }
     catch { req.log.error({ reqId: req.id }, 'external run could not be logged; AI opinion not used'); return NO_OPINION('unavailable'); }
     if (!run.opinion) return NO_OPINION('unusable');
@@ -54,7 +50,6 @@ export async function secondOpinion(deps: Deps, req: FastifyRequest, enc: Encoun
   }
 }
 
-/** Compare with the rules' own result (every layer except the AI hint). The AI can only raise: `raised` is the only case that changes the stored tier. */
 export function compareWithRules(ai: AiSecondOpinion, log: { layer: string; tier: Tier }[]) {
   const rulesTier = Math.min(...log.filter(l => l.layer !== 'external').map(l => l.tier)) as Tier;
   if (ai.tier == null) return { rulesTier, relation: null as null | 'agrees' | 'raised' | 'lower' };

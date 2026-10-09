@@ -1,7 +1,3 @@
-// Picture checks and clean-up for uploaded report photos. Pure JavaScript, no native code.
-//   * analyse():  is the photo blurry, dark, washed out, low in contrast or too small? Returns plain warnings. Never blocks an upload.
-//   * enhance():  stretch the contrast and straighten a slightly tilted page, so the OCR reads it better. The cleaned copy is used for
-//                 reading only; the stored file stays exactly what was uploaded (after metadata is removed).
 import jpeg from 'jpeg-js';
 import { PNG } from 'pngjs';
 
@@ -9,7 +5,6 @@ export interface Gray { width: number; height: number; data: Uint8ClampedArray }
 export type Warning = 'blurry' | 'too_dark' | 'washed_out' | 'low_contrast' | 'small';
 export interface Quality { width: number; height: number; sharpness: number; brightness: number; contrast: number; warnings: Warning[] }
 
-/** Draft thresholds, tuned on synthetic pages only. A person always looks at the picture too. */
 export const LIMITS = { blurBelow: 60, darkBelow: 70, brightAbove: 225, contrastBelow: 35, smallBelow: 700 } as const;
 export const WARNING_TEXT: Record<Warning, string> = {
   blurry: 'The picture looks blurry. Text may be misread. Retake it holding the camera steady.',
@@ -28,13 +23,12 @@ export function decode(bytes: Buffer, mime: string): { width: number; height: nu
 export function toGray(rgba: { width: number; height: number; data: Uint8Array }): Gray {
   const { width, height, data } = rgba; const g = new Uint8ClampedArray(width * height);
   for (let i = 0, p = 0; i < g.length; i++, p += 4) {
-    const a = data[p + 3]! / 255; const bg = 255 * (1 - a);                       // transparent pixels count as white paper
+    const a = data[p + 3]! / 255; const bg = 255 * (1 - a);
     g[i] = 0.299 * data[p]! * a + 0.587 * data[p + 1]! * a + 0.114 * data[p + 2]! * a + bg;
   }
   return { width, height, data: g };
 }
 
-/** Box-average down to at most `max` pixels on the long side (keeps analysis fast and size-independent). */
 export function shrink(g: Gray, max = 800): Gray {
   const k = Math.max(g.width, g.height) / max; if (k <= 1) return g;
   const w = Math.max(1, Math.floor(g.width / k)), h = Math.max(1, Math.floor(g.height / k)); const out = new Uint8ClampedArray(w * h);
@@ -48,7 +42,6 @@ export function shrink(g: Gray, max = 800): Gray {
 
 const stats = (g: Gray) => { let s = 0; for (const v of g.data) s += v; const mean = s / g.data.length; let q = 0; for (const v of g.data) q += (v - mean) ** 2; return { mean, std: Math.sqrt(q / g.data.length) }; };
 
-/** Variance of the Laplacian: low means few sharp edges, i.e. blur. */
 export function sharpness(g: Gray): number {
   const { width: w, height: h, data: d } = g; if (w < 3 || h < 3) return 0;
   let n = 0, s = 0, s2 = 0;
@@ -67,7 +60,6 @@ export function analyse(bytes: Buffer, mime: string): Quality {
   return { width: img.width, height: img.height, sharpness: Math.round(sh), brightness: Math.round(mean), contrast: Math.round(std), warnings };
 }
 
-/** Stretch so the 1st to 99th percentile of brightness fills 0 to 255. */
 export function stretchContrast(g: Gray): Gray {
   const hist = new Uint32Array(256); for (const v of g.data) hist[v]!++;
   const total = g.data.length; let acc = 0, lo = 0, hi = 255;
@@ -79,7 +71,6 @@ export function stretchContrast(g: Gray): Gray {
   return { ...g, data: out };
 }
 
-/** Rotate about the centre by `deg` (positive = clockwise), bilinear, filling the corners with white. */
 export function rotate(g: Gray, deg: number): Gray {
   if (Math.abs(deg) < 0.01) return g;
   const { width: w, height: h, data: d } = g; const out = new Uint8ClampedArray(w * h).fill(255);
@@ -93,7 +84,6 @@ export function rotate(g: Gray, deg: number): Gray {
   return { width: w, height: h, data: out };
 }
 
-/** The tilt, in degrees within +-maxDeg, that makes the text lines most horizontal (projection-profile method). 0 when unsure. */
 export function estimateSkew(g: Gray, maxDeg = 5, step = 0.5): number {
   const small = shrink(g, 400); const { mean } = stats(small);
   const dark = new Uint8ClampedArray(small.data.length); for (let i = 0; i < dark.length; i++) dark[i] = small.data[i]! < mean * 0.8 ? 1 : 0;
@@ -105,14 +95,13 @@ export function estimateSkew(g: Gray, maxDeg = 5, step = 0.5): number {
     if (Math.abs(a) < 1e-9) zeroScore = score;
     if (score > bestScore) { bestScore = score; best = a; }
   }
-  return bestScore > zeroScore * 1.05 ? best : 0;                                    // only act on a clear improvement
+  return bestScore > zeroScore * 1.05 ? best : 0;
 }
 
-/** A cleaned copy of the picture for the OCR engine, as PNG bytes. Returns the original on any problem. */
 export function enhance(bytes: Buffer, mime: string): { bytes: Buffer; skewDegrees: number } {
   try {
     const img = decode(bytes, mime); let g = stretchContrast(toGray(img));
-    const skew = estimateSkew(g); g = rotate(g, -skew);                          // estimateSkew rotates points; rotate() samples, so the sign flips
+    const skew = estimateSkew(g); g = rotate(g, -skew);
     const png = new PNG({ width: g.width, height: g.height });
     for (let i = 0, p = 0; i < g.data.length; i++, p += 4) { png.data[p] = png.data[p + 1] = png.data[p + 2] = g.data[i]!; png.data[p + 3] = 255; }
     return { bytes: PNG.sync.write(png), skewDegrees: skew };

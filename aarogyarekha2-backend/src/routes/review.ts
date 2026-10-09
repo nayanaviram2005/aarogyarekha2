@@ -1,8 +1,3 @@
-// Reviewer sign-off: confirm the priority the rules set, or change it with a recorded reason.
-//
-// The decision is written by app.record_review (migration 0013): one transaction that checks the reviewer's role at the
-// encounter's facility, refuses a stale assessment, and updates the queue. This route adds: the caller must be able to see the
-// encounter (RLS), consent must be active, the request must be well-formed, and failures are explained in plain words.
 import { z } from 'zod';
 import type { RouteCtx, RouteHelpers } from './intake.js';
 import { ReviewError, type ReviewArgs } from '../review/record.js';
@@ -49,12 +44,10 @@ export function registerReviewRoutes(c: RouteCtx, h: RouteHelpers): void {
       return c.fail(reply, 502, 'transient', 'The review could not be recorded. Try again.');
     }
 
-    // The decision is already committed and append-only. The audit entry deliberately holds ids and flags, never the reason text.
     await h.note(req, {
       action: 'update', entityType: 'review', entityId: r.reviewId, patientId: r.patientId, facilityId: r.facilityId, outcome: 'success',
       details: { action: r.action, assessmentId: b.assessmentId, from: r.fromUrgency, to: r.effectiveUrgency, rules: r.rulesUrgency, downgrade: r.downgrade, belowRuleFloor: r.belowRuleFloor, ...(b.action === 'override' ? { reasonCode: b.reasonCode } : {}) },
     });
-    // The patient hears their status only after this human decision. A failure here never undoes or blocks the sign-off.
     const sms = c.deps.statusSms
       ? await c.deps.statusSms.afterSignOff({ encounterId: ctx.enc.id, effectiveUrgency: r.effectiveUrgency }).catch((): StatusSmsResult => ({ status: 'failed', reason: 'provider_error' }))
       : null;

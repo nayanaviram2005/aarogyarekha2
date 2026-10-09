@@ -1,8 +1,3 @@
-// Executes every migration in an in-process Postgres (PGlite) with minimal stubs of Supabase's
-// `auth`, `storage` and role setup, then asserts RLS / constraint / trigger behaviour.
-//   usage:  npm install && npm test        (from supabase/tests)
-// This validates the SQL and the policy logic. It does NOT replace testing against a real Supabase
-// project (PostgREST, GoTrue JWTs, storage API, realtime).
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -13,7 +8,6 @@ const here = dirname(fileURLToPath(import.meta.url));
 const migDir = join(here, '..', 'migrations');
 const db = new PGlite();
 
-// ---------------------------------------------------------------- Supabase stubs
 await db.exec(`
   create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
   create schema auth;
@@ -32,17 +26,14 @@ await db.exec(`
   grant all on storage.objects, storage.buckets to service_role;
 `);
 
-// ---------------------------------------------------------------- apply migrations in order
 const files = readdirSync(migDir).filter(f => f.endsWith('.sql')).sort();
 for (const f of files) {
   try { await db.exec(readFileSync(join(migDir, f), 'utf8')); console.log('applied', f); }
   catch (e) { console.error('MIGRATION FAILED', f, '\n  ', e.message); process.exit(2); }
 }
-// Supabase's default privileges give service_role everything; replicate for the stub.
 await db.exec(`grant all on all tables in schema public to service_role;
                grant usage on schema app to service_role;`);
 
-// ---------------------------------------------------------------- helpers
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => { cond ? pass++ : fail++; console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${cond ? '' : '  ' + extra}`); };
 async function as(user, sql, params = []) {
@@ -53,7 +44,7 @@ async function as(user, sql, params = []) {
   else
     await db.exec(`select set_config('request.jwt.claim.sub','',false), set_config('request.jwt.claim.role','${role}',false)`);
   try { return (await db.query(sql, params)).rows; }
-  catch (e) { throw new Error(e.message); }          // PGlite errors carry huge payloads; keep only the message
+  catch (e) { throw new Error(e.message); }
   finally { await db.exec('reset role'); }
 }
 const root = async (sql, params = []) => (await db.query(sql, params)).rows;
@@ -63,7 +54,6 @@ async function fails(promise, re, name) {
   catch (e) { ok(name, re.test(e.message), `got: ${e.message}`); }
 }
 
-// ---------------------------------------------------------------- seed (as superuser)
 const U = Object.fromEntries(['hw1', 'doc1', 'doc2', 'doc3', 'adm1', 'patu', 'outsider', 'nobody', 'plat'].map(k => [k, randomUUID()]));
 const F1 = randomUUID(), F2 = randomUUID(), F3 = randomUUID();
 const P1 = randomUUID(), E1 = randomUUID(), CONSENT = randomUUID(), RS = randomUUID(), A1 = randomUUID();
@@ -85,7 +75,6 @@ await root(`insert into triage_assessments(id,encounter_id,version,rule_set_id,b
 await root(`insert into triage_signals(assessment_id,signal_code,kind,source,display_text) values ($1,'high_temp_reported','abnormal_vital','rule','temperature recorded above range')`, [A1]);
 await root(`insert into queue_items(encounter_id,facility_id,urgency_code) values ($1,$2,'yellow')`, [E1, F1]);
 
-// ---------------------------------------------------------------- 1. tenancy & visibility
 console.log('\n-- visibility');
 ok('hw1 (F1 worker) sees patient', await count(U.hw1, 'patients') === 1);
 ok('doc1 (F1 doctor) sees patient', await count(U.doc1, 'patients') === 1);
@@ -101,7 +90,6 @@ await fails(as('anon', 'select * from patients'), /permission denied/i, 'anon ha
 await fails(as('anon', 'select * from facilities'), /permission denied/i, 'anon has no access to facilities');
 ok('authenticated can read active facility directory', await count(U.outsider, 'facilities') === 3);
 
-// ---------------------------------------------------------------- 2. write controls
 console.log('\n-- writes / column privileges');
 await fails(as(U.hw1, `insert into patients(registered_facility_id,full_name,created_by) values ('${F2}','X','${U.hw1}')`), /row-level security/i, 'cannot register patient at a facility you do not belong to');
 await fails(as(U.hw1, `insert into patients(registered_facility_id,full_name,created_by,user_id) values ('${F1}','X','${U.hw1}','${U.outsider}')`), /permission denied/i, 'client cannot set patients.user_id (column grant)');
@@ -116,21 +104,18 @@ ok('valid vital accepted', (await as(U.hw1, `insert into vitals(encounter_id,kin
 await fails(as(U.doc2, `insert into vitals(encounter_id,kind,value,unit,measured_by) values ('${E1}','pulse_bpm',80,'bpm','${U.doc2}')`), /row-level/i, 'other facility cannot add vitals to my encounter');
 await fails(as(U.doc1, `insert into consents(patient_id,purpose,method,notice_version,captured_by) values ('${P1}','referral_sharing','digital','v2','${U.doc1}')`), /unique|duplicate/i, 'only one active consent per patient+purpose');
 
-// ---------------------------------------------------------------- 3. review actions
 console.log('\n-- review actions');
 await fails(as(U.doc1, `insert into review_actions(encounter_id,reviewer_id,action,to_urgency_code) values ('${E1}','${U.doc1}','override_urgency','red')`), /check/i, 'override without reason rejected');
 ok('reviewer can override with reason', (await as(U.doc1, `insert into review_actions(encounter_id,reviewer_id,action,from_urgency_code,to_urgency_code,reason) values ('${E1}','${U.doc1}','override_urgency','yellow','orange','clinical judgement: pallor noted') returning 1`)).length === 1);
 await fails(as(U.hw1, `insert into review_actions(encounter_id,reviewer_id,action,reason) values ('${E1}','${U.hw1}','approve','ok')`), /row-level/i, 'health_worker is not a reviewer role');
 await fails(as(U.doc1, `insert into review_actions(encounter_id,reviewer_id,action) values ('${E1}','${U.doc2}','approve')`), /row-level/i, 'cannot record an action as someone else');
 
-// ---------------------------------------------------------------- 4. append-only
 console.log('\n-- append-only / immutability');
 await fails(root(`update triage_assessments set urgency_code='red' where id='${A1}'`), /append-only/i, 'assessments immutable (even for superuser sessions)');
 await fails(root(`delete from review_actions`), /append-only/i, 'review actions cannot be deleted');
 await fails(root(`delete from audit_events`), /immutable audit/i, 'audit log cannot be deleted');
 await fails(root(`update audit_events set outcome='denied'`), /immutable audit/i, 'audit log cannot be updated');
 
-// ---------------------------------------------------------------- 5. external signal guard rails
 console.log('\n-- external (DXGPT) guard rails');
 await fails(root(`insert into external_signal_runs(encounter_id,provider,deidentified,sent_fields,status) values ('${E1}','dxgpt',true,'{}','ok')`), /null value|consent_id/i, 'external run requires a consent_id');
 const AI = randomUUID();
@@ -143,7 +128,6 @@ const DRAFT_RS = randomUUID();
 await root(`insert into triage_rule_sets(id,name,version,status,definition) values ($1,'draft-alg','0','draft','{}')`, [DRAFT_RS]);
 await fails(root(`insert into triage_assessments(encounter_id,version,rule_set_id,basis,urgency_code,note,input_fingerprint,engine_version) values ('${E1}',10,'${DRAFT_RS}','rules_engine','green','{}','x','x')`), /not approved/i, 'assessment cannot use an unapproved rule set');
 
-// ---------------------------------------------------------------- 6. break-glass
 console.log('\n-- break-glass');
 await fails(as(U.doc2, `insert into break_glass_grants(user_id,patient_id,facility_id,reason) values ('${U.doc2}','${P1}','${F2}','short')`), /check/i, 'break-glass requires a real reason');
 ok('doc2 cannot see P1 before break-glass', await count(U.doc2, 'patients') === 0);
@@ -152,7 +136,6 @@ ok('doc2 sees P1 + encounter after break-glass', await count(U.doc2, 'patients')
 ok('break-glass automatically audited', (await root(`select count(*)::int n from audit_events where action='break_glass' and actor_user_id='${U.doc2}'`))[0].n === 1);
 ok('break-glass scoped to that patient only', await count(U.doc2, 'patients', `id <> '${P1}'`) === 0);
 
-// ---------------------------------------------------------------- 7. referral workflow
 console.log('\n-- referral workflow');
 const R1 = randomUUID();
 await as(U.doc1, `insert into referrals(id,encounter_id,patient_id,from_facility_id,to_facility_id,requested_by,priority,reason_text) values ('${R1}','${E1}','${P1}','${F1}','${F3}','${U.doc1}','urgent','needs higher-level assessment')`);
@@ -170,7 +153,6 @@ ok('receiver accepted', (await root(`select status from referrals where id='${R1
 ok('referral events logged automatically', (await root(`select count(*)::int n from referral_events where referral_id='${R1}'`))[0].n === 3);
 ok('other facility (F2, no break-glass on referral) cannot see referral', await count(U.doc2, 'referrals') === 0);
 
-// ---------------------------------------------------------------- 8. memberships / admin separation
 console.log('\n-- admin separation');
 await fails(as(U.adm1, `insert into memberships(user_id,facility_id,role) values ('${U.outsider}','${F1}','facility_admin')`), /row-level/i, 'facility_admin cannot mint another facility_admin');
 ok('facility_admin can add a doctor to own facility', (await as(U.adm1, `insert into memberships(user_id,facility_id,role) values ('${U.outsider}','${F1}','nurse') returning 1`)).length === 1);
@@ -181,7 +163,6 @@ ok('patient can see audit rows about their own record', await count(U.patu, 'aud
 await fails(as(U.hw1, `select app.write_audit('read','patients')`), /permission denied/i, 'clients cannot forge audit events');
 ok('service role can write audit events', (await as('service', `select app.write_audit('read','patients','${P1}','${P1}','${F1}','${U.hw1}') as id`)).length === 1);
 
-// ---------------------------------------------------------------- 9. documents & storage
 console.log('\n-- documents / storage');
 const D1 = randomUUID(), path = `${F1}/${P1}/${D1}.pdf`;
 await fails(as(U.hw1, `insert into documents(id,patient_id,facility_id,kind,storage_path,mime_type,size_bytes,uploaded_by) values ('${D1}','${P1}','${F1}','lab_report','../../etc/passwd','application/pdf',100,'${U.hw1}')`), /check/i, 'path traversal impossible: storage_path format CHECK');
@@ -200,7 +181,6 @@ await root(`update documents set scan_status='infected' where id='${D1}'`);
 ok('infected file no longer readable', await count(U.hw1, 'storage.objects', `name='${path}'`) === 0);
 await root(`update documents set scan_status='clean' where id='${D1}'`);
 
-// ---------------------------------------------------------------- 10. erasure + audit chain
 console.log('\n-- erasure & audit chain');
 ok('audit chain verifies before erasure', (await root(`select * from app.verify_audit_chain()`)).length === 0);
 const ER = randomUUID();
@@ -218,7 +198,6 @@ await fails(as('service', `select app.erase_patient('${ER}','${U.doc1}')`), /not
 ok('erased patient no longer visible to staff', await count(U.hw1, 'patients', `id='${P1}'`) === 0);
 ok('audit chain STILL verifies after erasure', (await root(`select * from app.verify_audit_chain()`)).length === 0);
 
-// tamper detection (last: leaves the chain broken on purpose)
 await root(`alter table audit_events disable trigger trg_audit_immutable`);
 const victim = (await root(`select id from audit_events order by id limit 1 offset 2`))[0].id;
 await root(`update audit_events set outcome='denied' where id=${victim}`);
@@ -226,7 +205,6 @@ await root(`alter table audit_events enable trigger trg_audit_immutable`);
 const broken = await root(`select broken_id from app.verify_audit_chain()`);
 ok('tampering with an audit row is detected', broken.length >= 1 && Number(broken[0].broken_id) === Number(victim));
 
-// ---------------------------------------------------------------- 11. structural checks
 console.log('\n-- structural');
 const colPriv = async (t, c, p) => (await root(`select has_column_privilege('authenticated','public.${t}','${c}','${p}') as v`))[0].v;
 ok('authenticated CANNOT insert documents.scan_status', !(await colPriv('documents', 'scan_status', 'INSERT')));

@@ -1,9 +1,3 @@
-// Deletes uploaded files whose retention period is over, and leaves proof in the audit log.
-//   npm --prefix aarogyarekha2-backend run retention:dry      lists how many WOULD be deleted (changes nothing)
-//   npm --prefix aarogyarekha2-backend run retention:apply    actually deletes
-// RETENTION_DOCUMENT_DAYS must be set for the default period. It is a legal/medical-records decision, so there is no built-in value.
-// This worker is the only place that uses the service-role key (to delete files from private storage). The API server never loads it.
-// Prints counts only: no names, paths or file contents.
 import { createClient } from '@supabase/supabase-js';
 import { loadConfig } from '../src/config.js';
 import { makePool } from '../src/liveDeps.js';

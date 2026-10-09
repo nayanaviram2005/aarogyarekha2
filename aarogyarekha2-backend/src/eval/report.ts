@@ -1,4 +1,3 @@
-// Turns an evaluation Summary (and an optional performance measurement) into the text of docs/EVALUATION.md.
 import type { InvariantReport, Summary } from './run.js';
 import type { Score } from './ocrCorpus.js';
 

@@ -1,5 +1,3 @@
-// Database side of the platform administrator's work (migration 0020): which facilities exist, make one, switch one on or off.
-// Appointing a facility administrator goes through the people-and-roles functions (0016), which allow it for a platform administrator only.
 import { PlatformError, type PlatformAdmin } from '../deps.js';
 
 interface Queryable { query(sql: string, params?: unknown[]): Promise<{ rows: any[] }> }

@@ -1,4 +1,3 @@
-// Migration 0016 (who works where, in what role) against the REAL schema in an in-process Postgres.
 import type { PGlite } from '@electric-sql/pglite';
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -32,7 +31,7 @@ describe('adding and changing a role', () => {
   it('changing the role turns the old one off: one active role at a facility', async () => {
     await setRole(U.admin, F1, U.hw, 'nurse'); expect(await active(U.hw)).toEqual(['nurse']);
     await setRole(U.admin, F1, U.hw, 'health_worker'); expect(await active(U.hw)).toEqual(['health_worker']);
-    expect((await rows(`select count(*)::int n from public.memberships where user_id = $1 and facility_id = $2`, [U.hw, F1]))[0].n).toBe(2);       // history kept, one active
+    expect((await rows(`select count(*)::int n from public.memberships where user_id = $1 and facility_id = $2`, [U.hw, F1]))[0].n).toBe(2);
   });
   it('setting the same role again is harmless', async () => { await setRole(U.admin, F1, U.hw, 'health_worker'); expect(await active(U.hw)).toEqual(['health_worker']); });
   it('the same person can hold a role at another facility at the same time', async () => { await setRole(U.otherAdmin, F2, U.hw, 'nurse'); expect(await active(U.hw, F2)).toEqual(['nurse']); expect(await active(U.hw, F1)).toEqual(['health_worker']); });

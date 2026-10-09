@@ -5,7 +5,6 @@ import type { QueueEntry } from '../lib/types';
 const RISKS: { key: number | 'none'; label: string }[] = [{ key: 1, label: 'Immediate' }, { key: 2, label: 'Very urgent' }, { key: 3, label: 'Urgent' }, { key: 4, label: 'Routine' }, { key: 'none', label: 'Not assessed' }];
 const WAITS = [[0, 'Any wait'], [30, '30 minutes or more'], [60, '1 hour or more'], [120, '2 hours or more'], [180, '3 hours or more']] as const;
 
-/** Narrows the list on this screen. It never changes the order or anyone's priority. */
 export function QueueFilterBar({ entries, value, onChange, facilityNames, shown }: { entries: QueueEntry[]; value: QueueFilter; onChange: (f: QueueFilter) => void; facilityNames: Record<string, string>; shown: number }) {
   const { scenarios, languages, facilityIds } = queueFacets(entries);
   const toggle = (k: number | 'none') => { const s = new Set(value.tiers); if (s.has(k)) s.delete(k); else s.add(k); onChange({ ...value, tiers: s }); };

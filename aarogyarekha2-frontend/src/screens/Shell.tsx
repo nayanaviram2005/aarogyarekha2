@@ -24,9 +24,7 @@ export function Shell() {
   const [meFailed, setMeFailed] = useState(false);
   const reloadMe = useCallback(() => { void api?.me().then(x => { setMe(x); setMeFailed(false); }).catch(() => { setMe(null); setMeFailed(true); }); }, [api]);
   useEffect(reloadMe, [reloadMe]);
-  // The name and roles decide what every screen shows. If they could not load, try once more soon instead of leaving the person with no access.
   useEffect(() => { if (!meFailed) return; const t = window.setTimeout(reloadMe, 2500); return () => window.clearTimeout(t); }, [meFailed, reloadMe]);
-  // A platform administrator has no facility, so the queue is empty for them: open their own screen first.
   const nav = useNavigate(); const loc = useLocation();
   useEffect(() => { if (me?.isPlatformAdmin && me.memberships.length === 0 && loc.pathname === '/') nav('/platform', { replace: true }); }, [me, loc.pathname, nav]);
   const needMfa = !demo && me?.mfaRequired === true && me.aal !== 'aal2';

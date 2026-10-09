@@ -46,7 +46,7 @@ function Offline({ outbox: given }: { outbox?: Outbox }) {
       const out = await processRow(api, asRow(n), String(n.data.witness ?? ''));
       if (out.status === 'done') { await outbox.remove(n.id); setMsgs(m => ({ ...m, [n.id]: { text: out.message ?? 'Sent.', ok: true } })); }
       else {
-        await outbox.put(n.id, { row: { ...out, status: 'todo' }, witness: n.data.witness }).catch(() => {});      // keeps progress so a retry never registers anyone twice
+        await outbox.put(n.id, { row: { ...out, status: 'todo' }, witness: n.data.witness }).catch(() => {});
         setMsgs(m => ({ ...m, [n.id]: { text: out.status === 'duplicate' ? `${out.message} ${out.duplicates?.map(d => `${d.fullName} (${d.publicRef})`).join(', ') ?? ''}` : out.message ?? 'Not sent.', ok: false } }));
       }
     }

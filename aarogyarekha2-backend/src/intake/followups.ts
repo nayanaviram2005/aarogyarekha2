@@ -1,16 +1,12 @@
-// Turns the engine's "missing information" into follow-up questions for the health worker, most useful first.
-// "Most useful" = the question whose answer could move the tier furthest (smallest potential tier first).
-// Questions only ask for information. They never suggest what the answer means or what to do about it.
 import type { RuleSet, Tier, TriageDecision } from '../triage/types.js';
 
 export interface FollowUp {
-  fieldCode: string;                      // matches triage_signals / info_requests.field_code, e.g. 'sign.central_cyanosis'
+  fieldCode: string;
   audience: 'health_worker' | 'patient';
   question: string;
   lang: 'en';
-  potentialTier: Tier | null;             // the tier this answer could lead to if it came back worst-case
-  rank: number;                           // 1 = ask first
-  /** Where the wording came from: the model, worded for this patient, or the rule set's own fixed text (used when no model is available). */
+  potentialTier: Tier | null;
+  rank: number;
   wording: 'ai' | 'rules';
 }
 

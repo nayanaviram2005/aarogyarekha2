@@ -1,14 +1,5 @@
--- 0008 Row Level Security: default-deny, least-privilege grants, explicit policies.
---
--- Model: the browser/mobile client talks to PostgREST as `authenticated` (RLS applies).
--- Privileged, system-authored data (triage assessments, signals, external runs, queue inserts,
--- reminders, health-card tokens, scan results) is written ONLY by the API tier using service_role.
--- Column-level GRANTs restrict WHICH columns a client may write, on top of the row policies.
-
--- ---------------------------------------------------------------- extra helpers
 create or replace function app.can_access_encounter_staff(p_encounter uuid)
 returns boolean language sql stable security definer set search_path = '' as $$
-  -- like can_access_encounter() but never satisfied merely by being the patient
   select exists (
     select 1 from public.encounters e
     where e.id = p_encounter and e.deleted_at is null and (
@@ -52,7 +43,6 @@ grant execute on all functions in schema app to authenticated, service_role;
 revoke execute on function app.write_audit(public.audit_action, text, uuid, uuid, uuid, uuid, public.audit_outcome, text, inet, text, text, jsonb) from authenticated;
 revoke execute on function app.verify_audit_chain(bigint) from authenticated;
 
--- ---------------------------------------------------------------- default deny
 do $$
 declare t record;
 begin
@@ -62,9 +52,7 @@ begin
 end $$;
 revoke all on all tables in schema public from anon, authenticated;
 revoke all on all sequences in schema public from anon, authenticated;
--- anon gets nothing at all. Any new table starts with RLS on and no grants.
 
--- ---------------------------------------------------------------- directory
 grant select, insert, update on public.facilities to authenticated;
 create policy facilities_select on public.facilities for select to authenticated
   using (is_active or app.is_platform_admin());
@@ -79,8 +67,6 @@ create policy fcap_insert on public.facility_capabilities for insert to authenti
   with check (app.is_platform_admin() or app.is_facility_admin_at(facility_id));
 create policy fcap_delete on public.facility_capabilities for delete to authenticated
   using (app.is_platform_admin() or app.is_facility_admin_at(facility_id));
-
--- platform_admins: no grants, no policies (service_role only)
 
 grant select on public.profiles to authenticated;
 grant update (display_name, phone, preferred_language) on public.profiles to authenticated;
@@ -100,15 +86,12 @@ create policy memberships_update on public.memberships for update to authenticat
 create policy memberships_delete on public.memberships for delete to authenticated
   using ((app.is_facility_admin_at(facility_id) and role <> 'facility_admin') or app.is_platform_admin());
 
--- ---------------------------------------------------------------- patients
 grant select on public.patients to authenticated;
 grant insert (registered_facility_id, full_name, preferred_language, sex, birth_date, age_years_reported,
               phone, address_line, village_town, district, state, pincode, guardian_name, guardian_phone,
               created_by) on public.patients to authenticated;
 grant update (full_name, preferred_language, sex, birth_date, age_years_reported, phone, address_line,
               village_town, district, state, pincode, guardian_name, guardian_phone) on public.patients to authenticated;
--- NB: the row-local clauses come first on purpose. INSERT ... RETURNING (supabase-js .insert().select())
--- evaluates this policy against the NEW row, which a helper that re-queries `patients` by id cannot see yet.
 create policy patients_select on public.patients for select to authenticated
   using (deleted_at is null
          and (app.is_clinician_at(registered_facility_id) or user_id = (select auth.uid())
@@ -130,8 +113,6 @@ create policy pid_update on public.patient_identifiers for update to authenticat
 create policy pid_delete on public.patient_identifiers for delete to authenticated
   using (app.is_clinician_at(app.patient_registered_facility(patient_id)));
 
--- health_card_tokens: no grants (service_role only; issuance/redemption go through the API tier)
-
 grant select, insert on public.reported_history to authenticated;
 grant update (confirmed_by, confirmed_at) on public.reported_history to authenticated;
 create policy rh_select on public.reported_history for select to authenticated
@@ -152,7 +133,6 @@ create policy preg_update on public.pregnancy_episodes for update to authenticat
   using (app.is_clinician_at(app.patient_registered_facility(patient_id)))
   with check (app.is_clinician_at(app.patient_registered_facility(patient_id)));
 
--- ---------------------------------------------------------------- consent / grants / break-glass
 grant select, insert on public.consents to authenticated;
 grant update (revoked_at) on public.consents to authenticated;
 create policy consents_select on public.consents for select to authenticated
@@ -186,7 +166,6 @@ create policy bg_review on public.break_glass_grants for update to authenticated
   using (app.is_facility_admin_at(facility_id))
   with check (app.is_facility_admin_at(facility_id) and reviewed_by = (select auth.uid()));
 
--- ---------------------------------------------------------------- encounters & intake data
 grant select on public.encounters to authenticated;
 grant insert (patient_id, facility_id, scenario, channel, status, language, chief_complaint_original,
               chief_complaint_translated, translation_confidence, group_ref, context, created_by)
@@ -194,7 +173,7 @@ grant insert (patient_id, facility_id, scenario, channel, status, language, chie
 grant update (status, language, chief_complaint_original, chief_complaint_translated, translation_confidence,
               group_ref, context, submitted_at, closed_at) on public.encounters to authenticated;
 create policy enc_select on public.encounters for select to authenticated
-  using (deleted_at is null and (app.is_clinician_at(facility_id) or app.can_access_encounter(id)));  -- row-local first (see patients_select)
+  using (deleted_at is null and (app.is_clinician_at(facility_id) or app.can_access_encounter(id)));
 create policy enc_insert on public.encounters for insert to authenticated
   with check (app.is_clinician_at(facility_id) and created_by = (select auth.uid())
               and app.can_access_patient(patient_id));
@@ -223,10 +202,7 @@ create policy info_update on public.info_requests for update to authenticated
   using (app.is_clinician_at(app.encounter_facility(encounter_id)))
   with check (app.is_clinician_at(app.encounter_facility(encounter_id)));
 
--- ---------------------------------------------------------------- documents & extraction
 grant select on public.documents to authenticated;
--- `id` is client-supplied: the storage path embeds the document id, so the row must exist (as 'pending')
--- under that id before the upload. scan_status / deleted_at are deliberately NOT insertable.
 grant insert (id, patient_id, encounter_id, facility_id, kind, storage_path, mime_type, size_bytes, sha256,
               original_filename, uploaded_by) on public.documents to authenticated;
 create policy docs_select on public.documents for select to authenticated
@@ -235,7 +211,6 @@ create policy docs_insert on public.documents for insert to authenticated
   with check (uploaded_by = (select auth.uid()) and scan_status = 'pending'
               and ((app.is_clinician_at(facility_id) and app.can_access_patient(patient_id))
                    or (app.is_self_patient(patient_id) and facility_id = app.patient_registered_facility(patient_id))));
--- scan_status / deleted_at changes: service_role only.
 
 grant select on public.extractions to authenticated;
 create policy ext_select on public.extractions for select to authenticated
@@ -250,7 +225,6 @@ create policy extf_verify on public.extracted_fields for update to authenticated
   with check (app.is_clinician_at(app.document_facility(app.extraction_document(extraction_id)))
               and (verified_by is null or verified_by = (select auth.uid())));
 
--- ---------------------------------------------------------------- triage (system-written; staff-read)
 grant select on public.urgency_levels to authenticated;
 create policy urgency_select on public.urgency_levels for select to authenticated using (true);
 
@@ -282,7 +256,6 @@ create policy ra_select on public.review_actions for select to authenticated
 create policy ra_insert on public.review_actions for insert to authenticated
   with check (reviewer_id = (select auth.uid()) and app.is_reviewer_at(app.encounter_facility(encounter_id)));
 
--- ---------------------------------------------------------------- referrals & follow-up
 grant select, insert on public.referrals to authenticated;
 grant update (to_facility_id, priority, reason_text, status, status_reason, bundle, bundle_sha256)
   on public.referrals to authenticated;
@@ -318,7 +291,7 @@ create policy fu_insert on public.followup_schedules for insert to authenticated
 create policy fu_update on public.followup_schedules for update to authenticated
   using (app.is_clinician_at(facility_id)) with check (app.is_clinician_at(facility_id));
 
-grant select on public.reminders to authenticated;   -- created/updated by the notification worker (service_role)
+grant select on public.reminders to authenticated;
 create policy rem_select on public.reminders for select to authenticated
   using (exists (select 1 from public.followup_schedules s where s.id = schedule_id));
 
@@ -331,11 +304,9 @@ create policy er_insert on public.erasure_requests for insert to authenticated
                    or (requested_via in ('staff', 'guardian')
                        and app.is_clinician_at(app.patient_registered_facility(patient_id)))));
 
--- ---------------------------------------------------------------- audit (read-only for clients)
 grant select on public.audit_events to authenticated;
 create policy audit_select on public.audit_events for select to authenticated
   using ((facility_id is not null and app.is_facility_admin_at(facility_id))
          or app.is_platform_admin()
          or (patient_id is not null and app.is_self_patient(patient_id)));
 
--- legacy_id_map: no grants (service_role only)

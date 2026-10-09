@@ -1,5 +1,3 @@
-// Says which PDF structures would make the upload check refuse a file. Prints names of structures and counts only, never text.
-// Run in aarogyarekha2-backend: npx tsx scripts/pdf-active-check.ts "C:\path\to\file.pdf"
 import { readFileSync } from 'node:fs';
 import { PDFDict, PDFDocument, PDFName, PDFStream } from 'pdf-lib';
 

@@ -3,16 +3,11 @@ import type { Api } from './types';
 
 export type Health = 'connecting' | 'online' | 'offline';
 
-export const PING_OK_MS = 20_000;       // how often to check while things are fine
-export const PING_RETRY_MS = 4_000;     // how soon to look again after a miss (a sleeping server needs a few tries to wake)
-export const PING_TIMEOUT_MS = 10_000;  // one check that takes longer than this counts as a miss
+export const PING_OK_MS = 20_000;
+export const PING_RETRY_MS = 4_000;
+export const PING_TIMEOUT_MS = 10_000;
 export const MISSES_BEFORE_OFFLINE = 2;
 
-/**
- * Whether the API can be reached. One slow or failed check is not "offline": a server on a free host can need a minute to wake, and one
- * dropped request on a weak connection is normal. It says "connecting" after the first miss and "offline" only after two in a row, and it
- * looks again quickly when it is not sure, when the browser regains its connection and when the tab comes back to the front.
- */
 export function useApiHealth(api: Api | null): Health {
   const [state, setState] = useState<Health>('connecting');
   useEffect(() => {

@@ -1,10 +1,3 @@
-// Referral preparation: pick a receiving facility, write the reason, preview the FHIR document, send it, download it.
-//
-//  * Preparing needs a reviewer's sign-off on the current assessment (checked here for a clear message AND in the database).
-//  * Sending is one database transaction (migration 0014) that re-checks the sender's role, the sign-off, the assessment being
-//    current, and the patient's `referral_sharing` consent, then freezes the document. The API cannot skip those checks.
-//  * Disclosure is audited BEFORE it happens (fail closed): if the attempt cannot be recorded, nothing is sent.
-//  * Everything a receiver gets is built from recorded facts; the only free text written by a person is the reason for referral.
 import { renderReferralPdf } from '../referral/pdf.js';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
@@ -36,7 +29,6 @@ const meta = (r: Omit<ReferralRow, 'bundle'>, toName?: string | null) => ({
 export function registerReferralRoutes(c: RouteCtx, h: RouteHelpers): void {
   const { app, deps, authenticate, fail } = c;
 
-  /** Active consent per purpose: the most recent one that is still in force. */
   const activeConsents = (rows: ConsentBrief[], purposes: string[]) =>
     purposes.flatMap(p => {
       const live = rows.filter(r => r.purpose === p && isConsentActive([r]));
@@ -44,7 +36,6 @@ export function registerReferralRoutes(c: RouteCtx, h: RouteHelpers): void {
       return latest ? [{ purpose: p, granted_at: latest.granted_at }] : [];
     });
 
-  /** Reads everything the document needs AS the caller, so row-level security decides what can go in it. */
   async function assemble(req: Parameters<typeof authenticate>[0], ref: Omit<ReferralRow, 'bundle'>, final: boolean) {
     const r = req.reader!;
     const [summary, patient, identifiers, from, to, consents] = await Promise.all([
@@ -85,7 +76,6 @@ export function registerReferralRoutes(c: RouteCtx, h: RouteHelpers): void {
     return ref;
   }
 
-  /** Same consent gate as the rest of the encounter: no processing without active triage consent. */
   async function consentOk(req: Parameters<typeof authenticate>[0], reply: Parameters<typeof fail>[0], patientId: string) {
     const ok = await h.writerFor(req).hasActiveConsent(patientId, 'care_triage').catch(() => undefined);
     if (ok === undefined) { fail(reply, 502, 'transient', 'Consent could not be checked. Try again.'); return false; }
@@ -93,14 +83,12 @@ export function registerReferralRoutes(c: RouteCtx, h: RouteHelpers): void {
     return true;
   }
 
-  // ------------------------------------------------------------------ directory (no patient data, so not audited)
   app.get('/facilities', { preHandler: authenticate }, async (req, reply) => {
     const rows = await req.reader!.listFacilities().catch(() => undefined);
     if (rows === undefined) return fail(reply, 502, 'transient', 'The facility list could not be loaded. Try again.');
     return reply.send({ facilities: rows });
   });
 
-  // ------------------------------------------------------------------ prepare
   app.post('/encounters/:id/referrals', { preHandler: authenticate }, async (req, reply) => {
     const body = createBody.safeParse(req.body);
     if (!body.success) return h.invalid(reply, body.error);
@@ -147,7 +135,6 @@ export function registerReferralRoutes(c: RouteCtx, h: RouteHelpers): void {
     return reply.send({ referrals: rows.map(r => meta(r, r.to_facility_id ? names.get(r.to_facility_id) : null)) });
   });
 
-  // ------------------------------------------------------------------ view (preview while a draft, the frozen document once sent)
   app.get('/referrals/:id', { preHandler: authenticate }, async (req, reply) => {
     const ref = await openReferral(req, reply); if (!ref) return;
     const sent = ref.status !== 'draft' && ref.status !== 'cancelled' && !!ref.bundle;
@@ -188,7 +175,6 @@ export function registerReferralRoutes(c: RouteCtx, h: RouteHelpers): void {
     } catch (err) { return h.dbFail(req, reply, err); }
   });
 
-  // ------------------------------------------------------------------ send
   app.post('/referrals/:id/send', { preHandler: authenticate }, async (req, reply) => {
     if (!(await c.requireMfa(req, reply, 'send_referral'))) return;
     const ref = await openReferral(req, reply); if (!ref) return;
@@ -205,7 +191,6 @@ export function registerReferralRoutes(c: RouteCtx, h: RouteHelpers): void {
     }
     const sha256 = createHash('sha256').update(canonicalJson(built.bundle)).digest('hex');
 
-    // Fail closed: the attempt to disclose must be on record BEFORE anything leaves the facility.
     if (!(await c.auditOrFail(req, reply, { action: 'share', entityType: 'referral', entityId: ref.id, patientId: ref.patient_id, facilityId: ref.from_facility_id, outcome: 'success', details: { phase: 'attempt', toFacilityId: ref.to_facility_id, bundleSha256: sha256 } }))) return;
 
     try {
@@ -223,7 +208,6 @@ export function registerReferralRoutes(c: RouteCtx, h: RouteHelpers): void {
     }
   });
 
-  // ------------------------------------------------------------------ download the frozen document
   app.get('/referrals/:id/bundle', { preHandler: authenticate }, async (req, reply) => {
     const ref = await openReferral(req, reply); if (!ref) return;
     if (!ref.bundle || ref.status === 'draft' || ref.status === 'cancelled') return fail(reply, 409, 'conflict', 'This referral has not been sent yet. Preview it instead.');
@@ -231,7 +215,6 @@ export function registerReferralRoutes(c: RouteCtx, h: RouteHelpers): void {
     return reply.header('content-disposition', `attachment; filename="referral-${ref.id.slice(0, 8)}.json"`).type(FHIR).send(ref.bundle);
   });
 
-  // ------------------------------------------------------------------ the same frozen document as a printable PDF
   app.get('/referrals/:id/pdf', { preHandler: authenticate, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req, reply) => {
     const ref = await openReferral(req, reply); if (!ref) return;
     if (!ref.bundle || ref.status === 'draft' || ref.status === 'cancelled') return fail(reply, 409, 'conflict', 'This referral has not been sent yet. Preview it instead.');

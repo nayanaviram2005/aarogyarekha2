@@ -5,12 +5,7 @@ import type { Api, EncounterSummary, VisitOutcome } from '../lib/types';
 export const OUTCOME_TEXT: Record<VisitOutcome, string> = { treated_here: 'Treated here', sent_home: 'Sent home', did_not_wait: 'Did not wait', referred: 'Referred' };
 type Choice = Exclude<VisitOutcome, 'referred'>;
 
-/**
- * Moves a patient through the visit: call in, then complete with an outcome so the patient leaves the queue and room opens up.
- * Treated here and sent home need a nurse or doctor and a priority that has already been signed off. A referral is not completed here:
- * sending the referral takes the patient off the queue.
- */
-export function VisitPanel({ api, summary, canReview, reviewedCurrent, onChanged, bare = false }: { api: Api; summary: EncounterSummary; canReview: boolean; reviewedCurrent: boolean; onChanged: () => Promise<void> | void; /** Without its own heading and frame, for use inside the next-step card. */ bare?: boolean }) {
+export function VisitPanel({ api, summary, canReview, reviewedCurrent, onChanged, bare = false }: { api: Api; summary: EncounterSummary; canReview: boolean; reviewedCurrent: boolean; onChanged: () => Promise<void> | void; bare?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<Choice | ''>('');

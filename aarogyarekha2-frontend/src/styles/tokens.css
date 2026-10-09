@@ -1,5 +1,3 @@
-/* "Ward Chart" design tokens. See docs/02-design-language.md.
-   Colour is reserved for urgency and state. No gradients, no shadows, no blur. Sans-serif only; no monospace. */
 :root {
   --ink: #15232d;
   --ink-2: #4a5b67;

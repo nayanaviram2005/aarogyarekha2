@@ -1,4 +1,3 @@
-// Read-only: shows recent audit rows (no PHI by design) and verifies the hash chain.
 import pg from 'pg';
 const c = new pg.Client({ connectionString: process.env.DATABASE_URL_POOLER.replace(':6543/', ':5432/'), ssl: { rejectUnauthorized: false } });
 await c.connect();

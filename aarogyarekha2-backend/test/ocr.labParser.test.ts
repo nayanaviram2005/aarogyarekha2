@@ -27,7 +27,7 @@ describe('typical report lines', () => {
   });
   it('no flag printed means no flag recorded (it never decides abnormality itself)', () => {
     expect(one('Fasting Blood Glucose 98 mg/dL 70 - 100')).toMatchObject({ fieldName: 'glucose_fasting', valueNum: 98, printedFlag: null });
-    expect(one('Creatinine 4.8 mg/dL 0.6 - 1.2')).toMatchObject({ valueNum: 4.8, printedFlag: null });      // far outside the range, still not flagged by us
+    expect(one('Creatinine 4.8 mg/dL 0.6 - 1.2')).toMatchObject({ valueNum: 4.8, printedFlag: null });
   });
   it('upper-limit only ranges, asterisk flag, and tests with no unit', () => {
     expect(one('Total Cholesterol 240 mg/dL < 200 *')).toMatchObject({ fieldName: 'cholesterol_total', referenceRangeText: '< 200', printedFlag: 'abnormal' });

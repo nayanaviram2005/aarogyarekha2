@@ -1,10 +1,6 @@
 import { formatTime, latestVitals, TIER_WORD, tierOfUrgency, vitalLabel, vitalUnit } from './format';
 import type { EncounterSummary } from './types';
 
-/**
- * A short plain-language summary of the timeline, built only from recorded facts (no model, nothing inferred). It answers "what
- * is the story so far" in a few lines; the full table of events sits beneath it.
- */
 export interface SummaryLine { label: string; text: string }
 
 const unitWord = (v: number | string, unit: string) => (Number(v) === 1 ? unit.replace(/s$/, '') : unit);
@@ -18,7 +14,6 @@ export function buildCaseSummary(input: EncounterSummary): SummaryLine[] {
   const complaint = s.encounter.chief_complaint_translated ?? s.encounter.chief_complaint_original;
   if (complaint) out.push({ label: 'Main complaint', text: complaint });
 
-  // Symptoms, longest-standing first, so the start of the story comes first.
   const sym = [...s.symptoms].sort((a, b) => ago(b.duration_value, b.duration_unit) - ago(a.duration_value, a.duration_unit));
   if (sym.length) {
     out.push({

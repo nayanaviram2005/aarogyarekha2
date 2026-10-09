@@ -1,30 +1,20 @@
-/**
- * Where a patient is in the triage-desk journey, and the one thing to do next. Pure: built only from facts the screen already has.
- *
- *   1 Check-in   consent, what the patient says, measurements, and the system's draft priority
- *   2 Questions  the danger-sign questions that fit this patient
- *   3 Sign-off   a nurse or doctor confirms or changes the priority
- *   4 Visit      call in, then treated / sent home / referred
- * The draft priority is a RESULT shown on the page, not a step of its own.
- */
 export type StepKey = 'checkin' | 'questions' | 'signoff' | 'visit';
 export type StepState = 'done' | 'current' | 'todo';
 export type NextAction = 'consent' | 'assess' | 'answer' | 'signoff' | 'wait_signoff' | 'call_in' | 'complete' | 'finished';
 
 export interface JourneyInput {
-  consent: boolean | null;               // null = not known yet
-  status: string;                        // encounter status
+  consent: boolean | null;
+  status: string;
   hasAssessment: boolean;
-  recorded: boolean;                     // at least one symptom, measurement or complaint
+  recorded: boolean;
   openQuestions: number;
-  signedOff: boolean;                    // the CURRENT assessment has been reviewed
+  signedOff: boolean;
   queueStatus: string | null;
   canReview: boolean;
 }
 export interface JourneyStep { key: StepKey; label: string; state: StepState; note: string }
-export interface Journey { steps: JourneyStep[]; next: NextAction; title: string; detail: string; owner: 'anyone' | 'nurse_or_doctor'; /** The step the next action belongs to (null when finished). */ recommended: StepKey | null }
+export interface Journey { steps: JourneyStep[]; next: NextAction; title: string; detail: string; owner: 'anyone' | 'nurse_or_doctor'; recommended: StepKey | null }
 
-/** The step an action belongs to. */
 export const stepOf = (n: NextAction): StepKey => (n === 'consent' || n === 'assess' ? 'checkin' : n === 'answer' ? 'questions' : n === 'signoff' || n === 'wait_signoff' ? 'signoff' : 'visit');
 
 export const STEP_LABEL: Record<StepKey, string> = { checkin: 'Check-in', questions: 'Questions', signoff: 'Sign-off', visit: 'Visit' };

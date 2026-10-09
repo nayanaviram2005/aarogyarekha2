@@ -4,18 +4,15 @@ import type { Tier } from '../lib/types';
 
 interface Props {
   fieldCode: string; question: string; rank: number; potentialTier: Tier | null; disabled?: boolean;
-  /** What the answer is recorded against, in the rules' own short words (so a reworded question can never hide what is being checked). */
   checks?: string | null;
-  /** The answer typed or chosen so far. It is only kept on screen until the reviewer presses Submit. */
   draft?: Draft; onDraft: (d: Draft | null) => void;
-  /** The same question in the patient's language, for reading aloud. */ translated?: string | null; translatedLang?: 'en' | 'hi' | 'or';
-  /** A health worker should leave this one for a nurse or doctor. */ needsClinician?: boolean;
+  translated?: string | null; translatedLang?: 'en' | 'hi' | 'or';
+  needsClinician?: boolean;
 }
 
-/** One follow-up question with the right way to answer it. Choosing an answer only marks it on screen; the reviewer submits all answers together. */
 export function FollowUpControl({ fieldCode, question, checks, rank, potentialTier, disabled, draft, onDraft, translated, translatedLang, needsClinician }: Props) {
   const yes = draft?.kind === 'bool' ? draft.value : undefined;
-  const pick = (v: boolean) => onDraft(yes === v ? null : { kind: 'bool', value: v });         // pressing the chosen answer again takes it back
+  const pick = (v: boolean) => onDraft(yes === v ? null : { kind: 'bool', value: v });
 
   let control: React.ReactNode;
   if (fieldCode.startsWith('sign.') || fieldCode === 'vital.oxygen' || fieldCode === 'context.pregnancy_status') {

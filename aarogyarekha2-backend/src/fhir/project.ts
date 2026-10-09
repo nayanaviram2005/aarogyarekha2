@@ -1,5 +1,3 @@
-// Relational rows -> FHIR R4 resources. Pure functions: no I/O, so they are easy to test and to validate.
-// Minimisation: only fields the schema holds are emitted; nothing is inferred. No diagnosis is ever produced.
 import type { Patient, Encounter, Observation, OperationOutcome } from 'fhir/r4';
 import {
   SYS, VITALS, BP_PANEL, BP_SYSTOLIC, BP_DIASTOLIC, MMHG, ENCOUNTER_STATUS, SEX_TO_GENDER, type VitalKind,
@@ -40,7 +38,6 @@ export function toFhirPatient(p: PatientRow, identifiers: IdentifierRow[] = []):
     name: [{ use: 'official', text: p.full_name }],
     gender: SEX_TO_GENDER[p.sex],
     ...(p.birth_date ? { birthDate: p.birth_date } : {}),
-    // Camps often record age only: keep it explicit and labelled "reported", never fabricate a birth date.
     ...(!p.birth_date && p.age_years_reported != null
       ? { extension: [{ url: `${SYS.local}/ext/age-years-reported`, valueInteger: p.age_years_reported }] }
       : {}),
@@ -69,7 +66,6 @@ export function toFhirEncounter(e: EncounterRow): Encounter {
     type: [{ coding: [{ system: `${SYS.local}/encounter-scenario`, code: e.scenario }] }],
     subject: { reference: `Patient/${e.patient_id}` },
     period: { start, ...(e.closed_at ? { end: e.closed_at } : {}) },
-    // Reported complaint only. The original-language text is primary; translation is labelled as such.
     ...(e.chief_complaint_original
       ? { reasonCode: [{
           text: e.chief_complaint_original,
@@ -86,7 +82,6 @@ export interface VitalRow { id: string; encounter_id: string; kind: VitalKind; v
 
 const num = (v: number | string) => (typeof v === 'string' ? Number(v) : v);
 
-/** Vitals -> Observations. A systolic and diastolic pair with the same timestamp becomes ONE BP panel. */
 export function toFhirVitals(patientId: string, vitals: VitalRow[]): Observation[] {
   const base = (v: VitalRow) => ({
     resourceType: 'Observation' as const,

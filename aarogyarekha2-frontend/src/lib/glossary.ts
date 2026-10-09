@@ -1,8 +1,3 @@
-/**
- * A small glossary of everyday symptom words in Hindi, Odia and Hindi typed in English letters, matched to one plain English term.
- * It helps a reviewer read the original quickly ("bukhar" = fever). It is a word lookup, NOT a diagnosis and NOT a translation of
- * the whole sentence. Written by the build team; a native-speaking clinician should review it before real use.
- */
 export interface GlossaryTerm { term: string; words: string[] }
 
 export const GLOSSARY: GlossaryTerm[] = [
@@ -32,7 +27,6 @@ export const GLOSSARY: GlossaryTerm[] = [
 
 const norm = (s: string) => s.normalize('NFC').toLowerCase().replace(/\s+/g, ' ');
 
-/** English terms whose words appear in the text. A term is listed once, in the order of the glossary. */
 export function glossaryMatches(text: string): string[] {
   const t = norm(text); if (!t.trim()) return [];
   const hay = ` ${t.replace(/[.,;:!?()\-]/g, ' ')} `;
@@ -40,7 +34,7 @@ export function glossaryMatches(text: string): string[] {
   for (const g of GLOSSARY) {
     const hit = g.words.some(w => {
       const nw = norm(w);
-      return /[a-z]/.test(nw) ? hay.includes(` ${nw} `) || hay.includes(` ${nw}`) && nw.length > 5 : t.includes(nw);   // Latin words match whole words; Devanagari and Odia match as written
+      return /[a-z]/.test(nw) ? hay.includes(` ${nw} `) || hay.includes(` ${nw}`) && nw.length > 5 : t.includes(nw);
     });
     if (hit) out.push(g.term);
   }

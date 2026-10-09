@@ -1,13 +1,3 @@
--- 0010 right-to-erasure routine (DPDP). service_role only.
--- Append-only tables are SCRUBBED (PII removed, structure/ids kept) rather than deleted, so referential
--- integrity, accountability records and the hash-chained audit log survive. Audit rows hold ids only.
--- Returns the Storage object paths the API tier must delete from the `patient-documents` bucket.
---
--- [OPEN] Medico-legal retention may require keeping clinical records for a statutory period. The routine
--- therefore refuses to run unless an erasure_request exists in status 'pending' and is explicitly released
--- (a decision recorded by a human: status stays 'pending' only if no legal hold applies; use 'legal_hold'
--- to block). Retention periods themselves are undefined and must be decided before production use.
-
 create or replace function app.erase_patient(p_request uuid, p_decided_by uuid)
 returns text[] language plpgsql security definer set search_path = '' as $$
 declare
@@ -22,12 +12,11 @@ begin
     raise exception 'erasure request % is %, not pending', p_request, v_status using errcode = '23514';
   end if;
 
-  perform set_config('app.erasure_mode', 'on', true);          -- transaction-local
+  perform set_config('app.erasure_mode', 'on', true);
 
   select coalesce(array_agg(storage_path), '{}') into v_paths
   from public.documents where patient_id = v_patient;
 
-  -- identity
   update public.patients set
     full_name = '[erased]', birth_date = null, age_years_reported = null, phone = null,
     address_line = null, village_town = null, district = null, state = null, pincode = null,
@@ -38,7 +27,6 @@ begin
   delete from public.reported_history    where patient_id = v_patient;
   delete from public.pregnancy_episodes  where patient_id = v_patient;
 
-  -- encounter content
   update public.encounters set chief_complaint_original = null, chief_complaint_translated = null,
          context = '{}'::jsonb, deleted_at = coalesce(deleted_at, now())
   where patient_id = v_patient;
@@ -49,7 +37,6 @@ begin
   update public.info_requests set question_text = '[erased]', answer_text = null
   where encounter_id in (select id from public.encounters where patient_id = v_patient);
 
-  -- documents & extraction
   delete from public.extracted_fields
   where extraction_id in (select x.id from public.extractions x join public.documents d on d.id = x.document_id
                           where d.patient_id = v_patient);
@@ -58,7 +45,6 @@ begin
   update public.documents set original_filename = null, deleted_at = coalesce(deleted_at, now())
   where patient_id = v_patient;
 
-  -- triage / review / referral (append-only tables: scrub, keep ids)
   update public.triage_assessments set note = '{"erased": true}'::jsonb
   where encounter_id in (select id from public.encounters where patient_id = v_patient);
   update public.triage_signals set display_text = null, evidence = '{}'::jsonb
@@ -70,9 +56,7 @@ begin
   where encounter_id in (select id from public.encounters where patient_id = v_patient);
   update public.referrals set bundle = null, bundle_sha256 = null, reason_text = null, erased_at = now()
   where patient_id = v_patient;
-  -- (A copy already delivered to the receiving facility is outside this database's control: [OPEN] policy.)
 
-  -- consent evidence is retained but de-identified; access revoked; reminders stopped
   update public.consents set witness_name = null where patient_id = v_patient;
   update public.access_grants set revoked_at = coalesce(revoked_at, now()) where patient_id = v_patient;
   update public.followup_schedules set active = false where patient_id = v_patient;

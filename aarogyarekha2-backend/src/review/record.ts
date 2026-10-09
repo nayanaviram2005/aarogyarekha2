@@ -1,4 +1,3 @@
-// Calls app.record_review (migration 0013) and turns its database errors into typed, plain-language failures.
 import type { PoolLike } from '../triage/persist.js';
 
 export type ReviewFailure = 'not_found' | 'forbidden' | 'wrong_state' | 'stale' | 'already_reviewed' | 'confirm_downgrade' | 'invalid';
@@ -18,7 +17,6 @@ export interface ReviewResult {
   downgrade: boolean; belowRuleFloor: boolean; facilityId: string; patientId: string;
 }
 
-// Wording is ours; the database's messages are never passed through, so no internals can leak.
 const TEXT: Record<ReviewFailure, string> = {
   not_found: 'No such encounter, or you do not have access.',
   forbidden: 'Only a nurse, doctor or medical officer at this facility can review a triage assessment.',
@@ -38,7 +36,7 @@ export function classify(err: unknown): ReviewError {
     case '40001': return new ReviewError('stale', TEXT.stale);
     case '23505': return new ReviewError('already_reviewed', TEXT.already_reviewed);
     case '22023': return e.hint === 'confirm_downgrade' ? new ReviewError('confirm_downgrade', TEXT.confirm_downgrade) : new ReviewError('invalid', TEXT.invalid);
-    default: throw err;      // unknown failures are not ours to explain; the caller treats them as a server problem
+    default: throw err;
   }
 }
 

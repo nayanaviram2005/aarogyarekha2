@@ -1,10 +1,3 @@
--- 0020 What a platform administrator does: create facilities, switch them on or off, and appoint facility administrators.
---
--- A platform administrator has NO patient-data access. These functions are for the service role only (the API checks the caller, and each
--- function checks again, so a bug or a bypass in the API still cannot create a facility for anyone else).
--- Appointing and removing a facility administrator reuses app.set_member_role / app.deactivate_member (0016), which already allow it for a
--- platform administrator only.
--- SQLSTATEs the API turns into plain words: 42501 not allowed · P0002 no such facility · 22023 bad input · 23505 code already used
 create or replace function app.platform_create_facility(p_actor uuid, p_name text, p_type text, p_state text, p_district text, p_pincode text, p_code text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_id uuid;

@@ -1,8 +1,3 @@
-// Checks the built frontend (aarogyarekha2-frontend/dist) for things that must never ship:
-//   * any secret value from .env (except the public anon key and the public project URL),
-//   * the demo module (synthetic people),
-//   * hosted fonts or other third-party hosts.
-// Prints names and counts only, never a secret value.   npm --prefix aarogyarekha2-backend run bundle:scan
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
@@ -15,7 +10,6 @@ const files = walk(dist);
 const textual = files.filter(f => /\.(js|css|html|json|map|txt)$/i.test(f));
 const blob = textual.map(f => readFileSync(f, 'utf8')).join('\n');
 
-// Secrets: every .env value of a sensitive-looking name that is long enough to be meaningful.
 const PUBLIC = new Set(['SUPABASE_URL', 'SUPABASE_ANON_KEY']);
 const env = existsSync(join(root, '.env')) ? readFileSync(join(root, '.env'), 'utf8').split(/\r?\n/) : [];
 const leaks: string[] = []; let checked = 0;
@@ -24,7 +18,7 @@ for (const line of env) {
   const [, name, raw] = m; const value = raw!.replace(/^["']|["']$/g, '').trim();
   if (PUBLIC.has(name!) || value.length < 12 || !/KEY|SECRET|PASSWORD|TOKEN|DATABASE_URL/.test(name!)) continue;
   checked++;
-  const pieces = [value, ...(value.includes('@') ? [value.split('@')[0]!.split(':').pop()!] : [])].filter(p => p.length >= 12);   // a connection string's password too
+  const pieces = [value, ...(value.includes('@') ? [value.split('@')[0]!.split(':').pop()!] : [])].filter(p => p.length >= 12);
   if (pieces.some(p => blob.includes(p))) leaks.push(name!);
 }
 

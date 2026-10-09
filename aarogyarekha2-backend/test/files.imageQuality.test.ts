@@ -3,7 +3,6 @@ import jpeg from 'jpeg-js';
 import { describe, expect, it } from 'vitest';
 import { analyse, decode, enhance, estimateSkew, LIMITS, rotate, sharpness, shrink, stretchContrast, toGray, WARNING_TEXT, type Gray } from '../src/files/imageQuality.js';
 
-/** A synthetic "page": white, with rows of dark word-blocks like lines of printed text. */
 function page(w = 800, h = 1000, o: { bg?: number; ink?: number; seed?: number } = {}): Gray {
   const bg = o.bg ?? 235, ink = o.ink ?? 25; const d = new Uint8ClampedArray(w * h).fill(bg); let s = o.seed ?? 3; const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 2 ** 32; };
   for (let line = 0; line < 30; line++) {

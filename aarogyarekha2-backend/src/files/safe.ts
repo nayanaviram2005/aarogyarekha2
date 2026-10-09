@@ -1,18 +1,9 @@
-// Upload safety, no database and no network. Every uploaded file is HOSTILE until it passes here.
-//
-//  * The real type comes from the first bytes, never from the filename or the browser's claim.
-//  * JPEG and PNG are rebuilt WITHOUT metadata (EXIF, GPS, camera, text chunks, thumbnails): only the pixel data and the few
-//    chunks needed to display the picture are copied. Huge pixel counts are refused (decompression bombs).
-//  * PDFs cannot be rewritten here, so they are checked for active content (scripts, launch actions, embedded files, forms
-//    that submit, encryption). This file does a quick byte scan; pdf.ts then walks every object with a real parser so compressed
-//    streams are covered too. STILL A HEURISTIC, NOT ANTIVIRUS. PDFs are only ever read as text on the server and are served
-//    as downloads, never opened inline.
 import { createHash } from 'node:crypto';
 
 export type Mime = 'application/pdf' | 'image/jpeg' | 'image/png';
 export const EXT: Record<Mime, 'pdf' | 'jpg' | 'png'> = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png' };
 
-export const MAX_PIXELS = 40_000_000;      // 40 megapixels
+export const MAX_PIXELS = 40_000_000;
 export const MAX_PDF_PAGES = 50;
 
 export type Safe =
@@ -28,9 +19,7 @@ export function sniff(b: Buffer): Mime | null {
   return null;
 }
 
-// ------------------------------------------------------------------ JPEG
 const SOF = new Set([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf]);
-/** APP0 (JFIF) and APP14 (Adobe colour transform) are needed to display correctly; every other APPn and COM is dropped. */
 const KEEP_APP = new Set([0xe0, 0xee]);
 
 function cleanJpeg(b: Buffer): Safe {
@@ -39,18 +28,18 @@ function cleanJpeg(b: Buffer): Safe {
   while (i < b.length) {
     if (b[i] !== 0xff) return bad('The image file is damaged.');
     let m = b[i + 1];
-    while (m === 0xff) { i++; m = b[i + 1]; }                       // fill bytes
+    while (m === 0xff) { i++; m = b[i + 1]; }
     if (m === undefined) return bad('The image file is damaged.');
-    if (m === 0xd9) { out.push(b.subarray(i, i + 2)); i += 2; break; }          // EOI
-    if (m === 0x01 || (m >= 0xd0 && m <= 0xd7)) { out.push(b.subarray(i, i + 2)); i += 2; continue; }   // standalone markers
+    if (m === 0xd9) { out.push(b.subarray(i, i + 2)); i += 2; break; }
+    if (m === 0x01 || (m >= 0xd0 && m <= 0xd7)) { out.push(b.subarray(i, i + 2)); i += 2; continue; }
     if (i + 4 > b.length) return bad('The image file is damaged.');
     const len = b.readUInt16BE(i + 2);
     if (len < 2 || i + 2 + len > b.length) return bad('The image file is damaged.');
     const seg = b.subarray(i, i + 2 + len);
     if (SOF.has(m)) { h = seg.readUInt16BE(5); w = seg.readUInt16BE(7); }
-    if (m === 0xda) { out.push(b.subarray(i)); i = b.length; break; }           // SOS: the rest is scan data, copy as is
+    if (m === 0xda) { out.push(b.subarray(i)); i = b.length; break; }
     const isApp = m >= 0xe0 && m <= 0xef;
-    if (!((isApp && !KEEP_APP.has(m)) || m === 0xfe)) out.push(seg);            // drop APP1 EXIF/XMP, APP13 IPTC, comments...
+    if (!((isApp && !KEEP_APP.has(m)) || m === 0xfe)) out.push(seg);
     i += 2 + len;
   }
   if (!w || !h) return bad('The image has no readable size.');
@@ -59,7 +48,6 @@ function cleanJpeg(b: Buffer): Safe {
   return { ok: true, bytes, mime: 'image/jpeg', sha256: createHash('sha256').update(bytes).digest('hex'), width: w, height: h, strippedBytes: b.length - bytes.length };
 }
 
-// ------------------------------------------------------------------ PNG
 const KEEP_CHUNK = new Set(['IHDR', 'PLTE', 'IDAT', 'IEND', 'tRNS', 'gAMA', 'cHRM', 'sRGB', 'sBIT', 'pHYs']);
 
 function cleanPng(b: Buffer): Safe {
@@ -71,20 +59,18 @@ function cleanPng(b: Buffer): Safe {
     const end = i + 12 + len;
     if (end > b.length) return bad('The image file is damaged.');
     if (type === 'IHDR') { if (len !== 13) return bad('The image file is damaged.'); w = b.readUInt32BE(i + 8); h = b.readUInt32BE(i + 12); }
-    if (KEEP_CHUNK.has(type)) out.push(b.subarray(i, end));                     // dropped: tEXt, zTXt, iTXt, eXIf, tIME, iCCP, anything unknown
+    if (KEEP_CHUNK.has(type)) out.push(b.subarray(i, end));
     i = end;
     if (type === 'IEND') { sawEnd = true; break; }
   }
   if (!sawEnd || !w || !h) return bad('The image file is damaged.');
   if (w * h > MAX_PIXELS) return bad('The image is too large in pixels.');
-  const bytes = Buffer.concat(out);                                              // bytes after IEND (hidden payloads) are discarded too
+  const bytes = Buffer.concat(out);
   return { ok: true, bytes, mime: 'image/png', sha256: createHash('sha256').update(bytes).digest('hex'), width: w, height: h, strippedBytes: b.length - bytes.length };
 }
 
-// ------------------------------------------------------------------ PDF
 const ACTIVE = ['/JavaScript', '/JS', '/Launch', '/EmbeddedFile', '/EmbeddedFiles', '/RichMedia', '/XFA', '/GoToR', '/GoToE', '/ImportData', '/SubmitForm', '/Encrypt'];
 
-/** PDF names may hide letters as #xx escapes (/J#61vaScript). Decode them before looking. */
 const decodeNames = (s: string) => s.replace(/#([0-9a-fA-F]{2})/g, (_m, h: string) => String.fromCharCode(parseInt(h, 16)));
 
 function checkPdf(b: Buffer): Safe {
@@ -94,11 +80,9 @@ function checkPdf(b: Buffer): Safe {
     if (re.test(text)) return bad(tok === '/Encrypt' ? 'Encrypted PDFs are not accepted.' : 'This PDF contains active content, so it was not accepted.');
   }
   if (!/%%EOF/.test(b.subarray(Math.max(0, b.length - 2048)).toString('latin1'))) return bad('The PDF file looks cut off or damaged.');
-  // Page count is NOT taken from this byte scan: compressed PDFs hide their page dictionaries. pdf.ts counts pages with a real parser.
   return { ok: true, bytes: b, mime: 'application/pdf', sha256: createHash('sha256').update(b).digest('hex'), strippedBytes: 0 };
 }
 
-/** Decide what the bytes really are and return a SAFE version, or say why not. `claimed` is the browser's guess and must agree. */
 export function makeSafe(input: Buffer, claimed?: string): Safe {
   if (input.length === 0) return bad('The file is empty.');
   const real = sniff(input);
@@ -107,7 +91,6 @@ export function makeSafe(input: Buffer, claimed?: string): Safe {
   return real === 'image/jpeg' ? cleanJpeg(input) : real === 'image/png' ? cleanPng(input) : checkPdf(input);
 }
 
-/** A display name only. Never used to build a path. Drops directories, control characters and odd symbols. */
 export function displayName(name: string | undefined): string | null {
   if (!name) return null;
   const base = name.split(/[\\/]/).pop() ?? '';

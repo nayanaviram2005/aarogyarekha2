@@ -86,7 +86,7 @@ describe('when two-factor is required', () => {
     expect(blocked.statusCode).toBe(403); expect(blocked.json().issue[0].details.text).toMatch(/Two-factor/);
     expect(w.sends).toBe(0);
     const ok = await send(app, 'aal2');
-    expect(ok.json().issue?.[0]?.details?.text ?? '').not.toMatch(/Two-factor/);   // got past the gate (then 404: no such referral here)
+    expect(ok.json().issue?.[0]?.details?.text ?? '').not.toMatch(/Two-factor/);
   });
   it('no token is still a 401, not a two-factor message', async () => {
     const r = await (await make(true)).inject({ method: 'POST', url: `/encounters/${E}/review`, payload: { action: 'approve', assessmentId: A } });

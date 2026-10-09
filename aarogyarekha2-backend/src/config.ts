@@ -1,8 +1,6 @@
 import { z } from 'zod';
 import { AiEnv, type AiEnvValues } from './ai/provider.js';
 
-// The API tier deliberately does NOT load SUPABASE_SERVICE_ROLE_KEY: reads go through the caller's JWT
-// (RLS applies) and audit writes go through app.write_audit() over the database connection.
 const schema = z.object({
   SUPABASE_URL: z.string().url(),
   SUPABASE_ANON_KEY: z.string().min(20),
@@ -13,20 +11,15 @@ const schema = z.object({
   API_ALLOWED_ORIGINS: z.string().default('http://localhost:5173'),
   UPLOAD_MAX_MB: z.coerce.number().int().min(1).max(20).default(10),
   OCR_PROVIDER: z.enum(['local', 'mock']).default('local'),
-  // Who reads PHOTOS of reports: local (Tesseract on this server), ai (the outside AI image reader first; needs the patient's consent) or ai_then_local.
   OCR_PHOTOS: z.enum(['local', 'ai', 'ai_then_local']).default('local'),
   TESSDATA_PATH: z.string().optional(),
-  // Reviews and referral sends need a verified second factor (authenticator app). On unless explicitly turned off for a local demo.
   MFA_REQUIRED: z.enum(['true', 'false']).default('true'),
-  // Requests per minute allowed from one address, across the whole API. Individual costly routes have their own lower limits.
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(60).max(5000).default(600),
   ACCESS_BUDGET_PATIENTS_PER_HOUR: z.coerce.number().int().min(0).max(5000).default(80),
-  // Text messages. 'mock' (the default) sends nothing and records what it would have sent; 'twilio' really sends.
   SMS_PROVIDER: z.preprocess(v => (v === '' ? undefined : v), z.enum(['mock', 'twilio']).default('mock')),
   TWILIO_ACCOUNT_SID: z.string().optional(), TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_FROM: z.string().optional(), TWILIO_MESSAGING_SERVICE_SID: z.string().optional(),
   SMS_DEFAULT_COUNTRY_CODE: z.preprocess(v => (v === '' ? undefined : v), z.string().regex(/^\+[0-9]{1,3}$/).default('+91')),
-  // The exact public address Twilio posts replies to (it is part of what Twilio signs), for example https://api.example.org/sms/inbound
   SMS_WEBHOOK_URL: z.string().optional(),
   TRIAGE_RULESET_NAME: z.string().optional(),
   TRIAGE_RULESET_VERSION: z.string().optional(),
@@ -37,7 +30,6 @@ export type Config = z.infer<typeof schema> & { databaseUrl: string; allowedOrig
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = schema.safeParse(env);
   if (!parsed.success) {
-    // Names of the bad variables only; never echo values.
     const bad = parsed.error.issues.map(i => i.path.join('.')).join(', ');
     throw new Error(`Invalid configuration: ${bad}`);
   }

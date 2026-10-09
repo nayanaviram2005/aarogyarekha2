@@ -1,11 +1,9 @@
 import type { Api, DuplicateMatch } from './types';
 
-/** An API failure with a message that is safe and useful to show a person. */
 export class ApiError extends Error {
   constructor(public readonly status: number, message: string, public readonly duplicates?: DuplicateMatch[]) { super(message); this.name = 'ApiError'; }
   get isConsent() { return this.status === 403 && /consent/i.test(this.message); }
   get isRulesNotApproved() { return this.status === 503 && /not approved/i.test(this.message); }
-  /** A newer assessment exists than the one the reviewer was looking at. */
   get isStale() { return this.status === 409 && /changed while you were reviewing/i.test(this.message); }
   get needsDowngradeConfirmation() { return this.status === 409 && /explicit confirmation/i.test(this.message); }
 }
@@ -20,7 +18,6 @@ const FALLBACK: Record<number, string> = {
   429: 'Too many requests. Wait a minute and try again.',
 };
 
-/** Pulls the plain message out of a FHIR OperationOutcome; never shows raw bodies or stack traces. */
 export function messageFromBody(status: number, body: unknown): string {
   const text = (body as { issue?: { details?: { text?: unknown } }[] } | null)?.issue?.[0]?.details?.text;
   if (typeof text === 'string' && text.trim()) return text;
@@ -75,7 +72,7 @@ export function createApi(baseUrl: string, getToken: TokenSource, fetchImpl: typ
     transcribe: async (id, audio, language) => {
       const token = await getToken();
       if (!token) throw new ApiError(401, FALLBACK[401]!);
-      const fd = new FormData(); if (language) fd.append('language', language); fd.append('audio', audio, 'recording');      // field order matters: language first
+      const fd = new FormData(); if (language) fd.append('language', language); fd.append('audio', audio, 'recording');
       let res: Response;
       try { res = await fetchImpl(`${baseUrl}/encounters/${enc(id)}/transcribe`, { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: fd }); }
       catch { throw new ApiError(0, FALLBACK[0]!); }
@@ -120,7 +117,7 @@ export function createApi(baseUrl: string, getToken: TokenSource, fetchImpl: typ
     uploadDocument: async (id, file, kind) => {
       const token = await getToken();
       if (!token) throw new ApiError(401, FALLBACK[401]!);
-      const fd = new FormData(); fd.append('kind', kind); fd.append('file', file, file.name);      // field order matters: kind first
+      const fd = new FormData(); fd.append('kind', kind); fd.append('file', file, file.name);
       let res: Response;
       try { res = await fetchImpl(`${baseUrl}/encounters/${enc(id)}/documents`, { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: fd }); }
       catch { throw new ApiError(0, FALLBACK[0]!); }
@@ -150,7 +147,6 @@ export function createApi(baseUrl: string, getToken: TokenSource, fetchImpl: typ
       const m = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '');
       return { blob: await res.blob(), filename: m?.[1] ?? `document-${id.slice(0, 8)}` };
     },
-    // Reading a photo can take a while, so it runs in the background on the server and this checks back every second.
     extractDocument: async (id, language) => {
       const token = await getToken();
       if (!token) throw new ApiError(401, FALLBACK[401]!);

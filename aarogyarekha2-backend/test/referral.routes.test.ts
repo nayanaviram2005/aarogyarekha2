@@ -238,7 +238,7 @@ describe('sending', () => {
     expect(w.sent).toHaveLength(1);
     const a = w.sent[0]!;
     expect(a).toMatchObject({ senderId: 'u-clinician', referralId: R, assessmentId: A });
-    expect(() => validateResource(a.bundle as never)).not.toThrow();                       // independent structural check
+    expect(() => validateResource(a.bundle as never)).not.toThrow();
     expect(a.sha256).toBe(createHash('sha256').update(canonicalJson(a.bundle)).digest('hex'));
     expect(a.bundle.entry![0]!.resource).toMatchObject({ resourceType: 'Composition', status: 'final' });
     const json = JSON.stringify(a.bundle);

@@ -1,6 +1,3 @@
-// The follow-up questions the rules ask, in Hindi and Odia, so a health worker can read them to a patient.
-// Written by the build team, NOT yet reviewed by a native-speaking clinician: review before real use. English stays on screen beside them.
-// Keyed by the question's field code ("sign.<sign>", "vital.<name>", "context.<name>").
 export type QLang = 'hi' | 'or';
 export const QUESTION_LANGS: { code: 'en' | QLang; label: string }[] = [{ code: 'en', label: 'English' }, { code: 'hi', label: 'हिन्दी' }, { code: 'or', label: 'ଓଡ଼ିଆ' }];
 
@@ -50,7 +47,6 @@ const Q: Record<string, { hi: string; or: string }> = {
   'vital.temperature_c': { hi: 'तापमान कितना है?', or: 'ତାପମାତ୍ରା କେତେ?' },
   'vital.bp_systolic_mmhg': { hi: 'रक्तचाप कितना है (ऊपर और नीचे की संख्या)?', or: 'ରକ୍ତଚାପ କେତେ (ଉପର ଓ ତଳ ସଂଖ୍ୟା)?' },
   'vital.bp_pregnancy': { hi: 'रक्तचाप कितना है (ऊपर और नीचे की संख्या)?', or: 'ରକ୍ତଚାପ କେତେ (ଉପର ଓ ତଳ ସଂଖ୍ୟା)?' },
-  // Questions for the flags taken from the GP triage chart (proposed rules v0.2.0). Hand-written by the build team, not reviewed by a native-speaking clinician.
   'sign.weapon_injury': { hi: 'क्या मरीज़ को चाकू, गोली या किसी हथियार से चोट लगी है?', or: 'ରୋଗୀଙ୍କୁ ଛୁରୀ, ଗୁଳି ବା କୌଣସି ଅସ୍ତ୍ରରେ ଆଘାତ ଲାଗିଛି କି?' },
   'sign.venomous_bite_or_sting': { hi: 'क्या मरीज़ को साँप, बड़ी मकड़ी या किसी ज़हरीले जीव ने काटा या डंक मारा है?', or: 'ରୋଗୀଙ୍କୁ ସାପ, ବଡ଼ ଅଳିଆ ବା କୌଣସି ବିଷାକ୍ତ ଜୀବ କାମୁଡ଼ିଛି କି?' },
   'sign.serious_chest_pain': { hi: 'क्या छाती का दर्द 20 मिनट से ज़्यादा रहा है, या उसके साथ पसीना, साँस फूलना है, या वह हाथ, जबड़े या पीठ तक फैल रहा है?', or: 'ଛାତି ଯନ୍ତ୍ରଣା 20 ମିନିଟରୁ ଅଧିକ ରହିଛି କି, ବା ଝାଳ, ଶ୍ୱାସ କଷ୍ଟ ଅଛି, ବା ହାତ, ଜହ୍ନ ବା ପିଠିକି ବ୍ୟାପୁଛି କି?' },

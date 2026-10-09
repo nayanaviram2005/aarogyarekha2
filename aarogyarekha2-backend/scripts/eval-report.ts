@@ -1,4 +1,3 @@
-// Runs the evaluation and a speed check, and writes docs/EVALUATION.md.   npm --prefix aarogyarekha2-backend run eval:report
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -25,14 +24,12 @@ await time('Triage engine, one assessment each', inputs.length, () => { for (con
 const entries: QueueEntry[] = Array.from({ length: 5000 }, (_, i) => ({ encounterId: randomUUID(), patient: { id: 'p', public_ref: 'AR', full_name: 'x', sex: 'unknown', birth_date: null, age_years_reported: 30, preferred_language: 'en' }, scenario: 'opd_queue', chiefComplaint: null, chiefComplaintTranslated: null, assessed: i % 9 !== 0, urgencyCode: 'yellow', tier: 1 + (i % 4), potentialTier: null, missingCount: 0, winningLabel: null, vulnerable: false, queueStatus: 'waiting', waitingSince: new Date(Date.now() - i * 1000).toISOString(), assessmentVersion: 1, engineTier: 1 + (i % 4), reviewed: false }));
 await time('Sort a queue of 5,000 people', entries.length, () => { sortQueue(entries); }, 'one sort');
 
-// The HTTP layer with in-memory stand-ins for the database: measures routing, sign-in check, validation and logging only.
 const deps = { verifyToken: async () => ({ userId: 'u', aal: 'aal2' as const }), userReader: () => ({ getMe: async () => ({ displayName: null, memberships: [] }) }), audit: async () => {} } as unknown as Deps;
 process.env.LOG_LEVEL = 'silent';
 const app = await buildApp({ allowedOrigins: [] }, deps);
 const reqs = 3000; const conc = 50;
 await time('HTTP GET /me, 50 at a time', reqs, async () => {
   let next = 0;
-  // each request pretends to come from a different address, so the server's per-address rate limit does not answer for it
   await Promise.all(Array.from({ length: conc }, async () => { while (next < reqs) { const i = next++; const r = await app.inject({ method: 'GET', url: '/me', remoteAddress: `10.${(i >> 8) & 255}.${i & 255}.1`, headers: { authorization: 'Bearer t' } }); if (r.statusCode !== 200) throw new Error('unexpected ' + r.statusCode); } }));
 }, 'in-memory stand-ins, so only routing, sign-in check and logging');
 await app.close();

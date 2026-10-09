@@ -14,7 +14,7 @@ export function ScenariosPage() {
 function Board() {
   const { entries, loading } = useQueue();
   const [scenario, setScenario] = useState(BOARD_SCENARIOS[0]!.value);
-  const now = useMemo(() => new Date(), [entries]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const now = useMemo(() => new Date(), [entries]);
   const def = BOARD_SCENARIOS.find(s => s.value === scenario)!;
   const sum = summarizeScenario(entries, scenario);
   const cluster = scenario === 'campus_fever' ? clusterSignal(entries, scenario, now) : null;

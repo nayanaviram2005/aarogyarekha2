@@ -1,4 +1,3 @@
-// Emergency access and audit-chain checks against the REAL schema in an in-process Postgres.
 import type { PGlite } from '@electric-sql/pglite';
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';

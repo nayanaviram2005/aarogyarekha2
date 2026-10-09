@@ -1,12 +1,3 @@
-// Patient report upload. The browser never talks to storage. The API does, so every step is checked and audited.
-//
-//   1. caller must see the encounter and consent must be active (same gate as everything else)
-//   2. the bytes are checked and cleaned in memory (src/files/safe.ts, pdf.ts). Anything refused is never stored.
-//   3. a `documents` row is created as 'pending' by the CALLER (row-level security decides who may), because storage policy
-//      only accepts an upload whose row already exists
-//   4. the file is uploaded to the private bucket as the caller
-//   5. the system marks it 'clean' with the checksum of the CLEANED bytes. Until then it cannot be read by anyone.
-// Reading a file is audited before any bytes leave (fail closed). PDFs are always sent as downloads, never shown inline.
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { RouteCtx, RouteHelpers } from './intake.js';
@@ -57,9 +48,8 @@ export function registerDocumentRoutes(c: RouteCtx, h: RouteHelpers, maxBytes: n
       if (!p.ok) return fail(reply, 400, 'invalid', p.reason);
     }
 
-    // Picture checks never block an upload: they tell the person to retake a poor photo.
     let quality: { warnings: { code: string; text: string }[] } | undefined;
-    if (safe.mime !== 'application/pdf') { try { quality = { warnings: analyse(safe.bytes, safe.mime).warnings.map(code => ({ code, text: WARNING_TEXT[code] })) }; } catch { /* unreadable pictures are handled when read */ } }
+    if (safe.mime !== 'application/pdf') { try { quality = { warnings: analyse(safe.bytes, safe.mime).warnings.map(code => ({ code, text: WARNING_TEXT[code] })) }; } catch { } }
 
     const id = randomUUID();
     const path = `${enc.facility_id}/${enc.patient_id}/${id}.${EXT[safe.mime]}`;

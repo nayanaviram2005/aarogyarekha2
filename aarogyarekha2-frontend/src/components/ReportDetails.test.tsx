@@ -47,7 +47,7 @@ describe('timeline summary', () => {
   it('puts the longest-standing symptom first and gives the complaint, measurements and a draft notice', () => {
     const l = buildCaseSummary(summary()); const by = Object.fromEntries(l.map(x => [x.label, x.text]));
     expect(by['Main complaint']).toBe('Fever and cough'); expect(by['Symptoms, longest first']).toBe('Fever, 3 days, severity 6/10; Cough, 2 days, severity 4/10'); expect(by['Latest measurements']).toContain('38.6');
-    expect(by['Review']).toBeUndefined();                                      // nothing assessed yet, so no review line
+    expect(by['Review']).toBeUndefined();
   });
   it('after assessment it says not reviewed yet, then names the reviewer and any change', () => {
     const a = { id: 'a1', version: 1, created_at: '2026-10-06T09:40:00Z', urgency_code: 'orange' as const, note: { tier: 2, winning: { layer: 'floor', ruleId: 'R', tier: 2, detail: 'Fits in a rule' } } as never, signals: [] };

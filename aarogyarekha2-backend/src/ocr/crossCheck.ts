@@ -1,10 +1,3 @@
-// Puts the local reader's rows and the AI model's rows side by side.
-//   agree     both read the same number for the same test
-//   differ    both found the test but the numbers differ: the OCR row is kept, its confidence is capped, and what the AI read is stored
-//             beside it so the person verifying sees both
-//   ocr_only  the local reader found it, the AI did not
-//   ai_only   only the AI found it (a person must check it against the report; it is a draft)
-// Nothing here decides which one is right. A person verifies every row. Agreement is shown as extra evidence, never as a verdict.
 import type { ParsedField } from '../deps.js';
 import type { VisionRow } from '../ai/vision.js';
 import { canonicalTest, parseNumber } from './labParser.js';

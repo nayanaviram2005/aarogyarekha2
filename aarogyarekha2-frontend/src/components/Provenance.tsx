@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 
-/** Marks machine-produced content. Hatched until a qualified person signs it; solid once they have. */
 export function Provenance({ reviewedBy, reviewedAt, children, label }: { reviewedBy?: string | null; reviewedAt?: string | null; children: ReactNode; label?: string }) {
   const reviewed = !!reviewedBy;
   return (

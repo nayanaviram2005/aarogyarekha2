@@ -1,6 +1,3 @@
-// A printable PDF of a referral note, drawn from the frozen FHIR document (the same words the receiving facility sees).
-// It adds nothing and removes nothing: each section's own text, the measurements, the notice, and the document's checksum.
-// Hindi and Odia are drawn with embedded Noto fonts, run by run, so names in those scripts print correctly.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
@@ -8,7 +5,6 @@ import fontkit from '@pdf-lib/fontkit';
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import type { Bundle } from 'fhir/r4';
 
-// The font library was built for older JavaScript and expects this helper to exist.
 if (!(globalThis as { regeneratorRuntime?: unknown }).regeneratorRuntime) (globalThis as { regeneratorRuntime?: unknown }).regeneratorRuntime = createRequire(import.meta.url)('regenerator-runtime');
 
 const FONT_DIR = join(import.meta.dirname, '..', '..', 'assets', 'fonts');
@@ -16,7 +12,6 @@ const load = (f: string) => readFileSync(join(FONT_DIR, f));
 
 type Script = 'latin' | 'deva' | 'orya';
 const scriptOf = (ch: string): Script => { const c = ch.codePointAt(0)!; return c >= 0x0900 && c <= 0x097f ? 'deva' : c >= 0x0b00 && c <= 0x0b7f ? 'orya' : 'latin'; };
-/** Splits text into runs that each use one font. Spaces and punctuation stay with the run before them. */
 export function runsOf(text: string): { text: string; script: Script }[] {
   const out: { text: string; script: Script }[] = []; let cur: Script | null = null;
   for (const ch of text) {
@@ -33,7 +28,6 @@ const tags = (xhtml: string): string[] => {
   return t.split('\n').map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
 };
 
-/** The readable content of the document, section by section. Exported so tests can check what goes on the page. */
 export function noteContent(b: Bundle): { title: string; sections: { title: string; lines: string[] }[]; when: string | null } {
   const res = (b.entry ?? []).map(e => e.resource as Res).filter(Boolean);
   const byRef = new Map(res.map(r => [`${r.resourceType}/${r.id}`, r]));
@@ -75,12 +69,11 @@ export async function renderReferralPdf(bundle: Bundle, meta: { sha256: string |
   const para = (text: string, o: { size?: number; bold?: boolean; indent?: number; after?: number } = {}) => {
     const size = o.size ?? 10.5; const x0 = M + (o.indent ?? 0); const max = W - M - x0; const lh = size + 4.5; let line = '';
     const flush = () => { if (y < 60) newPage(); drawRuns(line.trimEnd(), x0, size, !!o.bold); y -= lh; line = ''; };
-    // The longest start of `s` that fits on one line (binary search, so a 3,000 character word is quick).
     const fit = (s: string) => { let lo = 1, hi = s.length; while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (widthOf(s.slice(0, mid), size, !!o.bold) <= max) lo = mid; else hi = mid - 1; } return lo; };
     for (const word of text.split(/\s+/).filter(Boolean)) {
       let piece = line ? `${line} ${word}` : word;
-      if (line && widthOf(piece, size, !!o.bold) > max) { flush(); piece = word; }       // start a new line with this word
-      while (widthOf(piece, size, !!o.bold) > max && piece.length > 1) { const cut = fit(piece); line = piece.slice(0, cut); flush(); piece = piece.slice(cut); }   // a single very long word
+      if (line && widthOf(piece, size, !!o.bold) > max) { flush(); piece = word; }
+      while (widthOf(piece, size, !!o.bold) > max && piece.length > 1) { const cut = fit(piece); line = piece.slice(0, cut); flush(); piece = piece.slice(cut); }
       line = piece;
     }
     if (line) flush(); y -= o.after ?? 0; void LH;

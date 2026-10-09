@@ -1,8 +1,3 @@
--- 0005 referral, follow-up reminders, erasure requests.
--- Referral = relational canonical row + an immutable FHIR Bundle snapshot taken at send time.
--- Mapping (FHIR R4): referrals -> ServiceRequest (+ Task for status); priority uses FHIR request-priority;
--- facilities -> Organization/Location; documents -> DocumentReference. [OPEN: ABDM/NRCeS profiles]
-
 create table public.referrals (
   id               uuid primary key default gen_random_uuid(),
   encounter_id     uuid not null references public.encounters(id) on delete restrict,
@@ -11,13 +6,13 @@ create table public.referrals (
   to_facility_id   uuid references public.facilities(id) on delete restrict,
   requested_by     uuid not null references auth.users(id) on delete restrict,
   priority         public.referral_priority not null default 'routine',
-  reason_text      text,                             -- clinician-authored; the system never drafts a diagnosis
+  reason_text      text,
   status           public.referral_status not null default 'draft',
   status_reason    text,
   bundle           jsonb check (bundle is null or jsonb_typeof(bundle) = 'object'),
   bundle_sha256    bytea check (bundle_sha256 is null or octet_length(bundle_sha256) = 32),
   sent_at          timestamptz,
-  erased_at        timestamptz,                      -- set by app.erase_patient; bundle/reason scrubbed
+  erased_at        timestamptz,
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now(),
   check (to_facility_id is distinct from from_facility_id),
@@ -48,7 +43,6 @@ create table public.referral_documents (
   primary key (referral_id, document_id)
 );
 
--- Lifecycle guard: legal transitions, who may perform them, and immutability after the referral is sent.
 create or replace function app.referral_guard()
 returns trigger language plpgsql set search_path = '' as $$
 declare
@@ -70,7 +64,6 @@ begin
       raise exception 'illegal referral transition % -> %', old.status, new.status using errcode = '23514';
     end if;
 
-    -- Who may act (a NULL uid means the service role / maintenance session: trusted).
     if uid is not null then
       if new.status in ('requested', 'cancelled')
          and not app.is_reviewer_at(old.from_facility_id) then
@@ -83,7 +76,6 @@ begin
     if new.status = 'requested' then new.sent_at := now(); end if;
   end if;
 
-  -- Content is frozen once sent (the Bundle is what the receiver saw).
   if old.status <> 'draft'
      and coalesce(current_setting('app.erasure_mode', true), '') <> 'on'
      and (new.bundle is distinct from old.bundle or new.bundle_sha256 is distinct from old.bundle_sha256
@@ -109,7 +101,6 @@ end $$;
 create trigger trg_referrals_events after insert or update on public.referrals
   for each row execute function app.referral_log_event();
 
--- ---------------------------------------------------------------- follow-up / reminders (maternal, chronic, fever)
 create table public.followup_schedules (
   id           uuid primary key default gen_random_uuid(),
   patient_id   uuid not null references public.patients(id) on delete restrict,
@@ -129,7 +120,7 @@ create trigger trg_followup_touch before update on public.followup_schedules
 create table public.reminders (
   id           uuid primary key default gen_random_uuid(),
   schedule_id  uuid not null references public.followup_schedules(id) on delete cascade,
-  consent_id   uuid not null references public.consents(id) on delete restrict,  -- 'reminders' consent required
+  consent_id   uuid not null references public.consents(id) on delete restrict,
   due_at       timestamptz not null,
   channel      text not null check (channel in ('sms', 'whatsapp', 'ivr', 'in_app')),
   status       text not null default 'scheduled'

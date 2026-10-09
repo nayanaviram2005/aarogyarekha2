@@ -40,7 +40,7 @@ declare module 'fastify' {
 const FHIR = 'application/fhir+json; charset=utf-8';
 const uuid = z.string().uuid();
 
-export async function buildApp(config: Pick<Config, 'allowedOrigins'> & { triageRuleSet?: { name: string; version: string }; uploadMaxMb?: number; requireMfa?: boolean; rateLimitPerMinute?: number; accessBudgetPerHour?: number }, deps: Deps): Promise<FastifyInstance> {
+export async function buildApp(config: Pick<Config, 'allowedOrigins'> & { triageRuleSet?: { name: string; version: string }; uploadMaxMb?: number; requireMfa?: boolean; rateLimitPerMinute?: number; accessBudgetPerHour?: number; ocrPhotos?: 'local' | 'ai' | 'ai_then_local' }, deps: Deps): Promise<FastifyInstance> {
   const app = Fastify({
     genReqId: () => randomUUID(),            // never trust a client-supplied request id
     // Deprecated in Fastify 5.x but still supported until v6; the replacement (logController) is not in the
@@ -138,7 +138,7 @@ export async function buildApp(config: Pick<Config, 'allowedOrigins'> & { triage
     return false;
   };
 
-  const routeCtx = { app, deps, authenticate, fail, base, auditOrFail, requireMfa, mfaRequired: config.requireMfa === true, jobs: new JobQueue(), triageRuleSet: config.triageRuleSet ?? { name: RULESET_DRAFT.name, version: RULESET_DRAFT.version } };
+  const routeCtx = { ocrPhotos: config.ocrPhotos ?? ('local' as const), app, deps, authenticate, fail, base, auditOrFail, requireMfa, mfaRequired: config.requireMfa === true, jobs: new JobQueue(), triageRuleSet: config.triageRuleSet ?? { name: RULESET_DRAFT.name, version: RULESET_DRAFT.version } };
   const helpers = registerIntakeRoutes(routeCtx);
   registerViewRoutes(routeCtx);
   registerReviewRoutes(routeCtx, helpers);

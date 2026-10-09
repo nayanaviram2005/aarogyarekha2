@@ -23,7 +23,7 @@ const extraction = (): ExtractionView => ({ id: 'ex1', document_id: D, engine: '
   fields: [{ id: FID, extraction_id: 'ex1', field_name: 'haemoglobin', extracted_value_text: 'Haemoglobin 9.1 g/dL 12.0 - 15.5 L', value_text: 'Haemoglobin 9.1 g/dL 12.0 - 15.5 L', value_num: 9.1, unit: 'g/dL', reference_range_text: '12.0 - 15.5', printed_flag: 'low', confidence: 0.91, verified_by: null, verified_at: null }] });
 
 let consents: unknown[] = [];
-const make = async (over: Partial<Deps> = {}) => {
+const make = async (over: Partial<Deps> = {}, cfg: { ocrPhotos?: 'local' | 'ai' | 'ai_then_local' } = {}) => {
   const reader = (t: string): UserReader => {
     const sees = t === 'clinician';
     return {
@@ -46,7 +46,7 @@ const make = async (over: Partial<Deps> = {}) => {
     audit: async e => { if (w.auditFails) throw new Error('audit down'); w.audits.push(e); },
     ...over,
   };
-  return buildApp({ allowedOrigins: [] }, deps);
+  return buildApp({ allowedOrigins: [], ...cfg }, deps);
 };
 type App = Awaited<ReturnType<typeof make>>;
 const call = (app: App, method: 'GET' | 'POST' | 'PUT', url: string, payload?: unknown, token: string | null = 'clinician') =>
@@ -251,5 +251,50 @@ describe('AI second read (vision)', () => {
   it('with no rows from the AI and none from OCR it still says nothing was found', async () => {
     w.ocr = async () => ok('nothing here'); visionRows = [];
     const r = await call(await app(), 'POST', `/documents/${D}/extract`); expect(r.statusCode).toBe(422);
+  });
+});
+
+describe('photos read by the outside AI reader first (OCR_PHOTOS=ai)', () => {
+  const aiConsent = { id: 'c-ai', purpose: 'external_ai_processing', granted_at: '2025-01-01T00:00:00Z', revoked_at: null, expires_at: null };
+  let localCalls: number; let sent: number;
+  const rows = [{ name: 'Hemoglobin', value: '9.1', unit: 'g/dL', referenceRange: '12.0 - 15.5', flag: 'low' as const }, { name: 'ESR', value: '30', unit: 'mm/hr', referenceRange: null, flag: null }];
+  const vision = (fail = false): import('../src/ai/vision.js').Vision => ({ name: 'gemini', model: 'm', supported: true, accepts: () => true, read: async () => { sent++; if (fail) throw new Error('boom'); return { rows, provider: 'gemini', model: 'm', dropped: 0 }; } });
+  const photo = () => { w.docs = [doc({ mime_type: 'image/png', storage_path: 'p/a/b.png' })]; };
+  const app = (mode: 'local' | 'ai' | 'ai_then_local', v = vision()) => make({ vision: v, readText: async () => { localCalls++; return ok(SAMPLE_REPORT); } }, { ocrPhotos: mode });
+  beforeEach(() => { consents = [aiConsent]; localCalls = 0; sent = 0; photo(); });
+
+  it('with consent the AI reads the photo and the local reader is never run', async () => {
+    const r = await call(await app('ai'), 'POST', `/documents/${D}/extract`);
+    expect(r.statusCode).toBe(201); expect(localCalls).toBe(0); expect(sent).toBe(1);
+    const sv = w.saved[0]!; expect(sv.engine).toBe('gemini'); expect(sv.fields.map(x => x.fieldName)).toEqual(['haemoglobin', 'esr']);
+    expect(sv.fields.every(x => x.agreement === 'ai_only')).toBe(true);        // every row is marked as read by the AI only, and a person verifies each
+  });
+  it('without the patient\'s consent nothing is sent and the person is told what to do', async () => {
+    consents = [];
+    const r = await call(await app('ai'), 'POST', `/documents/${D}/extract`);
+    expect(r.statusCode).toBe(422); expect(sent).toBe(0); expect(localCalls).toBe(0);
+    expect(r.json().error).toMatch(/needs the patient’s separate consent/); expect(r.json().error).toMatch(/PDF/);
+  });
+  it('when the AI service is not set up it says so instead of running the heavy local reader', async () => {
+    const r = await call(await make({ readText: async () => { localCalls++; return ok(SAMPLE_REPORT); } }, { ocrPhotos: 'ai' }), 'POST', `/documents/${D}/extract`);
+    expect(r.statusCode).toBe(422); expect(localCalls).toBe(0); expect(r.json().error).toMatch(/not set up on this server/);
+  });
+  it('a failing AI service gives a plain message in ai mode', async () => {
+    const r = await call(await app('ai', vision(true)), 'POST', `/documents/${D}/extract`);
+    expect(r.statusCode).toBe(422); expect(localCalls).toBe(0); expect(r.json().error).toMatch(/busy|could not be read/);
+  });
+  it('ai_then_local falls back to this server\'s reader when the AI cannot help', async () => {
+    consents = [];
+    const r = await call(await app('ai_then_local'), 'POST', `/documents/${D}/extract`);
+    expect(r.statusCode).toBe(201); expect(localCalls).toBe(1); expect(sent).toBe(0); expect(w.saved[0]!.engine).toBe('pdf-text-layer');
+  });
+  it('PDFs are always read locally, whatever the photo setting', async () => {
+    w.docs = [doc()];
+    const r = await call(await app('ai'), 'POST', `/documents/${D}/extract`);
+    expect(r.statusCode).toBe(201); expect(localCalls).toBe(1);
+  });
+  it('the default (local) behaves as before: photos use the local reader', async () => {
+    const r = await call(await app('local'), 'POST', `/documents/${D}/extract`);
+    expect(r.statusCode).toBe(201); expect(localCalls).toBe(1);
   });
 });

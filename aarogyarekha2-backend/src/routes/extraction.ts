@@ -12,6 +12,14 @@ import { secondRead } from './visionRead.js';
 import type { ExtractionView } from '../deps.js';
 
 const uuid = z.string().uuid();
+/** What to tell the person when the AI image reader could not read a photo. */
+const PHOTO_PROBLEM: Record<string, string> = {
+  no_consent: 'Reading a photo uses an outside AI service and needs the patient’s separate consent. Record that consent, or upload the report as a PDF.',
+  not_set_up: 'Reading photos is not set up on this server. Upload the report as a PDF instead.',
+  unsupported_type: 'This kind of photo cannot be read. Use a JPEG or PNG, or upload a PDF.',
+  too_large: 'The photo is too large to send for reading (over 8 MB). Retake it smaller, or upload a PDF.',
+  unavailable: 'The outside reading service is busy. Try again in a moment.',
+};
 const runBody = z.object({ language: z.enum(['en', 'hi', 'or']).optional() }).strict();
 const verifyBody = z.object({
   valueText: z.string().trim().min(1).max(200).nullable().optional(),
@@ -56,22 +64,30 @@ export function registerExtractionRoutes(c: RouteCtx, h: RouteHelpers): void {
     catch (err) { req.log.error({ reqId: req.id, err: (err as Error).message }, 'document download for extraction failed'); return fail(reply, 502, 'transient', 'The file could not be opened. Try again.'); }
 
     const work = async (): Promise<{ failure: string | null; secondRead: { status: string; counts: Record<string, number> | null } }> => {
-      let failure: string | null = null; let result: Awaited<ReturnType<typeof deps.readText>> | null = null;
-      try { result = await deps.readText({ bytes, mime: d.mime_type, language: body.data.language }); }
-      catch (err) {
-        failure = err instanceof OcrUnavailable ? err.message : 'The report could not be read.';
-        if (!(err instanceof OcrUnavailable)) req.log.error({ reqId: req.id, err: (err as Error).message }, 'ocr failed');
-      }
-      const parsed = result ? parseLabText(result.text, result.confidence) : { fields: [], skipped: 0 };
-      // Second reader: an AI model reads the same image. Both reads are kept; a person verifies every row either way.
+      type Read = Awaited<ReturnType<typeof deps.readText>>;
+      const local = async (): Promise<{ result: Read | null; failure: string | null }> => {
+        try { return { result: await deps.readText({ bytes, mime: d.mime_type, language: body.data.language }), failure: null }; }
+        catch (err) {
+          if (!(err instanceof OcrUnavailable)) req.log.error({ reqId: req.id, err: (err as Error).message }, 'ocr failed');
+          return { result: null, failure: err instanceof OcrUnavailable ? err.message : 'The report could not be read.' };
+        }
+      };
+      // Photos can be read by the outside AI image reader first (OCR_PHOTOS=ai), so a small server never runs the heavy local reader.
+      const aiPrimary = d.mime_type !== 'application/pdf' && c.ocrPhotos !== 'local';
+      let { result, failure } = aiPrimary ? { result: null as Read | null, failure: null as string | null } : await local();
+      // The AI reader (needs the patient's separate consent). Both reads are kept when both ran; a person verifies every row either way.
       const sr = await secondRead(deps, req, d, bytes);
+      const aiRead = sr.status === 'ok' && sr.rows.length > 0;
+      if (aiPrimary && !aiRead && c.ocrPhotos === 'ai_then_local') ({ result, failure } = await local());
+      const parsed = result ? parseLabText(result.text, result.confidence) : { fields: [], skipped: 0 };
       let fields = parsed.fields; let counts: Record<string, number> | null = null; let engine = result?.engine ?? 'none';
-      if (sr.status === 'ok' && sr.rows.length > 0) {
+      if (aiRead) {
         const m = crossCheck(parsed.fields, sr.rows); fields = m.fields; counts = m.counts; engine = result ? `${engine}+${sr.provider}` : `${sr.provider}`;
         if (fields.length > 0) failure = null;                                   // the AI read rows the local reader could not
       }
-      if (fields.length === 0 && (result || failure === null)) failure = 'No test results were found in this document. If it is a photo, try a clearer, straighter picture.';
+      if (aiPrimary && !result && !aiRead && sr.status !== 'ok') failure = PHOTO_PROBLEM[sr.status] ?? 'The photo could not be read.';
       const avg = fields.length ? Math.round((fields.reduce((s, f) => s + (f.confidence ?? 0), 0) / fields.length) * 1000) / 1000 : null;
+      if (fields.length === 0 && (result || failure === null)) failure = 'No test results were found in this document. If it is a photo, try a clearer, straighter picture.';
       await deps.saveExtraction({
         documentId: d.id, engine, engineVersion: result?.engineVersion ?? null, language: result?.language ?? body.data.language ?? null,
         avgConfidence: avg, status: failure ? 'failed' : 'completed', error: failure, rawText: result?.text ?? null, fields: failure ? [] : fields,

@@ -13,6 +13,8 @@ const schema = z.object({
   API_ALLOWED_ORIGINS: z.string().default('http://localhost:5173'),
   UPLOAD_MAX_MB: z.coerce.number().int().min(1).max(20).default(10),
   OCR_PROVIDER: z.enum(['local', 'mock']).default('local'),
+  // Who reads PHOTOS of reports: local (Tesseract on this server), ai (the outside AI image reader first; needs the patient's consent) or ai_then_local.
+  OCR_PHOTOS: z.enum(['local', 'ai', 'ai_then_local']).default('local'),
   TESSDATA_PATH: z.string().optional(),
   // Reviews and referral sends need a verified second factor (authenticator app). On unless explicitly turned off for a local demo.
   MFA_REQUIRED: z.enum(['true', 'false']).default('true'),
@@ -30,7 +32,7 @@ const schema = z.object({
   TRIAGE_RULESET_VERSION: z.string().optional(),
 });
 
-export type Config = z.infer<typeof schema> & { databaseUrl: string; allowedOrigins: string[]; uploadMaxMb: number; requireMfa: boolean; rateLimitPerMinute: number; accessBudgetPerHour: number; sms: { provider: 'mock' | 'twilio'; accountSid?: string; authToken?: string; from?: string; messagingServiceSid?: string; defaultCountry: string; webhookUrl?: string }; triageRuleSet?: { name: string; version: string }; ai: AiEnvValues };
+export type Config = z.infer<typeof schema> & { databaseUrl: string; allowedOrigins: string[]; uploadMaxMb: number; requireMfa: boolean; rateLimitPerMinute: number; accessBudgetPerHour: number; ocrPhotos: 'local' | 'ai' | 'ai_then_local'; sms: { provider: 'mock' | 'twilio'; accountSid?: string; authToken?: string; from?: string; messagingServiceSid?: string; defaultCountry: string; webhookUrl?: string }; triageRuleSet?: { name: string; version: string }; ai: AiEnvValues };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = schema.safeParse(env);
@@ -53,6 +55,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     requireMfa: c.MFA_REQUIRED === 'true',
     rateLimitPerMinute: c.RATE_LIMIT_PER_MINUTE,
     accessBudgetPerHour: c.ACCESS_BUDGET_PATIENTS_PER_HOUR,
+    ocrPhotos: c.OCR_PHOTOS,
     sms: { provider: c.SMS_PROVIDER, accountSid: c.TWILIO_ACCOUNT_SID?.trim() || undefined, authToken: c.TWILIO_AUTH_TOKEN?.trim() || undefined, from: c.TWILIO_FROM?.trim() || undefined,
            messagingServiceSid: c.TWILIO_MESSAGING_SERVICE_SID?.trim() || undefined, defaultCountry: c.SMS_DEFAULT_COUNTRY_CODE, webhookUrl: c.SMS_WEBHOOK_URL?.trim() || undefined },
     ai: ai.data,

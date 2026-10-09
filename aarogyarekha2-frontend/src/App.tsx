@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { warmApi } from './lib/warm';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { EncounterPage } from './screens/EncounterPage';
 import { HomePage } from './screens/HomePage';
@@ -17,7 +19,9 @@ import { SignIn } from './screens/SignIn';
 import { Landing } from './screens/Landing';
 
 function Gate() {
-  const { status } = useAuth();
+  const { status, demo } = useAuth();
+  // Signed out (the landing and sign-in pages): start waking a sleeping API now, so it is ready by the time the person has signed in.
+  useEffect(() => { if (status === 'signedOut' && !demo) warmApi(__API_URL__); }, [status, demo]);
   if (status === 'loading') return <p style={{ padding: 24 }} role="status">Loading…</p>;
   // Signed out: the root explains the app; every other address (including a link to a patient) goes straight to sign-in.
   if (status === 'signedOut') return <Routes><Route index element={<Landing />} /><Route path="*" element={<SignIn />} /></Routes>;

@@ -19,6 +19,8 @@ export interface Me {
   mfaRequired?: boolean;
   userId: string;
   displayName: string | null;
+  /** Platform administrators manage facilities and have no facility role of their own. */
+  isPlatformAdmin?: boolean;
   memberships: { facilityId: string; facilityName: string | null; facilityType: string | null; role: string }[];
 }
 
@@ -116,6 +118,7 @@ export type VisitOutcome = 'treated_here' | 'sent_home' | 'did_not_wait' | 'refe
 export interface DoneEntry { encounterId: string; facilityId: string; patientRef: string; patientName: string | null; sex: string | null; urgencyCode: string | null; outcome: VisitOutcome | null; finishedAt: string; by: string | null; waitedMinutes: number | null }
 export type MemberRole = 'health_worker' | 'nurse' | 'doctor' | 'medical_officer';
 export interface MemberView { userId: string; facilityId: string; role: string; active: boolean; since: string; name: string | null; email: string | null; isSelf: boolean; canChange: boolean }
+export interface PlatformFacilityView { id: string; name: string; type: string; state: string | null; district: string | null; code: string | null; active: boolean; staff: number; admins: { userId: string; name: string | null; email: string | null }[] }
 export interface MemberChangeView { at: string; facilityId: string; op: string; role: string | null; previous: string | null; actor: string | null; target: string | null }
 export interface BreakGlassGrantView { id: string; who: string | null; userId: string; patientRef: string; facilityId: string; reason: string; createdAt: string; expiresAt: string; reviewedAt: string | null; reviewed: boolean }
 export type HistoryKind = 'reported_condition' | 'allergy' | 'medication' | 'family_history' | 'occupational_exposure' | 'immunisation' | 'other';
@@ -213,6 +216,11 @@ export interface Api {
   addMember(body: { email: string; role: MemberRole; facilityId?: string }): Promise<{ userId: string; role: string; previous: string }>;
   setMemberRole(userId: string, role: MemberRole, facilityId?: string): Promise<{ userId: string; role: string; previous: string }>;
   removeMember(userId: string, facilityId?: string): Promise<{ userId: string; removed: true }>;
+  platformFacilities(): Promise<PlatformFacilityView[]>;
+  createFacility(body: { name: string; type: string; state?: string; district?: string; pincode?: string; code?: string }): Promise<{ id: string }>;
+  setFacilityActive(facilityId: string, active: boolean): Promise<{ id: string; active: boolean }>;
+  appointFacilityAdmin(facilityId: string, email: string): Promise<{ userId: string }>;
+  removeFacilityAdmin(facilityId: string, userId: string): Promise<{ userId: string; removed: true }>;
   breakGlassList(): Promise<BreakGlassGrantView[]>;
   reviewBreakGlass(id: string): Promise<{ id: string; reviewed: true }>;
   requestBreakGlass(body: { publicRef: string; reason: string; facilityId?: string }): Promise<{ id: string; patientId: string; patientRef: string; expiresAt: string }>;

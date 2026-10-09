@@ -19,7 +19,9 @@ export function registerViewRoutes(c: RouteCtx): void {
     let me: Awaited<ReturnType<NonNullable<typeof req.reader>['getMe']>> | undefined;
     try { me = await req.reader!.getMe(); } catch (err) { req.log.warn({ reqId: req.id, err: (err as Error).message }, 'profile could not be loaded'); }
     if (me === undefined) return fail(reply, 502, 'transient', 'Your profile could not be loaded. Try again.');
-    return reply.send({ userId: req.user!.userId, aal: req.user!.aal ?? 'aal1', mfaRequired: c.mfaRequired, ...me });
+    // Platform administrators have no facility role, so this is how the page knows to show their screen. A failed check just means "no".
+    const isPlatformAdmin = deps.platformAdmin ? await deps.platformAdmin.isPlatform(req.user!.userId).catch(() => false) : false;
+    return reply.send({ userId: req.user!.userId, aal: req.user!.aal ?? 'aal1', mfaRequired: c.mfaRequired, isPlatformAdmin, ...me });
   });
 
   app.get('/patients', { preHandler: authenticate }, async (req, reply) => {

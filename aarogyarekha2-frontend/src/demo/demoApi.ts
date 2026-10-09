@@ -177,6 +177,12 @@ export function createDemoApi(opts: { rulesApproved: boolean }): Api {
     memberChanges: async () => wait([{ at: ago(120), facilityId: 'f1', op: 'set_role', role: 'doctor', previous: 'none', actor: 'Demo Admin', target: 'Dr. Rao' }]),
     addMember: async b => { demoMembers.push({ userId: 'm' + demoMembers.length, facilityId: 'f1', role: b.role, active: true, since: new Date().toISOString(), name: b.email.split('@')[0]!, email: b.email, isSelf: false, canChange: true }); return wait({ userId: 'm', role: b.role, previous: 'none' }); },
     setMemberRole: async (id, role) => { const m = demoMembers.find(x => x.userId === id); if (m) { m.role = role; m.active = true; } return wait({ userId: id, role, previous: 'nurse' }); },
+    // Demo mode has no platform administrator, so these are never reached from the screen.
+    platformFacilities: async () => wait([]),
+    createFacility: async () => wait({ id: 'demo-facility' }),
+    setFacilityActive: async (id, active) => wait({ id, active }),
+    appointFacilityAdmin: async () => wait({ userId: 'demo-admin' }),
+    removeFacilityAdmin: async (_f, userId) => wait({ userId, removed: true as const }),
     removeMember: async id => { const m = demoMembers.find(x => x.userId === id); if (m) m.active = false; return wait({ userId: id, removed: true as const }); },
     breakGlassList: async () => wait([{ id: 'bg1', who: 'Demo Nurse', userId: 'u', patientRef: 'AR-0042', facilityId: 'f1', reason: 'Unconscious on arrival, relatives not found', createdAt: ago(90), expiresAt: ago(30), reviewedAt: null, reviewed: false }]),
     reviewBreakGlass: async id => wait({ id, reviewed: true as const }),

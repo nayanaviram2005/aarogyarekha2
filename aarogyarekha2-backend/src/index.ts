@@ -10,4 +10,5 @@ const close = async () => { await app.close(); await pool.end(); process.exit(0)
 process.on('SIGINT', close);
 process.on('SIGTERM', close);
 
-await app.listen({ port: config.API_PORT, host: '127.0.0.1' });   // loopback only until a reverse proxy fronts it
+// Loopback only by default (behind a reverse proxy). A host such as Render sets PORT and needs API_HOST=0.0.0.0 so its router can reach the service.
+await app.listen({ port: Number(process.env.PORT) || config.API_PORT, host: process.env.API_HOST?.trim() || '127.0.0.1' });

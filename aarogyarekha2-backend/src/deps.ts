@@ -185,6 +185,16 @@ export interface MemberAdmin {
   changes(facilityIds: string[], limit: number): Promise<MemberChange[]>;
 }
 
+export interface PlatformFacilityRow { id: string; name: string; type: string; state: string | null; district: string | null; code: string | null; active: boolean; staff: number; admins: { userId: string; name: string | null; email: string | null }[] }
+export class PlatformError extends Error { constructor(public readonly kind: 'forbidden' | 'not_found' | 'invalid', message: string) { super(message); } }
+/** The platform administrator's work: facilities. Appointing facility administrators goes through MemberAdmin. No patient data. */
+export interface PlatformAdmin {
+  isPlatform(userId: string): Promise<boolean>;
+  facilities(): Promise<PlatformFacilityRow[]>;
+  create(a: { actor: string; name: string; type: string; state?: string | undefined; district?: string | undefined; pincode?: string | undefined; code?: string | undefined }): Promise<{ id: string }>;
+  setActive(a: { actor: string; facilityId: string; active: boolean }): Promise<void>;
+}
+
 export interface BreakGlassRow { id: string; user_id: string; patient_ref: string; facility_id: string; reason: string; created_at: string; expires_at: string; reviewed_by: string | null; reviewed_at: string | null }
 export class BreakGlassError extends Error { constructor(public readonly kind: 'not_found' | 'forbidden', message: string) { super(message); } }
 /** Administrator reads and writes as the CALLER (row-level security decides). */
@@ -288,6 +298,8 @@ export interface Deps {
   visitFlow?: VisitFlow;
   /** People and roles. Optional: needs migration 0016; when absent the screen says it is not set up. */
   memberAdmin?: MemberAdmin;
+  /** Facilities and their administrators, for platform administrators. Optional: when absent those screens say they are not set up. */
+  platformAdmin?: PlatformAdmin;
   /** Administrator and emergency-access functions. Optional: when absent those screens say they are not set up. */
   adminStore?: (token: string, userId: string) => AdminStore;
   systemAdmin?: SystemAdmin;

@@ -11,6 +11,7 @@ import { CampBatchPage } from './screens/CampBatchPage';
 import { OfflinePage } from './screens/OfflinePage';
 import { SettingsPage } from './screens/SettingsPage';
 import { AdminPage } from './screens/AdminPage';
+import { PlatformPage } from './screens/PlatformPage';
 import { ReferralsPage } from './screens/ReferralsPage';
 import { BreakGlassPage } from './screens/BreakGlassPage';
 import { HackathonBar } from './components/HackathonBar';
@@ -34,6 +35,7 @@ function Gate() {
         <Route path="camp" element={<CampBatchPage />} />
         <Route path="offline" element={<OfflinePage />} />
         <Route path="admin" element={<AdminPage />} />
+        <Route path="platform" element={<PlatformPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="referrals" element={<ReferralsPage />} />
         <Route path="emergency" element={<BreakGlassPage />} />

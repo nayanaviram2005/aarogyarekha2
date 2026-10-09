@@ -11,3 +11,6 @@ quarantine/
 .claude/
 docs/
 .agents/
+*.key
+*.pem
+*.pub

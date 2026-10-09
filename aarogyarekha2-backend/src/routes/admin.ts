@@ -11,6 +11,7 @@ const grantBody = z.object({
   facilityId: uuid.optional(),
 }).strict();
 const CLINICAL = new Set(['health_worker', 'nurse', 'doctor', 'medical_officer']);
+const SEARCH_LIMIT = 15;
 
 export function registerAdminRoutes(c: RouteCtx, h: RouteHelpers): void {
   const { app, deps, authenticate, fail } = c;
@@ -48,6 +49,35 @@ export function registerAdminRoutes(c: RouteCtx, h: RouteHelpers): void {
     if (a === undefined) return fail(reply, 502, 'transient', 'The figures could not be worked out. Try again.');
     await h.note(req, { action: 'read', entityType: 'admin_analytics', outcome: 'success', details: { days: q.data.days } });
     return reply.send({ ...a, note: 'Counts and times only. Agreement means how often a reviewer confirmed the rules priority instead of changing it. It is not a measure of clinical accuracy.' });
+  });
+
+  const csvCell = (v: string | number | null) => {
+    const t = v === null ? '' : String(v);
+    const safe = /^[=+\-@\t\r]/.test(t) ? `'${t}` : t;
+    return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+  };
+  const EXPORT_LIMIT = 50_000;
+  app.get('/admin/audit/export', { preHandler: authenticate, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
+    if (!deps.systemAdmin) return notSetUp(reply);
+    const q = z.object({ days: z.coerce.number().int().refine(n => [7, 30, 90].includes(n), 'Days must be 7, 30 or 90.').default(30) }).safeParse(req.query);
+    if (!q.success) return fail(reply, 400, 'invalid', 'Days must be 7, 30 or 90.');
+    const fac = await adminFacilities(req, reply); if (!fac) return;
+    const since = new Date(Date.now() - q.data.days * 86_400_000).toISOString();
+    const rows = await deps.systemAdmin.auditExport(fac, since, EXPORT_LIMIT + 1).catch(() => undefined);
+    if (rows === undefined) return fail(reply, 502, 'transient', 'The audit log could not be exported. Try again.');
+    const chain = await deps.systemAdmin.verifyChain().catch(() => undefined);
+    if (!(await c.auditOrFail(req, reply, { action: 'export', entityType: 'admin_audit_export', outcome: 'success', details: { days: q.data.days, rows: Math.min(rows.length, EXPORT_LIMIT) } }))) return;
+    const truncated = rows.length > EXPORT_LIMIT;
+    const shown = truncated ? rows.slice(0, EXPORT_LIMIT) : rows;
+    const head = ['entry', 'time', 'person', 'role', 'facility', 'action', 'record', 'patient_ref', 'outcome'];
+    const lines = [head.join(','), ...shown.map(r => [r.id, r.occurred_at, r.actor_name ?? r.actor_user_id, r.actor_role, r.facility_name ?? r.facility_id, r.action, r.entity_type, r.patient_ref, r.outcome].map(csvCell).join(','))];
+    const day = new Date().toISOString().slice(0, 10);
+    const chainState = chain === undefined ? 'unchecked' : chain.brokenIds.length === 0 ? 'intact' : 'broken';
+    return reply
+      .header('content-type', 'text/csv; charset=utf-8')
+      .header('content-disposition', `attachment; filename="audit-${q.data.days}d-${day}.csv"`)
+      .header('x-audit-chain', chainState).header('x-audit-rows', String(shown.length)).header('x-audit-truncated', String(truncated))
+      .send(lines.join('\r\n') + '\r\n');
   });
 
   app.get('/admin/audit/chain', { preHandler: authenticate }, async (req, reply) => {
@@ -102,6 +132,39 @@ export function registerAdminRoutes(c: RouteCtx, h: RouteHelpers): void {
       req.log.error({ reqId: req.id, err: (err as Error).message }, 'break glass failed');
       return fail(reply, 502, 'transient', 'Emergency access could not be granted. Try again.');
     }
+  });
+
+  const searchQuery = z.object({ q: z.string().trim().min(2, 'Type at least 2 letters of the name or record number.').max(60) }).strict();
+  app.get('/break-glass/patients', { preHandler: authenticate, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => {
+    if (!deps.systemAdmin) return notSetUp(reply);
+    const q = searchQuery.safeParse(req.query); if (!q.success) return h.invalid(reply, q.error);
+    if (!(await c.requireMfa(req, reply, 'break_glass'))) return;
+    const me = await req.reader!.getMe().catch(() => undefined);
+    if (me === undefined) return fail(reply, 502, 'transient', 'Your profile could not be loaded. Try again.');
+    const mine = [...new Set(me.memberships.filter(m => CLINICAL.has(m.role)).map(m => m.facilityId))];
+    if (mine.length === 0) return fail(reply, 403, 'forbidden', 'Only clinical staff can use emergency access.');
+    const rows = await deps.systemAdmin.searchPatients(q.data.q, SEARCH_LIMIT + 1).catch(() => undefined);
+    if (rows === undefined) return fail(reply, 502, 'transient', 'The search could not be run. Try again.');
+    if (!(await c.auditOrFail(req, reply, { action: 'read', entityType: 'break_glass_patient_search', facilityId: mine.length === 1 ? mine[0] : undefined, outcome: 'success', details: { length: q.data.q.length, results: Math.min(rows.length, SEARCH_LIMIT) } }))) return;
+    const shown = rows.slice(0, SEARCH_LIMIT);
+    return reply.send({ truncated: rows.length > SEARCH_LIMIT, patients: shown.map(r => ({ publicRef: r.publicRef, name: r.name, sex: r.sex, age: r.age, facility: r.facilityName, ownFacility: mine.includes(r.facilityId) })) });
+  });
+
+  app.get('/patients/:id/triage-history', { preHandler: authenticate }, async (req, reply) => {
+    const store = storeFor(req); if (!store) return notSetUp(reply);
+    const id = uuid.safeParse((req.params as { id: string }).id); if (!id.success) return fail(reply, 400, 'invalid', 'Patient id must be a UUID.');
+    const p = await req.reader!.getPatient(id.data).catch(() => undefined);
+    if (p === undefined) return fail(reply, 502, 'transient', 'The record could not be loaded. Try again.');
+    if (!p) return fail(reply, 404, 'not-found', 'No such patient, or you do not have access.');
+    const rows = await store.patientTriageHistory(p.id).catch(() => undefined);
+    if (rows === undefined) return fail(reply, 502, 'transient', 'The triage history could not be loaded. Try again.');
+    if (!(await c.auditOrFail(req, reply, { action: 'read', entityType: 'patient_triage_history', entityId: p.id, patientId: p.id, facilityId: p.registered_facility_id, outcome: 'success', details: { visits: rows.length, notes: rows.reduce((n, v) => n + v.notes.length, 0) } }))) return;
+    const people = [...new Set(rows.flatMap(v => [...v.notes.map(x => x.authorId), ...(v.reviewedBy ? [v.reviewedBy] : [])]))];
+    const names = people.length ? await req.reader!.getNames(people).catch(() => ({} as Record<string, string | null>)) : ({} as Record<string, string | null>);
+    return reply.send({
+      patientRef: p.public_ref, patientName: p.full_name,
+      visits: rows.map(v => ({ id: v.id, createdAt: v.createdAt, facility: v.facilityName, scenario: v.scenario, status: v.status, outcome: v.outcome, complaint: v.complaint, assessedUrgency: v.assessedUrgency, finalUrgency: v.finalUrgency, reviewedBy: v.reviewedBy ? names[v.reviewedBy] ?? null : null, reviewedAt: v.reviewedAt, notes: v.notes.map(x => ({ id: x.id, body: x.body, author: names[x.authorId] ?? null, at: x.at })) })),
+    });
   });
 
   app.get('/patients/:id/encounters', { preHandler: authenticate }, async (req, reply) => {

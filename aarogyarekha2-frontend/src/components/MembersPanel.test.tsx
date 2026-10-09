@@ -5,7 +5,7 @@ import { ApiError } from '../lib/api';
 import type { Api, MemberView } from '../lib/types';
 import { MembersPanel } from './MembersPanel';
 
-const m = (o: Partial<MemberView> = {}): MemberView => ({ userId: 'u1', facilityId: 'f1', role: 'nurse', active: true, since: '2026-01-01T00:00:00Z', name: 'Ravi', email: 'ravi@x.in', isSelf: false, canChange: true, ...o });
+const m = (o: Partial<MemberView> = {}): MemberView => ({ userId: 'u1', facilityId: 'f1', role: 'nurse', active: true, since: '2026-01-01T00:00:00Z', name: 'Ravi', email: 'ravi@x.in', lastSignIn: '2026-10-07T08:00:00Z', mfa: true, isSelf: false, canChange: true, ...o });
 const admin = m({ userId: 'u0', name: 'Asha', email: 'asha@x.in', role: 'facility_admin', isSelf: true, canChange: false });
 const api = (o: Record<string, unknown> = {}) => ({
   members: vi.fn().mockResolvedValue([admin, m()]), memberChanges: vi.fn().mockResolvedValue([{ at: '2026-10-07T08:00:00Z', facilityId: 'f1', op: 'set_role', role: 'doctor', previous: 'nurse', actor: 'Asha', target: 'Ravi' }]),
@@ -47,4 +47,13 @@ describe('MembersPanel', () => {
     await userEvent.selectOptions(await screen.findByLabelText('Role for Mala'), 'doctor'); await waitFor(() => expect(a.setMemberRole).toHaveBeenCalledWith('u9', 'doctor', 'f2'));
   });
   it('a failed load says why', async () => { render(<MembersPanel api={api({ members: vi.fn().mockRejectedValue(new ApiError(403, 'Administrator access is needed for this screen.')) })} />); expect(await screen.findByText('Administrator access is needed for this screen.')).toBeInTheDocument(); });
+});
+
+describe('MembersPanel sign-in columns', () => {
+  it('shows last sign-in and whether a second factor is set up', async () => {
+    const a = api({ members: vi.fn().mockResolvedValue([admin, m({ userId: 'u2', name: 'Meera', lastSignIn: null, mfa: false })]) }); render(<MembersPanel api={a} />);
+    expect(await screen.findByText('Meera')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Last sign-in' })).toBeInTheDocument(); expect(screen.getByRole('columnheader', { name: 'Second factor' })).toBeInTheDocument();
+    expect(screen.getByText('Never')).toBeInTheDocument(); expect(screen.getByText('Not set up')).toBeInTheDocument(); expect(screen.getAllByText('On').length).toBeGreaterThan(0);
+  });
 });

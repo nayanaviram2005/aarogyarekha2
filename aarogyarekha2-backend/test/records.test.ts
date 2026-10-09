@@ -4,7 +4,7 @@ import { buildApp } from '../src/app.js';
 import type { AuditEvent, Deps, DocumentRow, ExtractionView, UserReader, UserWriter } from '../src/deps.js';
 import type { EncounterRow } from '../src/fhir/project.js';
 import { makeAccessBudget } from '../src/guard/accessBudget.js';
-import { reportNotes, summariseRecords, type ContextDoc } from '../src/ocr/recordContext.js';
+import { LOW_CONFIDENCE, recordGaps, reportNotes, summariseRecords, type ContextDoc } from '../src/ocr/recordContext.js';
 
 const P = '11111111-1111-4111-8111-111111111111', F = '22222222-2222-4222-8222-222222222222', E = '33333333-3333-4333-8333-333333333333', D = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const enc = { id: E, patient_id: P, facility_id: F, status: 'submitted' } as unknown as EncounterRow;
@@ -19,6 +19,16 @@ describe('what the records say', () => {
     const s = summariseRecords(docs);
     expect(s).toMatchObject({ documents: 2, read: 1, notRead: 1, rows: 3, verified: 2, flagged: 2 });
     expect(s.lines).toEqual(['Haemoglobin 9.1 g/dL (printed LOW)', 'WBC 11200 (printed HIGH, not yet checked by a person)']);
+  });
+  it('lists what the records cannot tell you yet: unread files, readers that disagree, low confidence; never a test to order', () => {
+    const g = recordGaps(docs);
+    expect(g.map(x => x.code)).toEqual(['unread']);
+    expect(g[0]!.text).toContain('x.jpg');
+    const d2: ContextDoc[] = [{ id: 'd3', kind: 'lab_report', filename: 'a.pdf', createdAt: '2026-10-08', status: 'completed', fields: [{ ...f('ESR', 30, null, false), agreement: 'differ', confidence: 0.5 }, { ...f('CRP', 5, null, false), confidence: LOW_CONFIDENCE - 0.1 }, { ...f('RBC', 4, null, false), confidence: 0.99 }] }];
+    expect(recordGaps(d2).map(x => x.code)).toEqual(['readers_differ', 'low_confidence']);
+    expect(recordGaps(d2).map(x => x.text).join(' ')).not.toMatch(/(test|order|recommend|should)/i);
+    expect(recordGaps([])).toEqual([]);
+    expect(summariseRecords(docs).gaps).toHaveLength(1);
   });
   it('gives the AI only checked rows, flagged first, with no file names or dates', () => {
     const n = reportNotes(docs);

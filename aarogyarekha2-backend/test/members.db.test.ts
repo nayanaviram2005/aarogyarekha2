@@ -86,3 +86,18 @@ describe('the functions are not callable by ordinary users', () => {
     }
   });
 });
+
+describe('last sign-in and second factor in the list', () => {
+  it('reports when each person last signed in and whether a second factor is verified', async () => {
+    const { makeMemberAdmin } = await import('../src/admin/members.js');
+    const fac = randomUUID(), a = randomUUID(), b = randomUUID();
+    await rows(`insert into public.facilities (id, name, type) values ($1,'Signin PHC','phc')`, [fac]);
+    await rows(`insert into auth.users (id, email, last_sign_in_at) values ($1,'sa@t.test','2026-10-07T08:00:00Z'), ($2,'sb@t.test',null)`, [a, b]);
+    await rows(`insert into public.profiles (user_id, display_name) values ($1,'Aa'), ($2,'Bb')`, [a, b]);
+    await rows(`insert into public.memberships (user_id, facility_id, role) values ($1,$3,'nurse'), ($2,$3,'doctor')`, [a, b, fac]);
+    await rows(`insert into auth.mfa_factors (user_id, status) values ($1,'verified'), ($2,'unverified')`, [a, b]);
+    const list = await makeMemberAdmin({ query: async (sql, p) => ({ rows: (await db.query(sql, p as any[])).rows as any[] }) }).list([fac]);
+    expect(list.find(m => m.userId === a)).toMatchObject({ lastSignIn: '2026-10-07T08:00:00.000Z', mfa: true });
+    expect(list.find(m => m.userId === b)).toMatchObject({ lastSignIn: null, mfa: false });
+  });
+});

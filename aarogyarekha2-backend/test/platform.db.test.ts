@@ -70,3 +70,16 @@ describe('the functions are closed to everyone but the service role', () => {
     expect(r[0]).toEqual({ a: false, b: false });
   });
 });
+
+describe('facility health columns', () => {
+  it('shows last activity, visits and referrals in the last 30 days for each facility', async () => {
+    const r = await admin.create({ actor: U.plat, name: 'Health PHC', type: 'phc' });
+    let row = (await admin.facilities()).find(f => f.id === r.id)!;
+    expect(row.lastActivity).not.toBeNull(); expect(row.visits30).toBe(0); expect(row.referrals30).toBe(0);
+    const pt = randomUUID();
+    await q(`insert into public.patients (id, registered_facility_id, full_name) values ($1,$2,'Health Test')`, [pt, r.id]);
+    await q(`insert into public.encounters (patient_id, facility_id, scenario, status) values ($1,$2,'opd_queue','draft')`, [pt, r.id]);
+    row = (await admin.facilities()).find(f => f.id === r.id)!;
+    expect(row.visits30).toBe(1); expect(typeof row.lastActivity).toBe('string'); expect(row.referrals30).toBe(0);
+  });
+});

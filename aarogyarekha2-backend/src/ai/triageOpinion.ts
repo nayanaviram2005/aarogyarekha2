@@ -20,8 +20,9 @@ const SYSTEM =
   'Choose FEWER rather than more: two or three well-chosen questions are better than eight, and an empty list is fine. Never pad the list with general red flags. ' +
   'Do not choose questions about self-harm, poisoning, weapons, injuries, burns or the eyes unless the person\'s words mention that. Each one you choose must connect to something they actually said or measured. ' +
   'Choose only codes from the list. ' +
-  'Also give "questions": [{"code":"...","text":"..."}] with one entry for EVERY code you put in "ask" and for every code listed under "Always asked". The text is the question to put to this person: the SAME meaning as the plain question shown for that code ' +
-  '(do not change what is being checked, do not combine two checks), one short sentence ending with a question mark, in plain words, worded for this person\'s situation. No diagnosis, no medicine, no advice, no names.';
+  'Also give "questions": [{"code":"...","text":"..."}] with one entry for EVERY code you put in "ask" and for every code listed under "Always asked". The text is a question a nurse answers about the patient by looking and asking: the SAME meaning as the plain question shown for that code ' +
+  '(do not change what is being checked, do not combine two checks), one short sentence ending with a question mark, in plain words. ' +
+  'Write it in the third person about the patient, like the plain question does (for example "Is the airway blocked?" or "Is the patient struggling to breathe?"). Never use "you", "your", "I", "my", "we" or "our". No diagnosis, no medicine, no advice, no names.';
 
 const LABEL: Record<string, string> = {
   temperature_c: 'temperature C', spo2_pct: 'oxygen saturation %', pulse_bpm: 'pulse per minute', resp_rate_pm: 'breaths per minute', bp_systolic_mmhg: 'systolic BP', bp_diastolic_mmhg: 'diastolic BP',
@@ -55,11 +56,14 @@ const candidateText = (c: Candidate[]) => {
 
 const NAMES_A_CONDITION = /\b\w{3,}(itis|osis|emia|aemia|pathy|oma|syndrome|ectomy)\b|\b(dengue|malaria|typhoid|covid|pneumonia|tuberculosis|diabetes|cancer|stroke|infarction|sepsis|meningitis|eclampsia|appendicitis)\b/i;
 
+const FIRST_OR_SECOND_PERSON = /\b(you|your|yours|yourself|you're|you've|you'll|i|i'm|my|mine|me|we|our|ours)\b/i;
+
 export function cleanQuestion(text: string): string | null {
   const t = text.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
   if (t.length < 8 || t.length > 200 || !t.endsWith('?') || (t.match(/\?/g) ?? []).length > 1) return null;
   if (/\[\[|\]\]|@|https?:|www\.|\d{6,}/i.test(t)) return null;
   if (NAMES_A_CONDITION.test(t)) return null;
+  if (FIRST_OR_SECOND_PERSON.test(t)) return null;
   return checkNonDiagnostic(t).allowed ? t : null;
 }
 

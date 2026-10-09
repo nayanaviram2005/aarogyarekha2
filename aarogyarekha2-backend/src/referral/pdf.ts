@@ -47,19 +47,27 @@ export function noteContent(b: Bundle): { title: string; sections: { title: stri
 }
 
 export async function renderReferralPdf(bundle: Bundle, meta: { sha256: string | null; fromFacility?: string | null; toFacility?: string | null; priority?: string | null; sentAt?: string | null }): Promise<Buffer> {
+  const c = noteContent(bundle);
+  const meta1 = [meta.fromFacility && `From: ${meta.fromFacility}`, meta.toFacility && `To: ${meta.toFacility}`, meta.priority && `Request priority: ${meta.priority}`, (meta.sentAt ?? c.when) && `Sent: ${(meta.sentAt ?? c.when)!.slice(0, 16).replace('T', ' ')}`].filter(Boolean) as string[];
+  return renderNotePdf({ title: c.title, headerLines: meta1, sections: c.sections }, { docTitle: 'Referral note', checksum: meta.sha256 });
+}
+
+export interface NotePdf { title: string; headerLines: string[]; sections: { title: string; lines: string[] }[] }
+
+export async function renderNotePdf(note: NotePdf, meta: { docTitle: string; checksum: string | null }): Promise<Buffer> {
   const doc = await PDFDocument.create(); doc.registerFontkit(fontkit);
   const f: Record<string, PDFFont> = {
     latin: await doc.embedFont(load('public-sans-latin-400-normal.woff'), { subset: true }), bold: await doc.embedFont(load('public-sans-latin-700-normal.woff'), { subset: true }),
     deva: await doc.embedFont(load('noto-sans-devanagari-devanagari-400-normal.woff'), { subset: true }), orya: await doc.embedFont(load('noto-sans-oriya-oriya-400-normal.woff'), { subset: true }),
   };
-  doc.setTitle('Referral note'); doc.setCreator('AarogyaRekha'); doc.setProducer('AarogyaRekha');
+  doc.setTitle(meta.docTitle); doc.setCreator('AarogyaRekha'); doc.setProducer('AarogyaRekha');
   const W = 595, H = 842, M = 50, LH = 15; const INK = rgb(0.08, 0.14, 0.18), MUTED = rgb(0.29, 0.36, 0.4);
   let page: PDFPage = doc.addPage([W, H]); let y = H - M; let pageNo = 1;
 
   const footer = (p: PDFPage, n: number) => {
     p.drawLine({ start: { x: M, y: 38 }, end: { x: W - M, y: 38 }, thickness: 0.5, color: MUTED });
     p.drawText('Organises information for review. Does not diagnose or advise treatment.', { x: M, y: 26, size: 8, font: f.latin!, color: MUTED });
-    p.drawText(`Page ${n}${meta.sha256 ? `  ·  document checksum (SHA-256) ${meta.sha256.slice(0, 16)}…` : ''}`, { x: M, y: 14, size: 8, font: f.latin!, color: MUTED });
+    p.drawText(`Page ${n}${meta.checksum ? `  ·  document checksum (SHA-256) ${meta.checksum.slice(0, 16)}…` : ''}`, { x: M, y: 14, size: 8, font: f.latin!, color: MUTED });
   };
   const newPage = () => { footer(page, pageNo); page = doc.addPage([W, H]); pageNo++; y = H - M; };
   const fontFor = (s: Script, bold: boolean) => (s === 'latin' ? (bold ? f.bold! : f.latin!) : f[s]!);
@@ -79,12 +87,10 @@ export async function renderReferralPdf(bundle: Bundle, meta: { sha256: string |
     if (line) flush(); y -= o.after ?? 0; void LH;
   };
 
-  const c = noteContent(bundle);
-  para(c.title, { size: 18, bold: true, after: 4 });
-  const meta1 = [meta.fromFacility && `From: ${meta.fromFacility}`, meta.toFacility && `To: ${meta.toFacility}`, meta.priority && `Request priority: ${meta.priority}`, (meta.sentAt ?? c.when) && `Sent: ${(meta.sentAt ?? c.when)!.slice(0, 16).replace('T', ' ')}`].filter(Boolean) as string[];
-  for (const l of meta1) para(l, { size: 9.5 });
+  para(note.title, { size: 18, bold: true, after: 4 });
+  for (const l of note.headerLines) para(l, { size: 9.5 });
   y -= 6;
-  for (const s of c.sections) {
+  for (const s of note.sections) {
     if (y < 110) newPage();
     para(s.title, { size: 12, bold: true, after: 1 });
     for (const l of s.lines) para(l, { indent: l.startsWith('•') ? 8 : 0 });

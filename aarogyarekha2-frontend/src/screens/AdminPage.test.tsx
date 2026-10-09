@@ -12,7 +12,7 @@ import { AdminPage, ChainBadge } from './AdminPage';
 
 const flags = (over: Partial<FlagsResponse> = {}): FlagsResponse => ({ hours: 24, examined: 120, rulesValidated: false, flags: [], ...over });
 const grant = (over: Partial<BreakGlassGrantView> = {}): BreakGlassGrantView => ({ id: 'g1', who: 'Nurse Das', userId: 'u1', patientRef: 'AR-0042', facilityId: 'f', reason: 'Unconscious on arrival', createdAt: '2026-10-07T08:00:00Z', expiresAt: '2026-10-07T09:00:00Z', reviewedAt: null, reviewed: false, ...over });
-const mk = (over: Record<string, unknown> = {}) => ({ members: vi.fn().mockResolvedValue([]), memberChanges: vi.fn().mockResolvedValue([]), analytics: vi.fn().mockResolvedValue({ days: 30, encounters: 0, submitted: 0, assessed: 0, reviewed: 0, byScenario: [], byUrgency: [], secondsToAssessment: { n: 0, median: null, p90: null }, minutesToReview: { n: 0, median: null, p90: null }, review: { approved: 0, changed: 0, loweredBelowRules: 0, agreementRate: null }, feedback: null, note: 'n' }), auditFlags: vi.fn().mockResolvedValue(flags()), breakGlassList: vi.fn().mockResolvedValue([]), auditChain: vi.fn().mockResolvedValue({ intact: true, checked: 77, brokenIds: [], checkedAt: '2026-10-07T10:00:00Z' }), reviewBreakGlass: vi.fn().mockResolvedValue({ id: 'g1', reviewed: true }), ...over }) as unknown as Api & Record<string, ReturnType<typeof vi.fn>>;
+const mk = (over: Record<string, unknown> = {}) => ({ members: vi.fn().mockResolvedValue([]), memberChanges: vi.fn().mockResolvedValue([]), analytics: vi.fn().mockResolvedValue({ days: 30, referralsSent: 0, perDay: [], encounters: 0, submitted: 0, assessed: 0, reviewed: 0, byScenario: [], byUrgency: [], secondsToAssessment: { n: 0, median: null, p90: null }, minutesToReview: { n: 0, median: null, p90: null }, review: { approved: 0, changed: 0, loweredBelowRules: 0, agreementRate: null }, feedback: null, note: 'n' }), auditFlags: vi.fn().mockResolvedValue(flags()), breakGlassList: vi.fn().mockResolvedValue([]), auditChain: vi.fn().mockResolvedValue({ intact: true, checked: 77, brokenIds: [], checkedAt: '2026-10-07T10:00:00Z' }), reviewBreakGlass: vi.fn().mockResolvedValue({ id: 'g1', reviewed: true }), ...over }) as unknown as Api & Record<string, ReturnType<typeof vi.fn>>;
 const view = () => render(<MemoryRouter><AdminPage /></MemoryRouter>);
 
 beforeEach(() => { h.api = mk(); });
@@ -72,5 +72,26 @@ describe('AdminPage', () => {
   it('one list failing does not hide the other', async () => {
     h.api = mk({ breakGlassList: vi.fn().mockRejectedValue(new ApiError(502, 'Emergency access records could not be loaded. Try again.')) });
     view(); expect(await screen.findByText(/Nothing unusual/)).toBeInTheDocument(); expect(screen.getByRole('alert')).toHaveTextContent('could not be loaded');
+  });
+});
+
+describe('audit export', () => {
+  const file = (over: Record<string, unknown> = {}) => ({ filename: 'audit-30d-2026-10-07.csv', blob: new Blob(['x'], { type: 'text/csv' }), chain: 'intact', rows: 42, truncated: false, ...over });
+  beforeEach(() => { URL.createObjectURL = vi.fn(() => 'blob:x'); URL.revokeObjectURL = vi.fn(); });
+  it('downloads the chosen period and says how many entries were saved and that the log is intact', async () => {
+    const a = mk({ downloadAuditExport: vi.fn().mockResolvedValue(file()) }); h.api = a; view();
+    await userEvent.selectOptions(await screen.findByLabelText('Export as CSV'), '7'); await userEvent.click(screen.getByRole('button', { name: 'Download CSV' }));
+    await waitFor(() => expect(a.downloadAuditExport).toHaveBeenCalledWith(7));
+    expect(await screen.findByText(/42 entries saved as audit-30d-2026-10-07\.csv\. The audit log was checked and is intact\./)).toBeInTheDocument();
+  });
+  it('warns loudly when the chain does not match and when the list was cut', async () => {
+    h.api = mk({ downloadAuditExport: vi.fn().mockResolvedValue(file({ chain: 'broken', truncated: true })) }); view();
+    await userEvent.click(await screen.findByRole('button', { name: 'Download CSV' }));
+    const note = await screen.findByText(/WARNING: the audit log does not match/); expect(note).toHaveTextContent('cut at the first 50,000 entries');
+  });
+  it('shows the reason when the export is refused', async () => {
+    h.api = mk({ downloadAuditExport: vi.fn().mockRejectedValue(new ApiError(502, 'The audit log could not be exported. Try again.')) }); view();
+    await userEvent.click(await screen.findByRole('button', { name: 'Download CSV' }));
+    expect(await screen.findByText('The audit log could not be exported. Try again.')).toBeInTheDocument();
   });
 });

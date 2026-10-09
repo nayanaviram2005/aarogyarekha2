@@ -4,13 +4,16 @@ import type { NotesStore } from '../deps.js';
 import { DbError } from '../deps.js';
 
 const body = z.object({
-  kind: z.enum(['comment', 'escalation', 'feedback_up', 'feedback_down']),
-  body: z.string().trim().max(1000).optional(),
+  kind: z.enum(['comment', 'escalation', 'feedback_up', 'feedback_down', 'doctor_note']),
+  body: z.string().trim().max(2000).optional(),
   assessmentId: z.string().uuid().optional(),
 }).strict().superRefine((b, ctx) => {
-  if ((b.kind === 'comment' || b.kind === 'escalation') && !b.body) ctx.addIssue({ code: 'custom', message: b.kind === 'escalation' ? 'Say why this needs a senior look.' : 'Write the note.', path: ['body'] });
+  if ((b.kind === 'comment' || b.kind === 'escalation' || b.kind === 'doctor_note') && !b.body) ctx.addIssue({ code: 'custom', message: b.kind === 'escalation' ? 'Say why this needs a senior look.' : b.kind === 'doctor_note' ? 'Write the doctor’s note.' : 'Write the note.', path: ['body'] });
+  if (b.kind !== 'doctor_note' && b.body && b.body.length > 1000) ctx.addIssue({ code: 'custom', message: 'A note can be at most 1000 characters.', path: ['body'] });
   if ((b.kind === 'feedback_up' || b.kind === 'feedback_down') && !b.assessmentId) ctx.addIssue({ code: 'custom', message: 'Feedback is about a specific assessment.', path: ['assessmentId'] });
 });
+
+const SIGNED_OFF = new Set(['reviewed', 'referred', 'closed']);
 
 export function registerNoteRoutes(c: RouteCtx, h: RouteHelpers): void {
   const { app, deps, authenticate, fail } = c;
@@ -30,12 +33,14 @@ export function registerNoteRoutes(c: RouteCtx, h: RouteHelpers): void {
     const store = storeFor(req); if (!store) return fail(reply, 503, 'not-supported', 'Reviewer notes are not set up.');
     const parsed = body.safeParse(req.body); if (!parsed.success) return h.invalid(reply, parsed.error);
     const ctx = await h.openEncounter(req, reply, false); if (!ctx) return;
+    if (parsed.data.kind === 'doctor_note' && !SIGNED_OFF.has(ctx.enc.status)) return fail(reply, 409, 'conflict', 'A doctor’s note can be added once the priority has been signed off.');
     try {
       const r = await store.add({ encounterId: ctx.enc.id, assessmentId: parsed.data.assessmentId, kind: parsed.data.kind, body: parsed.data.body });
       await h.note(req, { action: 'create', entityType: 'reviewer_notes', entityId: r.id, patientId: ctx.enc.patient_id, facilityId: ctx.enc.facility_id, outcome: 'success', details: { kind: parsed.data.kind } });
       return reply.code(201).send({ id: r.id });
     } catch (err) {
-      if (err instanceof DbError && err.code === '42501') return fail(reply, 403, 'forbidden', 'Only a nurse, doctor or medical officer at this facility can add notes or feedback.');
+      if (err instanceof DbError && err.code === '42501') return fail(reply, 403, 'forbidden', parsed.data.kind === 'doctor_note' ? 'Only a doctor or medical officer at this facility can add a doctor’s note.' : 'Only a nurse, doctor or medical officer at this facility can add notes or feedback.');
+      if (err instanceof DbError && err.code === '23514' && parsed.data.kind === 'doctor_note') return fail(reply, 409, 'conflict', 'A doctor’s note can be added once the priority has been signed off.');
       return h.dbFail(req, reply, err);
     }
   });

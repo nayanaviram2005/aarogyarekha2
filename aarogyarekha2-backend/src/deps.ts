@@ -141,9 +141,10 @@ export interface HistoryStore {
 }
 
 export interface VitalPoint { kind: string; value: number; unit: string; measured_at: string; encounter_id: string }
+export interface LabHistoryStore { forPatient(patientId: string, limit: number): Promise<import('./ocr/labTrends.js').LabPoint[]> }
 export interface VitalHistoryStore { forPatient(patientId: string, kinds: string[], limit: number): Promise<VitalPoint[]> }
 
-export type NoteKind = 'comment' | 'escalation' | 'feedback_up' | 'feedback_down';
+export type NoteKind = 'comment' | 'escalation' | 'feedback_up' | 'feedback_down' | 'doctor_note';
 export interface NoteRow { id: string; encounter_id: string; assessment_id: string | null; author_id: string; kind: NoteKind; body: string | null; created_at: string }
 export interface NotesStore {
   list(encounterId: string): Promise<NoteRow[]>;
@@ -159,7 +160,7 @@ export interface VisitFlow {
   done(facilityIds: string[], hours: number): Promise<DoneRow[]>;
 }
 
-export interface MemberRow { userId: string; facilityId: string; role: string; active: boolean; since: string; name: string | null; email: string | null }
+export interface MemberRow { userId: string; facilityId: string; role: string; active: boolean; since: string; name: string | null; email: string | null; lastSignIn: string | null; mfa: boolean }
 export interface MemberChange { at: string; facilityId: string; op: string; role: string | null; previous: string | null; actor: string | null; target: string | null }
 export class MemberError extends Error { constructor(public readonly kind: 'forbidden' | 'not_found' | 'invalid', message: string) { super(message); } }
 export interface MemberAdmin {
@@ -170,7 +171,7 @@ export interface MemberAdmin {
   changes(facilityIds: string[], limit: number): Promise<MemberChange[]>;
 }
 
-export interface PlatformFacilityRow { id: string; name: string; type: string; state: string | null; district: string | null; code: string | null; active: boolean; staff: number; admins: { userId: string; name: string | null; email: string | null }[] }
+export interface PlatformFacilityRow { id: string; name: string; type: string; state: string | null; district: string | null; code: string | null; active: boolean; staff: number; lastActivity: string | null; visits30: number; referrals30: number; admins: { userId: string; name: string | null; email: string | null }[] }
 export class PlatformError extends Error { constructor(public readonly kind: 'forbidden' | 'not_found' | 'invalid', message: string) { super(message); } }
 export interface PlatformAdmin {
   isPlatform(userId: string): Promise<boolean>;
@@ -181,22 +182,32 @@ export interface PlatformAdmin {
 
 export interface BreakGlassRow { id: string; user_id: string; patient_ref: string; facility_id: string; reason: string; created_at: string; expires_at: string; reviewed_by: string | null; reviewed_at: string | null }
 export class BreakGlassError extends Error { constructor(public readonly kind: 'not_found' | 'forbidden', message: string) { super(message); } }
+export interface TriageVisitRow {
+  id: string; createdAt: string; facilityId: string; facilityName: string | null; scenario: string; status: string; outcome: string | null; complaint: string | null;
+  assessedUrgency: string | null; finalUrgency: string | null; reviewedBy: string | null; reviewedAt: string | null;
+  notes: { id: string; authorId: string; body: string; at: string }[];
+}
+export interface PatientSearchRow { publicRef: string; name: string; sex: string | null; age: number | null; facilityId: string; facilityName: string }
 export interface AdminStore {
   recentAudit(sinceIso: string, limit: number): Promise<AuditRow[]>;
   reviewBreakGlass(id: string, reviewerId: string): Promise<boolean>;
   patientEncounters(patientId: string): Promise<{ id: string; status: string; scenario: string; created_at: string }[]>;
+  patientTriageHistory(patientId: string): Promise<TriageVisitRow[]>;
 }
 export interface Spread { n: number; median: number | null; p90: number | null }
 export interface Analytics {
-  days: number; encounters: number; submitted: number; assessed: number; reviewed: number;
+  days: number; referralsSent: number; perDay: { day: string; n: number }[]; encounters: number; submitted: number; assessed: number; reviewed: number;
   byScenario: { scenario: string; n: number }[]; byUrgency: { urgency: string; n: number }[];
   secondsToAssessment: Spread; minutesToReview: Spread;
   review: { approved: number; changed: number; loweredBelowRules: number; agreementRate: number | null };
   feedback: { helpful: number; notHelpful: number } | null;
 }
+export interface AuditExportRow { id: number; occurred_at: string; actor_user_id: string | null; actor_name: string | null; actor_role: string | null; facility_id: string | null; facility_name: string | null; action: string; entity_type: string; outcome: string; patient_ref: string | null }
 export interface SystemAdmin {
   analytics(facilityIds: string[], days: number): Promise<Analytics>;
   verifyChain(): Promise<{ checked: number; brokenIds: number[] }>;
+  auditExport(facilityIds: string[], sinceIso: string, limit: number): Promise<AuditExportRow[]>;
+  searchPatients(q: string, limit: number): Promise<PatientSearchRow[]>;
   listBreakGlass(facilityIds: string[], limit: number): Promise<BreakGlassRow[]>;
   grantBreakGlass(a: { userId: string; facilityId: string; publicRef: string; reason: string }): Promise<{ id: string; patientId: string; publicRef: string; expiresAt: string }>;
 }
@@ -254,6 +265,7 @@ export interface Deps {
   referralBoard?: (token: string, userId: string) => ReferralBoard;
   history?: (token: string, userId: string) => HistoryStore;
   vitalHistory?: (token: string) => VitalHistoryStore;
+  labHistory?: (token: string) => LabHistoryStore;
   notes?: (token: string, userId: string) => NotesStore;
   statusSms?: StatusSms;
   smsInbound?: { store: SmsStore; authToken: string; webhookUrl: string };

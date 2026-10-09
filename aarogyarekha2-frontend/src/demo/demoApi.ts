@@ -115,9 +115,9 @@ export function createDemoApi(opts: { rulesApproved: boolean }): Api {
   const open = (encId: string) => [...referrals.values()].find(r => r.encounterId === encId && ['draft', 'requested', 'accepted', 'in_progress'].includes(r.status));
   const demoDone: DoneEntry[] = [{ encounterId: 'done-1', facilityId: 'f1', patientRef: 'AR-0090', patientName: 'Seed Patient 90', sex: 'male', urgencyCode: 'green', outcome: 'treated_here', finishedAt: ago(45), by: 'Demo Nurse', waitedMinutes: 35 }, { encounterId: 'done-2', facilityId: 'f1', patientRef: 'AR-0091', patientName: 'Seed Patient 91', sex: 'female', urgencyCode: 'orange', outcome: 'referred', finishedAt: ago(100), by: null, waitedMinutes: 12 }];
   const demoMembers: MemberView[] = [
-    { userId: 'm-self', facilityId: 'f1', role: 'facility_admin', active: true, since: ago(90000), name: 'Demo Admin', email: 'admin@demo.test', isSelf: true, canChange: false },
-    { userId: 'm1', facilityId: 'f1', role: 'nurse', active: true, since: ago(60000), name: 'Demo Nurse', email: 'nurse@demo.test', isSelf: false, canChange: true },
-    { userId: 'm2', facilityId: 'f1', role: 'doctor', active: true, since: ago(50000), name: 'Dr. Rao', email: 'rao@demo.test', isSelf: false, canChange: true },
+    { userId: 'm-self', facilityId: 'f1', role: 'facility_admin', active: true, since: ago(90000), name: 'Demo Admin', email: 'admin@demo.test', lastSignIn: ago(30), mfa: true, isSelf: true, canChange: false },
+    { userId: 'm1', facilityId: 'f1', role: 'nurse', active: true, since: ago(60000), name: 'Demo Nurse', email: 'nurse@demo.test', lastSignIn: ago(300), mfa: true, isSelf: false, canChange: true },
+    { userId: 'm2', facilityId: 'f1', role: 'doctor', active: true, since: ago(50000), name: 'Dr. Rao', email: 'rao@demo.test', lastSignIn: null, mfa: false, isSelf: false, canChange: true },
   ];
   const wait = <T,>(v: T) => new Promise<T>(r => setTimeout(() => r(v), 150));
   const fups: Record<string, Followup[]> = {};
@@ -138,6 +138,12 @@ export function createDemoApi(opts: { rulesApproved: boolean }): Api {
     };
   };
   const sortKey = (e: QueueEntry) => (e.assessed && e.tier ? e.tier : 3);
+  const withOrder = (list: QueueEntry[]): QueueEntry[] => list.map((e, i) => {
+    const prev = list[i - 1];
+    const eff = sortKey(e);
+    const why = !prev ? 'first' as const : sortKey(prev) < eff ? 'tier' as const : !prev.assessed && e.assessed ? 'unassessed' as const : prev.vulnerable && !e.vulnerable ? 'vulnerable' as const : 'wait' as const;
+    return { ...e, order: { position: i + 1, of: list.length, effectiveTier: eff, promoted: false, why, waitedMin: Math.max(0, Math.round((Date.now() - Date.parse(e.waitingSince!)) / 60000)) } };
+  });
   const questions: Record<string, string> = {
     'sign.airway_obstructed_or_not_breathing': 'Is the airway blocked, or has breathing stopped?', 'sign.severe_respiratory_distress': 'Is the patient struggling severely to breathe (gasping, very fast, or chest drawing in hard)?',
     'sign.central_cyanosis': 'Are the lips or tongue blue or grey?', 'sign.shock_signs': 'Are the hands and feet cold, with a weak fast pulse or slow capillary refill?', 'sign.unconscious_or_convulsing_now': 'Is the patient unconscious, or having a convulsion right now?',
@@ -160,6 +166,7 @@ export function createDemoApi(opts: { rulesApproved: boolean }): Api {
       r.status = to; r.statusReason = note ?? null; r.updatedAt = new Date().toISOString(); return wait({ id, status: to });
     },
     auditFlags: async hours => wait({ hours: hours ?? 24, examined: 312, rulesValidated: false, flags: [{ kind: 'emergency_access' as const, severity: 'info' as const, who: { actorId: 'u', ip: null, name: 'Demo Nurse' }, count: 1, firstAt: ago(90), lastAt: ago(90), text: 'Used emergency access 1 time. Check the reasons in the emergency access list.' }] }),
+    downloadAuditExport: async days => wait({ filename: `audit-${days}d-demo.csv`, blob: new Blob([['entry,time,person', '1,2026-10-07T08:00:00.000Z,Demo Nurse', ''].join(String.fromCharCode(13, 10))], { type: 'text/csv' }), chain: 'intact' as const, rows: 1, truncated: false }),
     auditChain: async () => wait({ intact: true, checked: 312, brokenIds: [], checkedAt: new Date().toISOString() }),
     callIn: async id => { const s = encOf(id); if (!s.queue) throw new ApiError(409, 'This patient is no longer in the queue, or has not been assessed yet.'); s.queue.status = 'in_review'; s.encounter.status = 'in_review'; return wait({ encounterId: id, status: 'in_review' }); },
     completeVisit: async (id, outcome) => {
@@ -172,7 +179,7 @@ export function createDemoApi(opts: { rulesApproved: boolean }): Api {
     queueDone: async () => wait(demoDone.map(d => ({ ...d }))),
     members: async () => wait(demoMembers.map(m => ({ ...m }))),
     memberChanges: async () => wait([{ at: ago(120), facilityId: 'f1', op: 'set_role', role: 'doctor', previous: 'none', actor: 'Demo Admin', target: 'Dr. Rao' }]),
-    addMember: async b => { demoMembers.push({ userId: 'm' + demoMembers.length, facilityId: 'f1', role: b.role, active: true, since: new Date().toISOString(), name: b.email.split('@')[0]!, email: b.email, isSelf: false, canChange: true }); return wait({ userId: 'm', role: b.role, previous: 'none' }); },
+    addMember: async b => { demoMembers.push({ userId: 'm' + demoMembers.length, facilityId: 'f1', role: b.role, active: true, since: new Date().toISOString(), name: b.email.split('@')[0]!, email: b.email, lastSignIn: null, mfa: false, isSelf: false, canChange: true }); return wait({ userId: 'm', role: b.role, previous: 'none' }); },
     setMemberRole: async (id, role) => { const m = demoMembers.find(x => x.userId === id); if (m) { m.role = role; m.active = true; } return wait({ userId: id, role, previous: 'nurse' }); },
     platformFacilities: async () => wait([]),
     createFacility: async () => wait({ id: 'demo-facility' }),
@@ -183,11 +190,22 @@ export function createDemoApi(opts: { rulesApproved: boolean }): Api {
     breakGlassList: async () => wait([{ id: 'bg1', who: 'Demo Nurse', userId: 'u', patientRef: 'AR-0042', facilityId: 'f1', reason: 'Unconscious on arrival, relatives not found', createdAt: ago(90), expiresAt: ago(30), reviewedAt: null, reviewed: false }]),
     reviewBreakGlass: async id => wait({ id, reviewed: true as const }),
     requestBreakGlass: async b => wait({ id: 'bg2', patientId: P.p1.id, patientRef: b.publicRef.toUpperCase(), expiresAt: new Date(Date.now() + 3_600_000).toISOString() }),
+    searchBreakGlassPatients: async q => {
+      const all = [{ publicRef: 'AR-0042', name: 'Sita Mohanty', sex: 'female', age: 34, facility: 'Cuttack CHC', ownFacility: false }, { publicRef: 'AR-0057', name: 'Ramesh Das', sex: 'male', age: 61, facility: 'Angul Health Camp', ownFacility: false }];
+      const k = q.trim().toLowerCase();
+      return wait({ truncated: false, patients: all.filter(p => p.name.toLowerCase().includes(k) || p.publicRef.toLowerCase().startsWith(k)) });
+    },
+    patientTriageHistory: async () => wait({
+      patientRef: 'AR-0042', patientName: 'Sita Mohanty',
+      visits: [{ id: 'hv1', createdAt: ago(60 * 24 * 12), facility: 'Cuttack CHC', scenario: 'opd_queue', status: 'closed', outcome: 'treated_here', complaint: 'Chest pain since morning', assessedUrgency: 'orange', finalUrgency: 'red', reviewedBy: 'Dr. Rao', reviewedAt: ago(60 * 24 * 12 - 20),
+        notes: [{ id: 'hn1', body: 'ECG normal. Started aspirin and advised a stress test; review in 2 days.', author: 'Dr. Rao', at: ago(60 * 24 * 12 - 45) }] },
+      { id: 'hv2', createdAt: ago(60 * 24 * 90), facility: 'Cuttack CHC', scenario: 'opd_queue', status: 'closed', outcome: 'sent_home', complaint: 'Fever and cough for three days', assessedUrgency: 'yellow', finalUrgency: 'yellow', reviewedBy: 'Dr. Sen', reviewedAt: ago(60 * 24 * 90 - 25), notes: [] }],
+    }),
     patientEncounters: async () => wait({ patientRef: 'AR-0001', encounters: [] }),
     trends: async () => wait([{ kind: 'bp_systolic_mmhg', value: 138, unit: 'mm[Hg]', at: ago(60 * 24 * 60), encounterId: 'x' }, { kind: 'bp_systolic_mmhg', value: 146, unit: 'mm[Hg]', at: ago(60 * 24 * 30), encounterId: 'x' }, { kind: 'bp_systolic_mmhg', value: 158, unit: 'mm[Hg]', at: ago(60), encounterId: 'x' }]),
     notes: async id => wait(notes[id] ?? []),
     addNote: async (id, b) => { (notes[id] ??= []).push({ id: 'n-' + Math.random().toString(36).slice(2, 8), kind: b.kind, body: b.body ?? null, assessmentId: b.assessmentId ?? null, author: 'Demo Reviewer', at: new Date().toISOString() }); return wait({ id: 'n' }); },
-    analytics: async days => wait({ days, encounters: 128, submitted: 121, assessed: 118, reviewed: 96, byScenario: [{ scenario: 'opd_queue', n: 90 }, { scenario: 'campus_fever', n: 24 }, { scenario: 'health_camp', n: 14 }], byUrgency: [{ urgency: 'green', n: 51 }, { urgency: 'yellow', n: 40 }, { urgency: 'orange', n: 20 }, { urgency: 'red', n: 7 }], secondsToAssessment: { n: 118, median: 1.4, p90: 3.8 }, minutesToReview: { n: 96, median: 14.2, p90: 52 }, review: { approved: 81, changed: 15, loweredBelowRules: 2, agreementRate: 0.844 }, feedback: { helpful: 22, notHelpful: 3 }, note: 'Demo figures (synthetic).' }),
+    analytics: async days => wait({ days, referralsSent: 9, perDay: [{ day: '2026-10-05', n: 14 }, { day: '2026-10-06', n: 22 }, { day: '2026-10-07', n: 18 }], encounters: 128, submitted: 121, assessed: 118, reviewed: 96, byScenario: [{ scenario: 'opd_queue', n: 90 }, { scenario: 'campus_fever', n: 24 }, { scenario: 'health_camp', n: 14 }], byUrgency: [{ urgency: 'green', n: 51 }, { urgency: 'yellow', n: 40 }, { urgency: 'orange', n: 20 }, { urgency: 'red', n: 7 }], secondsToAssessment: { n: 118, median: 1.4, p90: 3.8 }, minutesToReview: { n: 96, median: 14.2, p90: 52 }, review: { approved: 81, changed: 15, loweredBelowRules: 2, agreementRate: 0.844 }, feedback: { helpful: 22, notHelpful: 3 }, note: 'Demo figures (synthetic).' }),
     history: async pid => wait(hist[pid] ?? []),
     addHistory: async (pid, b) => { (hist[pid] ??= []).unshift({ id: 'h-' + Math.random().toString(36).slice(2, 8), kind: b.kind, text: b.text, lang: b.lang ?? null, source: 'health_worker', createdAt: new Date().toISOString(), confirmed: false, confirmedAt: null, confirmedBy: null }); return wait({ id: 'h' }); },
     confirmHistory: async id => { for (const l of Object.values(hist)) for (const r of l) if (r.id === id) { r.confirmed = true; r.confirmedAt = new Date().toISOString(); r.confirmedBy = 'Demo Reviewer'; } return wait({ id, confirmed: true as const }); },
@@ -215,6 +233,11 @@ export function createDemoApi(opts: { rulesApproved: boolean }): Api {
       if (!/.(pdf|jpe?g|png)$/i.test(file.name)) throw new ApiError(400, 'Only PDF, JPEG and PNG files are accepted.');
       return wait({ identity: {}, rows: 0, readable: false, note: 'Demo mode does not read files. Sign in to the real system to read records.', averageConfidence: null });
     },
+    labTrends: async () => wait({ rows: 4, unverified: 1, visits: 2, tests: [
+      { name: 'haemoglobin', label: 'Haemoglobin', unit: 'g/dL', unitsDiffer: false, change: { from: 9.1, to: 10.4, direction: 'up' as const, unit: 'g/dL' }, points: [
+        { at: ago(60 * 24 * 90), value: 9.1, text: '9.1', flag: 'low', verified: true, documentId: 'd1', encounterId: 'x' }, { at: ago(60 * 24 * 7), value: 10.4, text: '10.4', flag: 'low', verified: false, documentId: 'd2', encounterId: 'y' }] },
+      { name: 'esr', label: 'Esr', unit: 'mm/hr', unitsDiffer: false, change: { from: 38, to: 30, direction: 'down' as const, unit: 'mm/hr' }, points: [
+        { at: ago(60 * 24 * 90), value: 38, text: '38', flag: 'high', verified: true, documentId: 'd1', encounterId: 'x' }, { at: ago(60 * 24 * 7), value: 30, text: '30', flag: 'high', verified: true, documentId: 'd2', encounterId: 'y' }] }] }),
     recordContext: async id => {
       const docs = (docsByEnc.get(id) ?? []).filter(d => d.status === 'clean').map(d => {
         const x = extractions.get(d.id);
@@ -264,6 +287,7 @@ export function createDemoApi(opts: { rulesApproved: boolean }): Api {
       s.encounter.status = 'referred'; if (s.queue) s.queue.status = 'referred';
       return wait({ id, status: 'requested', sentAt: r.sentAt, bundleSha256: r.bundleSha256 });
     },
+    downloadHandoverPdf: async id => wait({ filename: `handover-${id.slice(0, 8)}.pdf`, blob: new Blob(['Demo mode: no real PDF is made.'], { type: 'text/plain' }) }),
     downloadReferralPdf: async id => { const r = referrals.get(id)!; if (r.status === 'draft') throw new ApiError(409, 'This referral has not been sent yet. Preview it instead.'); return wait({ filename: 'referral-demo.pdf', blob: new Blob(['%PDF-1.4 demo'], { type: 'application/pdf' }) }); },
     downloadReferral: async id => { const r = referrals.get(id)!; if (r.status === 'draft') throw new ApiError(409, 'This referral has not been sent yet. Preview it instead.'); return wait({ filename: 'referral-' + id + '.json', text: JSON.stringify(demoBundle(encOf(r.encounterId), r, true), null, 2) }); },
     review: async (id, b) => {
@@ -287,7 +311,7 @@ export function createDemoApi(opts: { rulesApproved: boolean }): Api {
       return wait({ reviewId: 'demo', action: b.action, effectiveUrgency: (s.queue?.urgency_code ?? cur) as UrgencyCode, rulesUrgency: s.assessment.urgency_code, downgrade: false, belowRuleFloor: false, sms: { status: 'skipped', reason: 'no_consent', language: 'en' } });
     },
     me: () => wait({ userId: 'demo-user', displayName: 'Demo Nurse', memberships: [{ facilityId: 'f1', facilityName: 'Seed PHC Khordha', facilityType: 'phc', role: 'nurse' }] }),
-    queue: () => wait({ generatedAt: new Date().toISOString(), entries: recs.filter(r => ['submitted', 'in_review'].includes(r.summary.encounter.status)).map(r => toEntry(r.summary)).sort((a, b) => sortKey(a) - sortKey(b) || Number(a.assessed) - Number(b.assessed) || Number(b.vulnerable) - Number(a.vulnerable) || Date.parse(a.waitingSince!) - Date.parse(b.waitingSince!)) }),
+    queue: () => wait({ generatedAt: new Date().toISOString(), entries: withOrder(recs.filter(r => ['submitted', 'in_review'].includes(r.summary.encounter.status)).map(r => toEntry(r.summary)).sort((a, b) => sortKey(a) - sortKey(b) || Number(a.assessed) - Number(b.assessed) || Number(b.vulnerable) - Number(a.vulnerable) || Date.parse(a.waitingSince!) - Date.parse(b.waitingSince!))) }),
     registerPatient: async b => {
       const same = patients.filter(p => p.full_name.toLowerCase() === b.fullName.trim().toLowerCase());
       if (same.length && !b.confirmNotDuplicate) throw new ApiError(409, 'Someone with the same name and age is already registered. Check the list, or confirm this is a different person.', same.map(p => ({ id: p.id, publicRef: p.public_ref, fullName: p.full_name, sex: p.sex, birthDate: p.birth_date, ageYears: p.age_years_reported })));

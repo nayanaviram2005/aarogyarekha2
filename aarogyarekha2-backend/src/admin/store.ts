@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { BreakGlassError, type AdminStore, type Analytics, type Spread, type SystemAdmin } from '../deps.js';
+import { BreakGlassError, type AdminStore, type Analytics, type PatientSearchRow, type Spread, type SystemAdmin, type TriageVisitRow } from '../deps.js';
 import type { AuditRow } from './suspicious.js';
 
 interface Queryable { query(sql: string, params?: unknown[]): Promise<{ rows: any[]; rowCount?: number | null }> }
@@ -15,11 +15,11 @@ const spread = (r: { n: unknown; median: unknown; p90: unknown } | undefined): S
 export function makeSystemAdmin(db: TxSource): SystemAdmin {
   return {
     async analytics(facilityIds, days): Promise<Analytics> {
-      const empty: Analytics = { days, encounters: 0, submitted: 0, assessed: 0, reviewed: 0, byScenario: [], byUrgency: [], secondsToAssessment: { n: 0, median: null, p90: null }, minutesToReview: { n: 0, median: null, p90: null }, review: { approved: 0, changed: 0, loweredBelowRules: 0, agreementRate: null }, feedback: null };
+      const empty: Analytics = { days, referralsSent: 0, perDay: [], encounters: 0, submitted: 0, assessed: 0, reviewed: 0, byScenario: [], byUrgency: [], secondsToAssessment: { n: 0, median: null, p90: null }, minutesToReview: { n: 0, median: null, p90: null }, review: { approved: 0, changed: 0, loweredBelowRules: 0, agreementRate: null }, feedback: null };
       if (facilityIds.length === 0) return empty;
       const since = new Date(Date.now() - days * 86_400_000).toISOString(); const p = [facilityIds, since];
       const E = "select id, scenario, submitted_at from public.encounters where facility_id = any($1::uuid[]) and created_at >= $2::timestamptz and deleted_at is null";
-      const [tot, sc, urg, ta, tr, rv, fb] = await Promise.all([
+      const [tot, sc, urg, ta, tr, rv, fb, rf, pd] = await Promise.all([
         db.query(`with e as (${E}) select (select count(*) from e) encounters, (select count(*) from e where submitted_at is not null) submitted,
                    (select count(distinct a.encounter_id) from public.triage_assessments a join e on e.id = a.encounter_id) assessed,
                    (select count(distinct r.encounter_id) from public.review_actions r join e on e.id = r.encounter_id where r.action in ('approve','override_urgency')) reviewed`, p),
@@ -39,11 +39,13 @@ export function makeSystemAdmin(db: TxSource): SystemAdmin {
                         count(*) filter (where r.action = 'override_urgency' and tk.k > fk.k) lowered
                  from r left join rk fk on fk.code = r.from_urgency_code left join rk tk on tk.code = r.to_urgency_code`, p),
         db.query(`select to_regclass('public.reviewer_notes') t`).then(async x => (x.rows[0]?.t ? db.query(`with e as (${E}) select count(*) filter (where n.kind = 'feedback_up') up, count(*) filter (where n.kind = 'feedback_down') down from public.reviewer_notes n join e on e.id = n.encounter_id`, p) : null)),
+        db.query(`select count(*)::int n from public.referrals where from_facility_id = any($1::uuid[]) and sent_at is not null and sent_at >= $2::timestamptz`, p),
+        db.query(`with e as (${E}) select to_char(created_at at time zone 'Asia/Kolkata', 'YYYY-MM-DD') as day, count(*)::int n from public.encounters where id in (select id from e) group by 1 order by 1`, p),
       ]);
       const t = tot.rows[0] ?? {}; const r = rv.rows[0] ?? {};
       const approved = Number(r.approved ?? 0), changed = Number(r.changed ?? 0);
       return {
-        days, encounters: Number(t.encounters ?? 0), submitted: Number(t.submitted ?? 0), assessed: Number(t.assessed ?? 0), reviewed: Number(t.reviewed ?? 0),
+        days, referralsSent: Number(rf.rows[0]?.n ?? 0), perDay: pd.rows.map(x => ({ day: x.day as string, n: Number(x.n) })), encounters: Number(t.encounters ?? 0), submitted: Number(t.submitted ?? 0), assessed: Number(t.assessed ?? 0), reviewed: Number(t.reviewed ?? 0),
         byScenario: sc.rows.map(x => ({ scenario: x.scenario, n: Number(x.n) })), byUrgency: urg.rows.map(x => ({ urgency: x.urgency, n: Number(x.n) })),
         secondsToAssessment: spread(ta.rows[0]), minutesToReview: spread(tr.rows[0]),
         review: { approved, changed, loweredBelowRules: Number(r.lowered ?? 0), agreementRate: approved + changed > 0 ? Math.round((approved / (approved + changed)) * 1000) / 1000 : null },
@@ -55,6 +57,29 @@ export function makeSystemAdmin(db: TxSource): SystemAdmin {
       const n = await db.query('select count(*)::int as n from public.audit_events');
       const b = await db.query('select broken_id from app.verify_audit_chain(0)');
       return { checked: n.rows[0].n as number, brokenIds: b.rows.map(r => Number(r.broken_id)) };
+    },
+
+    async auditExport(facilityIds, sinceIso, limit) {
+      if (facilityIds.length === 0) return [];
+      const r = await db.query(
+        `select e.id, e.occurred_at, e.actor_user_id, ap.display_name actor_name, e.actor_role::text actor_role, e.facility_id, f.name facility_name, e.action::text action, e.entity_type, e.outcome::text outcome, pt.public_ref patient_ref
+           from public.audit_events e left join public.profiles ap on ap.user_id = e.actor_user_id left join public.facilities f on f.id = e.facility_id left join public.patients pt on pt.id = e.patient_id
+          where e.facility_id = any($1::uuid[]) and e.occurred_at >= $2::timestamptz order by e.occurred_at desc, e.id desc limit $3`, [facilityIds, sinceIso, limit]);
+      return r.rows.map(x => ({ id: Number(x.id), occurred_at: iso(x.occurred_at), actor_user_id: x.actor_user_id ?? null, actor_name: x.actor_name ?? null, actor_role: x.actor_role ?? null, facility_id: x.facility_id ?? null, facility_name: x.facility_name ?? null, action: x.action, entity_type: x.entity_type, outcome: x.outcome, patient_ref: x.patient_ref ?? null }));
+    },
+
+    async searchPatients(q, limit): Promise<PatientSearchRow[]> {
+      const like = q.replace(/[\\%_]/g, m => `\\${m}`);
+      const r = await db.query(
+        `select p.public_ref, p.full_name, p.sex::text sex, p.birth_date, p.age_years_reported, p.registered_facility_id, f.name facility_name
+           from public.patients p join public.facilities f on f.id = p.registered_facility_id
+          where p.deleted_at is null and (upper(p.public_ref) like upper($1) || '%' or lower(p.full_name) like '%' || lower($1) || '%')
+          order by p.full_name, p.public_ref limit $2`, [like, limit]);
+      return r.rows.map(x => {
+        const born = x.birth_date ? new Date(x.birth_date) : null;
+        const age = born ? Math.max(0, Math.floor((Date.now() - born.getTime()) / (365.25 * 86_400_000))) : x.age_years_reported ?? null;
+        return { publicRef: x.public_ref, name: x.full_name, sex: x.sex === 'unknown' ? null : x.sex ?? null, age, facilityId: x.registered_facility_id, facilityName: x.facility_name };
+      });
     },
 
     async listBreakGlass(facilityIds, limit) {
@@ -89,6 +114,36 @@ export function makeAdminStore(sb: SupabaseClient): AdminStore {
       const { data, error } = await sb.from('break_glass_grants').update({ reviewed_by: reviewerId, reviewed_at: new Date().toISOString() }).eq('id', id).is('reviewed_at', null).select('id');
       if (error) throw new Error(error.message);
       return (data ?? []).length === 1;
+    },
+    async patientTriageHistory(patientId): Promise<TriageVisitRow[]> {
+      const fail = (e: { message: string } | null) => { if (e) throw new Error(e.message); };
+      const enc = await sb.from('encounters').select('id, facility_id, scenario, status, outcome, created_at, chief_complaint_original, chief_complaint_translated')
+        .eq('patient_id', patientId).is('deleted_at', null).order('created_at', { ascending: false }).limit(50);
+      fail(enc.error);
+      const rows = (enc.data ?? []) as unknown as { id: string; facility_id: string; scenario: string; status: string; outcome: string | null; created_at: string; chief_complaint_original: string | null; chief_complaint_translated: string | null }[];
+      if (rows.length === 0) return [];
+      const ids = rows.map(x => x.id); const facIds = [...new Set(rows.map(x => x.facility_id))];
+      const [ass, rev, notes, fac] = await Promise.all([
+        sb.from('triage_assessments').select('encounter_id, urgency_code, version').in('encounter_id', ids).order('version', { ascending: false }),
+        sb.from('review_actions').select('encounter_id, action, to_urgency_code, reviewer_id, created_at').in('encounter_id', ids).in('action', ['approve', 'override_urgency']).order('created_at', { ascending: false }),
+        sb.from('reviewer_notes').select('id, encounter_id, author_id, body, created_at').in('encounter_id', ids).eq('kind', 'doctor_note').order('created_at', { ascending: true }),
+        sb.from('facilities').select('id, name').in('id', facIds),
+      ]);
+      fail(ass.error); fail(rev.error); fail(notes.error);
+      const a = (ass.data ?? []) as unknown as { encounter_id: string; urgency_code: string }[];
+      const v = (rev.data ?? []) as unknown as { encounter_id: string; action: string; to_urgency_code: string | null; reviewer_id: string; created_at: string }[];
+      const n = (notes.data ?? []) as unknown as { id: string; encounter_id: string; author_id: string; body: string; created_at: string }[];
+      const names = new Map(((fac.data ?? []) as unknown as { id: string; name: string }[]).map(x => [x.id, x.name]));
+      return rows.map(x => {
+        const assessed = a.find(y => y.encounter_id === x.id)?.urgency_code ?? null;
+        const review = v.find(y => y.encounter_id === x.id) ?? null;
+        const finalUrgency = review ? (review.action === 'override_urgency' && review.to_urgency_code ? review.to_urgency_code : assessed) : null;
+        return {
+          id: x.id, createdAt: x.created_at, facilityId: x.facility_id, facilityName: names.get(x.facility_id) ?? null, scenario: x.scenario, status: x.status, outcome: x.outcome,
+          complaint: x.chief_complaint_translated ?? x.chief_complaint_original ?? null, assessedUrgency: assessed, finalUrgency, reviewedBy: review?.reviewer_id ?? null, reviewedAt: review?.created_at ?? null,
+          notes: n.filter(y => y.encounter_id === x.id).map(y => ({ id: y.id, authorId: y.author_id, body: y.body, at: y.created_at })),
+        };
+      });
     },
     async patientEncounters(patientId) {
       const { data, error } = await sb.from('encounters').select('id, status, scenario, created_at').eq('patient_id', patientId).is('deleted_at', null).order('created_at', { ascending: false }).limit(50);

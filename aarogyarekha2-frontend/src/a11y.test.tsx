@@ -15,6 +15,7 @@ import { FollowupsPanel } from './components/FollowupsPanel';
 import { HistoryPanel } from './components/HistoryPanel';
 import { MeasurementForm } from './components/MeasurementForm';
 import { MfaPanel } from './components/MfaPanel';
+import { DoctorNotesPanel } from './components/DoctorNotesPanel';
 import { NotesPanel } from './components/NotesPanel';
 import { UrgencyPlate } from './components/Plate';
 import { QueueFilterBar } from './components/QueueFilterBar';
@@ -47,9 +48,9 @@ import { NO_FILTER } from './lib/queueFilter';
 const empty = () => vi.fn().mockResolvedValue([]);
 const api = {
   history: empty(), followups: empty(), notes: empty(), trends: empty(), incomingReferrals: empty(), sentReferrals: empty(), breakGlassList: empty(), patients: empty(), memberChanges: empty(), queueDone: empty(),
-  members: vi.fn().mockResolvedValue([{ userId: 'u1', facilityId: 'f', role: 'nurse', active: true, since: '2026-01-01T00:00:00Z', name: 'Ravi', email: 'r@x.in', isSelf: false, canChange: true }, { userId: 'u2', facilityId: 'f', role: 'facility_admin', active: true, since: '2026-01-01T00:00:00Z', name: 'Asha', email: 'a@x.in', isSelf: true, canChange: false }]),
+  members: vi.fn().mockResolvedValue([{ userId: 'u1', facilityId: 'f', role: 'nurse', active: true, since: '2026-01-01T00:00:00Z', name: 'Ravi', email: 'r@x.in', lastSignIn: '2026-10-07T08:00:00Z', mfa: true, isSelf: false, canChange: true }, { userId: 'u2', facilityId: 'f', role: 'facility_admin', active: true, since: '2026-01-01T00:00:00Z', name: 'Asha', email: 'a@x.in', lastSignIn: null, mfa: false, isSelf: true, canChange: false }]),
   auditFlags: vi.fn().mockResolvedValue({ hours: 24, examined: 0, rulesValidated: false, flags: [] }),
-  analytics: vi.fn().mockResolvedValue({ days: 30, encounters: 3, submitted: 3, assessed: 3, reviewed: 2, byScenario: [{ scenario: 'opd_queue', n: 3 }], byUrgency: [{ urgency: 'red', n: 1 }], secondsToAssessment: { n: 3, median: 1, p90: 2 }, minutesToReview: { n: 2, median: 5, p90: 9 }, review: { approved: 1, changed: 1, loweredBelowRules: 0, agreementRate: 0.5 }, feedback: { helpful: 1, notHelpful: 0 }, note: 'n' }),
+  analytics: vi.fn().mockResolvedValue({ days: 30, referralsSent: 1, perDay: [{ day: '2026-10-06', n: 1 }, { day: '2026-10-07', n: 2 }], encounters: 3, submitted: 3, assessed: 3, reviewed: 2, byScenario: [{ scenario: 'opd_queue', n: 3 }], byUrgency: [{ urgency: 'red', n: 1 }], secondsToAssessment: { n: 3, median: 1, p90: 2 }, minutesToReview: { n: 2, median: 5, p90: 9 }, review: { approved: 1, changed: 1, loweredBelowRules: 0, agreementRate: 0.5 }, feedback: { helpful: 1, notHelpful: 0 }, note: 'n' }),
   recordConsent: vi.fn(), registerPatient: vi.fn(), addVital: vi.fn(), addSymptom: vi.fn(),
 } as unknown as Api;
 h.api = api;
@@ -78,6 +79,7 @@ const PAGES: [string, React.ReactElement][] = [
   ['history panel', <HistoryPanel api={api} patientId="p" editable canConfirm defaultLanguage="en" />],
   ['follow-up panel', <FollowupsPanel api={api} encounterId="e" patientId="p" editable />],
   ['notes panel', <NotesPanel api={api} encounterId="e" assessmentId="a" canWrite />],
+  ['doctor notes panel', <DoctorNotesPanel api={api} encounterId="e" status="reviewed" canWrite />],
   ['trend panel', <TrendPanel api={api} patientId="p" />],
   ['analytics panel', <AnalyticsPanel api={api} />],
   ['people and roles', <MembersPanel api={api} />],

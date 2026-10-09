@@ -48,7 +48,7 @@ const encounterBody = z.object({
   patientId: uuid, facilityId: uuid.optional(),
   scenario: z.enum(SCENARIOS).default('opd_queue'),
   language: z.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]+)*$/).default('en'),
-  chiefComplaint: z.string().min(1).max(2000).optional(),
+  chiefComplaint: z.string().trim().min(1, 'A main complaint is needed. For a routine check-up, write Routine.').max(2000),
 }).strict();
 
 const symptomBody = z.object({

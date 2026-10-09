@@ -18,12 +18,13 @@ import { QUESTION_LANGS, questionIn } from '../i18n/questions';
 import { audienceOf, needsClinician, orderForAudience } from '../lib/questionAudience';
 import { HistoryPanel } from '../components/HistoryPanel';
 import { MeasurementForm } from '../components/MeasurementForm';
+import { DoctorNotesPanel } from '../components/DoctorNotesPanel';
 import { NotesPanel } from '../components/NotesPanel';
 import { ScenarioChecklist } from '../components/ScenarioChecklist';
 import { TrendPanel } from '../components/TrendPanel';
 import { FollowupsPanel } from '../components/FollowupsPanel';
 import { VoiceInput } from '../components/VoiceInput';
-import { canReviewAt, useMe } from './meContext';
+import { canReviewAt, canWriteDoctorNoteAt, useMe } from './meContext';
 import { RULES_CLINICALLY_VALIDATED } from '../config';
 import { ApiError } from '../lib/api';
 import { AiOpinion } from '../components/AiOpinion';
@@ -35,6 +36,9 @@ import { Fold } from '../components/Fold';
 import { journey, type StepKey } from '../lib/journey';
 import { ReportDetails } from '../components/ReportDetails';
 import { RecordContextPanel } from '../components/RecordContextPanel';
+import { LabTrendsPanel } from '../components/LabTrendsPanel';
+import { HandoverButton } from '../components/HandoverButton';
+import { VoiceWalkthrough } from '../components/VoiceWalkthrough';
 import { ageSex, formatTime, isTier, languageLabel, latestVitals, scenarioLabel, TIER_WORD, tierOfUrgency, vitalLabel, vitalUnit } from '../lib/format';
 import type { EncounterSummary, Tier, UrgencyCode } from '../lib/types';
 import { PaneFrame } from './PaneFrame';
@@ -43,6 +47,8 @@ import { useQueue } from './queueContext';
 const EDITABLE = new Set(['draft', 'submitted', 'in_review']);
 
 const QUESTION_LIMIT = 12;
+
+const isYesNoCode = (code: string) => code.startsWith('sign.') || code === 'vital.oxygen' || code === 'context.pregnancy_status';
 
 export function EncounterPage() {
   const { id } = useParams();
@@ -111,6 +117,9 @@ function Workspace({ summary: s, onChanged }: { summary: EncounterSummary; onCha
   const setDraft = (code: string, d: Draft | null) => setDrafts(prev => { const next = { ...prev }; if (d) next[code] = d; else delete next[code]; return next; });
   const open = orderForAudience(s.followUps.filter(f => f.status === 'open' && f.field_code && (pt.size === 0 || pt.has(f.field_code)))
     .map((f, i) => ({ f, i, p: pt.get(f.field_code!) ?? null, fieldCode: f.field_code, potentialTier: pt.get(f.field_code!) ?? null })), audience);
+  const shownQ = showAllQ ? open : open.slice(0, QUESTION_LIMIT);
+  const effectTiers = new Set(shownQ.map(o => o.p).filter(isTier));
+  const sameEffect = shownQ.length > 1 && effectTiers.size === 1 && shownQ.every(o => isTier(o.p)) ? [...effectTiers][0]! : null;
   const done = s.followUps.filter(f => f.status !== 'open');
   const openCodes = new Set(open.map(o => o.f.field_code!));
   const pending = Object.fromEntries(Object.entries(drafts).filter(([code, d]) => openCodes.has(code) && draftReady(code, d)));
@@ -252,10 +261,18 @@ function Workspace({ summary: s, onChanged }: { summary: EncounterSummary; onCha
               <section className="block" aria-label="Information still needed">
                 <div className="block__head"><h3>{t('enc.stillNeeded')}</h3><span className="chip">{open.length}</span><span className="grow" /><label className="small" style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>Also show in <select className="select" value={qLang} onChange={ev => setQLang(ev.target.value as 'en' | 'hi' | 'or')} aria-label="Show questions also in">{QUESTION_LANGS.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}</select></label></div>
                 <div className="block__body">
+                  {api && editable && open.some(o => isYesNoCode(o.f.field_code!)) && (
+                    <div style={{ marginBottom: 8 }}>
+                      <VoiceWalkthrough api={api} encounterId={s.encounter.id} patientId={s.patient.id} defaultLanguage={lang ?? 'en'}
+                        questions={open.filter(o => isYesNoCode(o.f.field_code!) && !drafts[o.f.field_code!]).map(o => ({ code: o.f.field_code!, text: l => (l === 'en' ? o.f.question_text : questionIn(o.f.field_code!, l) ?? o.f.question_text) }))}
+                        onAnswer={(code, value) => setDraft(code, { kind: 'bool', value })} />
+                    </div>
+                  )}
+                  {sameEffect !== null && <p className="small strong">A Yes to any of these could change the priority to {TIER_WORD[sameEffect].toLowerCase()}.</p>}
                   {open.length === 0 ? <p className="muted small">Nothing outstanding.</p> : (
-                    <ol>{(showAllQ ? open : open.slice(0, QUESTION_LIMIT)).map((o, n) => api && (
+                    <ol>{shownQ.map((o, n) => api && (
                       <FollowUpControl key={o.f.field_code} fieldCode={o.f.field_code!} draft={drafts[o.f.field_code!]} onDraft={d => setDraft(o.f.field_code!, d)} question={o.f.question_text} checks={o.f.field_code!.startsWith('sign.') ? checkLabel.get(o.f.field_code!) ?? null : null} translated={questionIn(o.f.field_code!, qLang)} translatedLang={qLang} needsClinician={audience === 'health_worker' && needsClinician(o.f.field_code)}
-                        rank={n + 1} potentialTier={o.p} disabled={!editable || submitting} />
+                        rank={n + 1} potentialTier={o.p} showEffect={sameEffect === null} disabled={!editable || submitting} />
                     ))}</ol>
                   )}
                   {open.length > 0 && editable && (
@@ -306,6 +323,8 @@ function Workspace({ summary: s, onChanged }: { summary: EncounterSummary; onCha
           <>
             {api && <VisitPanel bare api={api} summary={s} canReview={canReviewAt(me, s.encounter.facility_id)} reviewedCurrent={!!currentReview} onChanged={async () => { await onChanged(); await refreshQueue(); }} />}
             {!s.queue && s.encounter.status !== 'closed' && s.encounter.status !== 'referred' && <p className="small muted">The visit starts once the patient has a draft priority and a nurse or doctor has signed it off.</p>}
+            {api && <DoctorNotesPanel api={api} encounterId={s.encounter.id} status={s.encounter.status} canWrite={canWriteDoctorNoteAt(me, s.encounter.facility_id)} disabled={s.consentActive === false} />}
+            {a && api && <HandoverButton api={api} encounterId={s.encounter.id} patientLanguage={s.patient.preferred_language} />}
             {a && api && (
               <ReferralPanel api={api} encounterId={s.encounter.id} patientId={s.patient.id} effectiveUrgency={(effUrgency ?? a.urgency_code) as UrgencyCode}
                 signedOff={!!currentReview} canReview={canReviewAt(me, s.encounter.facility_id)} disabled={s.consentActive === false} onChanged={() => void onChanged()} />
@@ -322,6 +341,7 @@ function Workspace({ summary: s, onChanged }: { summary: EncounterSummary; onCha
         {api && <NotesPanel api={api} encounterId={s.encounter.id} assessmentId={a?.id ?? null} canWrite={canReviewAt(me, s.encounter.facility_id)} disabled={s.consentActive === false} />}
       </Fold>
       <Fold title="Reports read and timeline" hint="Key details from reports, the story so far, everything recorded">
+        {api && s.consentActive !== false && <LabTrendsPanel api={api} patientId={s.patient.id} refreshKey={reportsKey} />}
         {api && <ReportDetails api={api} encounterId={s.encounter.id} refreshKey={reportsKey} />}
         <CaseSummary summary={s} />
         <Timeline summary={s} />

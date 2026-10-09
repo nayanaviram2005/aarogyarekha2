@@ -20,11 +20,14 @@ export function makePlatformAdmin(db: Queryable): PlatformAdmin {
       const r = await db.query(
         `select f.id, f.name, f.type::text type, f.state, f.district, f.code, f.is_active,
                 (select count(*)::int from public.memberships m where m.facility_id = f.id and m.is_active and m.role <> 'facility_admin') staff,
+                (select max(e.occurred_at) from public.audit_events e where e.facility_id = f.id) last_activity,
+                (select count(*)::int from public.encounters x where x.facility_id = f.id and x.deleted_at is null and x.created_at >= now() - interval '30 days') visits30,
+                (select count(*)::int from public.referrals r where r.from_facility_id = f.id and r.sent_at is not null and r.sent_at >= now() - interval '30 days') referrals30,
                 coalesce((select json_agg(json_build_object('userId', m.user_id, 'name', p.display_name, 'email', u.email) order by p.display_name)
                            from public.memberships m left join public.profiles p on p.user_id = m.user_id left join auth.users u on u.id = m.user_id
                           where m.facility_id = f.id and m.is_active and m.role = 'facility_admin'), '[]'::json) admins
            from public.facilities f order by f.is_active desc, f.name`);
-      return r.rows.map(x => ({ id: x.id, name: x.name, type: x.type, state: x.state ?? null, district: x.district ?? null, code: x.code ?? null, active: x.is_active === true, staff: x.staff, admins: x.admins }));
+      return r.rows.map(x => ({ id: x.id, name: x.name, type: x.type, state: x.state ?? null, district: x.district ?? null, code: x.code ?? null, active: x.is_active === true, staff: x.staff, lastActivity: x.last_activity ? new Date(x.last_activity).toISOString() : null, visits30: x.visits30, referrals30: x.referrals30, admins: x.admins }));
     },
     async create(a) {
       try { const r = await db.query(`select app.platform_create_facility($1::uuid,$2,$3,$4,$5,$6,$7) r`, [a.actor, a.name, a.type, a.state ?? null, a.district ?? null, a.pincode ?? null, a.code ?? null]); return { id: r.rows[0].r.id as string }; }

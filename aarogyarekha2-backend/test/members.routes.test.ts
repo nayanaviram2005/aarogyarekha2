@@ -17,7 +17,7 @@ const make = async () => {
     getNames: async () => ({}), listDocuments: async () => [], getDocument: async () => null, getExtraction: async () => null,
   });
   const memberAdmin: MemberAdmin = {
-    list: async f => { w.calls.push({ op: 'list', a: f }); return [{ userId: 'u-admin', facilityId: F1, role: 'facility_admin', active: true, since: '2026-01-01T00:00:00.000Z', name: 'Asha', email: 'a@x.in' }, { userId: T, facilityId: F1, role: 'nurse', active: true, since: '2026-01-01T00:00:00.000Z', name: 'Ravi', email: 'r@x.in' }]; },
+    list: async f => { w.calls.push({ op: 'list', a: f }); return [{ userId: 'u-admin', facilityId: F1, role: 'facility_admin', active: true, since: '2026-01-01T00:00:00.000Z', name: 'Asha', email: 'a@x.in', lastSignIn: '2026-10-07T08:00:00.000Z', mfa: true }, { userId: T, facilityId: F1, role: 'nurse', active: true, since: '2026-01-01T00:00:00.000Z', name: 'Ravi', email: 'r@x.in', lastSignIn: null, mfa: false }]; },
     findByEmail: async e => { w.calls.push({ op: 'find', a: e }); return w.found ? { id: T } : null; },
     setRole: async a => { w.calls.push({ op: 'set', a }); if (w.fail) throw w.fail; return { role: a.role, previous: 'none' }; },
     deactivate: async a => { w.calls.push({ op: 'off', a }); if (w.fail) throw w.fail; return { previous: 'nurse' }; },

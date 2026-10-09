@@ -13,4 +13,5 @@ docs/
 .agents/
 *.key
 *.pem
-*.pub
+*.pubintro-video/
+skills-lock.json

@@ -9,12 +9,13 @@ import { AccountMenu } from '../components/AccountMenu';
 import type { Me } from '../lib/types';
 import { QueueProvider } from './queueContext';
 import { MeContext } from './meContext';
+import { useApiHealth } from '../lib/useApiHealth';
 
 export function Shell() {
   const { api, demo, signOut, mfa } = useAuth();
   const { t } = useI18n();
   const [me, setMe] = useState<Me | null>(null);
-  const [online, setOnline] = useState(true);
+  const health = useApiHealth(api ?? null);
   const [mfaOpen, setMfaOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
   const [lowData, setLowData] = useLowData();
@@ -29,14 +30,6 @@ export function Shell() {
   const nav = useNavigate(); const loc = useLocation();
   useEffect(() => { if (me?.isPlatformAdmin && me.memberships.length === 0 && loc.pathname === '/') nav('/platform', { replace: true }); }, [me, loc.pathname, nav]);
   const needMfa = !demo && me?.mfaRequired === true && me.aal !== 'aal2';
-  useEffect(() => {
-    if (!api) return;
-    let live = true;
-    const ping = () => void api.health().then(ok => live && setOnline(ok));
-    ping();
-    const t = window.setInterval(ping, 20_000);
-    return () => { live = false; window.clearInterval(t); };
-  }, [api]);
 
   const facilityLine = [...new Set((me?.memberships ?? []).map(x => x.facilityName).filter(Boolean))].join(' · ');
   const isPlatform = me?.isPlatformAdmin === true;
@@ -52,9 +45,9 @@ export function Shell() {
         </div>
         <div className="topbar__right">
           {demo && <span className="demo-flag" title="Synthetic data held in memory. Not connected to any database.">DEMO DATA</span>}
-          <span className={`status ${online ? 'status--ok' : 'status--bad'}`} role="status">
+          <span className={`status ${health === 'online' ? 'status--ok' : health === 'offline' ? 'status--bad' : 'status--wait'}`} role="status">
             <span className="status__mark" aria-hidden="true" />
-            {online ? t('shell.connected') : t('shell.offline')}
+            {health === 'online' ? t('shell.connected') : health === 'offline' ? t('shell.offline') : t('shell.connecting')}
           </span>
           <NavLink className="btn btn--small btn--primary topbar__new" to="/intake">New patient</NavLink>
           <button className="btn btn--small" onClick={() => setSwitchOpen(true)} aria-keyshortcuts="Control+K">Switch patient</button>

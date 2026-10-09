@@ -254,7 +254,7 @@ html, body { overflow-x: hidden; }
 
 /* ------------------------------------------------------------------ hackathon bar: a plain black strip, sliding text */
 .app-root { display: grid; grid-template-rows: auto minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); height: 100%; }
-.app-root > :not(.hbar) { min-height: 0; }
+.app-root > :not(.hbar):not(.bars) { min-height: 0; }
 .hbar { min-width: 0; max-width: 100%; display: flex; align-items: center; background: #000; color: #fff; height: 28px; font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.02em; }
 .hbar__viewport { flex: 1; overflow: hidden; min-width: 0; }
 .hbar__track { display: inline-flex; white-space: nowrap; animation: hbar-slide 60s linear infinite; will-change: transform; }
@@ -262,6 +262,11 @@ html, body { overflow-x: hidden; }
 .hbar:hover .hbar__track, .hbar:focus-within .hbar__track, .hbar[data-paused='true'] .hbar__track { animation-play-state: paused; }
 .hbar__pause { flex: none; margin: 0 var(--s2); min-height: 22px; padding: 0 var(--s2); background: #000; color: #fff; border: 1px solid #fff; border-radius: var(--radius); font: inherit; font-weight: 600; cursor: pointer; }
 .hbar__pause:hover { background: #222; }
+.hbar--warn { background: #ffd54a; color: #14232b; }
+.hbar--warn .hbar__pause { background: #ffd54a; color: #14232b; border-color: #14232b; }
+.hbar--warn .hbar__pause:hover { background: #f5c423; }
+.hbar--warn .hbar__pause:focus-visible { outline-color: #14232b; }
+.status--wait .status__mark { background: #ffd54a; border-radius: 0; }
 .hbar__pause:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 @keyframes hbar-slide { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 

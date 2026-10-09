@@ -9,9 +9,9 @@ vi.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ status }) }));
 const at = (path: string) => render(<MemoryRouter initialEntries={[path]}><SlowServerBar /></MemoryRouter>);
 
 describe('speed warning', () => {
-  it('is on, and says plainly that answers may be slow and why', () => {
+  it('is on, and says plainly that triage can take several seconds and why', () => {
     expect(SHOW_SLOW_SERVER_NOTICE).toBe(true);
-    expect(SLOW_SERVER_MESSAGE).toMatch(/slow/i); for (const m of [SLOW_SERVER_MESSAGE, SLOW_SERVER_SHORT]) expect(m).toMatch(/far from you/);
+    for (const m of [SLOW_SERVER_MESSAGE, SLOW_SERVER_SHORT]) { expect(m).toMatch(/triage/); expect(m).not.toMatch(/sign/i); } for (const m of [SLOW_SERVER_MESSAGE, SLOW_SERVER_SHORT]) expect(m).toMatch(/several seconds/); for (const m of [SLOW_SERVER_MESSAGE, SLOW_SERVER_SHORT]) expect(m).toMatch(/far from you/);
   });
   it('slides across signed-in pages, announced once, and can be paused', () => {
     status = 'signedIn'; const { container } = at('/encounters/1');

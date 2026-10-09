@@ -21,7 +21,7 @@ export function SignIn() {
 
   return (
     <main className="signin">
-      {SHOW_SLOW_SERVER_NOTICE && <div style={{ width: '100%', maxWidth: 420, margin: '0 auto var(--s3)' }}><Banner kind="warn" title="Responses may be slow">{SLOW_SERVER_SHORT}</Banner></div>}
+      {SHOW_SLOW_SERVER_NOTICE && <div style={{ width: '100%', maxWidth: 420, margin: '0 auto var(--s3)' }}><Banner kind="warn" title="Some actions can take a few seconds">{SLOW_SERVER_SHORT}</Banner></div>}
       <form className="signin__card" onSubmit={submit} noValidate>
         <div className="signin__head">
           <h1>AarogyaRekha</h1>

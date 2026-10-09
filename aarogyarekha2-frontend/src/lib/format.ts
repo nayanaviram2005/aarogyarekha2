@@ -97,3 +97,8 @@ export function formatTime(iso: string | null | undefined): string {
   if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
 }
+
+export const FACILITY_TYPE_LABEL: Record<string, string> = {
+  sub_centre: 'Sub-centre', phc: 'Primary health centre', chc: 'Community health centre', district_hospital: 'District hospital', medical_college: 'Medical college hospital',
+  company_clinic: 'Company clinic', industrial_unit: 'Industrial unit', campus_health_centre: 'Campus health centre', health_camp: 'Health camp', other: 'Other',
+};

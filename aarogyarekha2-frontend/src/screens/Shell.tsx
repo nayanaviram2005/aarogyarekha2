@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { MfaPanel } from '../components/MfaPanel';
 import { SwitchPatient } from '../components/SwitchPatient';
 import { useLowData } from '../lib/lowBandwidth';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { useI18n } from '../i18n/I18n';
 import { AccountMenu } from '../components/AccountMenu';
@@ -25,6 +25,9 @@ export function Shell() {
   useEffect(reloadMe, [reloadMe]);
   // The name and roles decide what every screen shows. If they could not load, try once more soon instead of leaving the person with no access.
   useEffect(() => { if (!meFailed) return; const t = window.setTimeout(reloadMe, 2500); return () => window.clearTimeout(t); }, [meFailed, reloadMe]);
+  // A platform administrator has no facility, so the queue is empty for them: open their own screen first.
+  const nav = useNavigate(); const loc = useLocation();
+  useEffect(() => { if (me?.isPlatformAdmin && me.memberships.length === 0 && loc.pathname === '/') nav('/platform', { replace: true }); }, [me, loc.pathname, nav]);
   const needMfa = !demo && me?.mfaRequired === true && me.aal !== 'aal2';
   useEffect(() => {
     if (!api) return;
@@ -36,13 +39,14 @@ export function Shell() {
   }, [api]);
 
   const facilityLine = [...new Set((me?.memberships ?? []).map(x => x.facilityName).filter(Boolean))].join(' · ');
+  const isPlatform = me?.isPlatformAdmin === true;
   const isAdmin = !!me?.memberships.some(x => x.role === 'facility_admin');
   const isClinical = !!me?.memberships.some(x => ['health_worker', 'nurse', 'doctor', 'medical_officer'].includes(x.role));
   return (
     <div className="app-shell">
       <header className="topbar">
         <span className="topbar__brand">AarogyaRekha</span>
-        <nav className="topbar__nav" aria-label="Main"><NavLink to="/" end>Queue</NavLink><NavLink to="/scenarios">Scenarios</NavLink>{isClinical && <NavLink to="/referrals">Referrals</NavLink>}<NavLink to="/offline">Offline notes</NavLink>{isClinical && <NavLink to="/emergency">Emergency access</NavLink>}{isAdmin && <NavLink to="/admin">Admin</NavLink>}</nav>
+        <nav className="topbar__nav" aria-label="Main"><NavLink to="/" end>Queue</NavLink><NavLink to="/scenarios">Scenarios</NavLink>{isClinical && <NavLink to="/referrals">Referrals</NavLink>}<NavLink to="/offline">Offline notes</NavLink>{isClinical && <NavLink to="/emergency">Emergency access</NavLink>}{isAdmin && <NavLink to="/admin">Admin</NavLink>}{isPlatform && <NavLink to="/platform">Facilities</NavLink>}</nav>
         <div className="topbar__ctx">
           {facilityLine && <span><strong>{facilityLine}</strong></span>}
         </div>

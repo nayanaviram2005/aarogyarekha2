@@ -16,6 +16,7 @@ import { makeTokenVerifier } from './auth/verifier.js';
 import { shapeMe, type MembershipRow, type ProfileRow } from './auth/me.js';
 import { makeAdminStore, makeSystemAdmin } from './admin/store.js';
 import { makeMemberAdmin } from './admin/members.js';
+import { makePlatformAdmin } from './admin/platform.js';
 import { makeVisitFlow } from './visits/store.js';
 import { makeStatusSms } from './sms/notify.js';
 import { makeSmsStore } from './sms/store.js';
@@ -412,6 +413,7 @@ export function makeLiveDeps(config: Config, pool: pg.Pool): Deps {
     ...smsDeps(config, pool),
     visitFlow: makeVisitFlow({ query: (sql, p) => pool.query(sql, p as unknown[]) }),
     memberAdmin: makeMemberAdmin({ query: (sql, p) => pool.query(sql, p as unknown[]) }),
+    platformAdmin: makePlatformAdmin({ query: (sql, p) => pool.query(sql, p as unknown[]) }),
     notes: (token, userId) => makeNotesStore(client(token), userId),
     vitalHistory: token => ({
       async forPatient(patientId, kinds, limit) {

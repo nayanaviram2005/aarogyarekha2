@@ -123,10 +123,10 @@ export function createApi(baseUrl: string, getToken: TokenSource, fetchImpl: typ
       if (!res.ok) throw new ApiError(res.status, messageFromBody(res.status, json));
       return json as { id: string; metadataBytesRemoved: number; quality?: { warnings: { code: string; text: string }[] } };
     },
-    readRecord: async (file, language) => {
+    readRecord: async (file, language, aiConsent) => {
       const token = await getToken();
       if (!token) throw new ApiError(401, FALLBACK[401]!);
-      const fd = new FormData(); if (language) fd.append('language', language); fd.append('file', file, file.name);
+      const fd = new FormData(); if (language) fd.append('language', language); if (aiConsent) fd.append('aiConsent', 'yes'); fd.append('file', file, file.name);
       let res: Response;
       try { res = await fetchImpl(`${baseUrl}/intake/records/read`, { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: fd }); }
       catch { throw new ApiError(0, FALLBACK[0]!); }

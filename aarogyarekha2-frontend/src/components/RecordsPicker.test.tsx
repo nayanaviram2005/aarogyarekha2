@@ -20,7 +20,19 @@ describe('adding records at intake', () => {
     await userEvent.upload(screen.getByLabelText(/Patient records/), pdf('cbc.pdf'));
     expect(await screen.findByText(/5 test results found/)).toBeInTheDocument();
     expect(onIdentity).toHaveBeenCalledWith({ fullName: 'Asha Rao', ageYears: 27 });
-    expect(readRecord).toHaveBeenCalledWith(expect.any(File), 'en');
+    expect(readRecord).toHaveBeenCalledWith(expect.any(File), 'en', false);
+  });
+  it('asks for the patient\'s agreement before a photo goes to the outside AI reader, then reads it', async () => {
+    const readRecord = vi.fn()
+      .mockResolvedValueOnce({ identity: {}, rows: 0, readable: false, note: 'Reading a photo needs the patient’s separate consent.', averageConfidence: null, needsAiConsent: true })
+      .mockResolvedValueOnce({ identity: { fullName: 'Asha Rao' }, rows: 3, readable: true, note: null, averageConfidence: null, readBy: 'ai' });
+    const onIdentity = vi.fn();
+    render(<Host api={{ readRecord } as unknown as Api} onIdentity={onIdentity} />);
+    await userEvent.upload(screen.getByLabelText(/Patient records/), new File(['x'], 'photo.png', { type: 'image/png' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Patient agrees: read the photo/ }));
+    expect(await screen.findByText(/3 test results found/)).toBeInTheDocument();
+    expect(readRecord).toHaveBeenLastCalledWith(expect.any(File), 'en', true);
+    expect(onIdentity).toHaveBeenCalledWith({ fullName: 'Asha Rao' });
   });
   it('says plainly when a record cannot be read, and lets it be removed', async () => {
     const readRecord = vi.fn().mockResolvedValue({ identity: {}, rows: 0, readable: false, note: 'This PDF is a scan with no text in it.', averageConfidence: null });

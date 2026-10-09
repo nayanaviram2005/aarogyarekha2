@@ -4,7 +4,7 @@ import { MAX_FILES, type RecordFile } from '../lib/recordsIntake';
 import type { Api, DocumentKind, OcrLanguage, RecordIdentity } from '../lib/types';
 
 let counter = 0;
-const STATE: Record<RecordFile['state'], string> = { reading: 'Reading…', read: 'Read', unreadable: 'Could not be read', failed: 'Failed' };
+const STATE: Record<RecordFile['state'], string> = { reading: 'Reading…', read: 'Read', unreadable: 'Could not be read', failed: 'Failed', needs_consent: 'Photo: needs the patient’s agreement' };
 
 /**
  * Add a patient's records (lab reports, discharge summaries, prescriptions) during intake. Each one is read here and what it says about the
@@ -16,19 +16,23 @@ export function RecordsPicker({ api, files, setFiles, language, onIdentity, disa
   const pick = useRef<HTMLInputElement>(null);
   const patch = (key: string, p: Partial<RecordFile>) => setFiles(fs => fs.map(f => (f.key === key ? { ...f, ...p } : f)));
 
+  async function readOne(f: RecordFile, aiConsent: boolean) {
+    patch(f.key, { state: 'reading', note: undefined });
+    try {
+      const r = await api.readRecord(f.file, language as OcrLanguage, aiConsent);
+      if (r.needsAiConsent) { patch(f.key, { state: 'needs_consent', note: r.note ?? undefined }); return; }
+      patch(f.key, { state: r.readable ? 'read' : 'unreadable', note: r.note ?? undefined, rows: r.rows, aiConsent });
+      if (onIdentity && Object.keys(r.identity).length > 0) onIdentity(r.identity);
+    } catch (e) { patch(f.key, { state: 'failed', note: (e as Error).message }); }
+  }
+
   async function add(list: FileList | null) {
     if (!list) return;
     const room = Math.max(0, MAX_FILES - files.length);
     const added: RecordFile[] = Array.from(list).slice(0, room).map(file => ({ key: `rf${++counter}`, file, kind: 'lab_report' as DocumentKind, state: 'reading' as const }));
     if (added.length === 0) return;
     setFiles(fs => [...fs, ...added]);
-    for (const f of added) {
-      try {
-        const r = await api.readRecord(f.file, language as OcrLanguage);
-        patch(f.key, { state: r.readable ? 'read' : 'unreadable', note: r.note ?? undefined, rows: r.rows });
-        if (onIdentity && Object.keys(r.identity).length > 0) onIdentity(r.identity);
-      } catch (e) { patch(f.key, { state: 'failed', note: (e as Error).message }); }
-    }
+    for (const f of added) await readOne(f, false);
   }
 
   return (
@@ -46,6 +50,7 @@ export function RecordsPicker({ api, files, setFiles, language, onIdentity, disa
                 {(Object.keys(KIND_LABEL) as DocumentKind[]).map(k => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
               </select>
               <span className="muted">{STATE[f.state]}{f.state === 'read' && f.rows ? ` · ${f.rows} test result${f.rows === 1 ? '' : 's'} found` : ''}{f.note ? ` · ${f.note}` : ''}</span>
+              {f.state === 'needs_consent' && !disabled && <button type="button" className="btn btn--small" onClick={() => void readOne(f, true)}>Patient agrees: read the photo with the outside AI service</button>}
               {!disabled && <button type="button" className="btn btn--small btn--quiet" onClick={() => setFiles(fs => fs.filter(x => x.key !== f.key))}>Remove</button>}
             </li>
           ))}

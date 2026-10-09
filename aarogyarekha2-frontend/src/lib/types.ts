@@ -157,7 +157,7 @@ export interface ReferralInput { toFacilityId: string; priority?: ReferralPriori
 
 export type DocumentKind = 'lab_report' | 'prescription' | 'discharge_summary' | 'imaging_report' | 'vaccination_record' | 'referral_letter' | 'photo' | 'other';
 export interface RecordIdentity { fullName?: string; sex?: 'female' | 'male' | 'other'; ageYears?: number; birthDate?: string; phone?: string }
-export interface RecordPreview { identity: RecordIdentity; rows: number; readable: boolean; note: string | null; averageConfidence: number | null }
+export interface RecordPreview { identity: RecordIdentity; rows: number; readable: boolean; note: string | null; averageConfidence: number | null; needsAiConsent?: boolean; readBy?: 'ai' | 'local' }
 export interface RecordContextRow { name: string; valueText: string | null; valueNum: number | null; unit: string | null; printedFlag: string | null; verified: boolean }
 export interface RecordContext {
   summary: { documents: number; read: number; notRead: number; rows: number; verified: number; flagged: number; lines: string[] };
@@ -229,7 +229,7 @@ export interface Api {
   analytics(days: 7 | 30 | 90): Promise<AnalyticsView>;
   documents(encounterId: string): Promise<DocumentMeta[]>;
   /** Reads one record (nothing is stored) and says who it seems to be about. */
-  readRecord(file: File, language?: OcrLanguage): Promise<RecordPreview>;
+  readRecord(file: File, language?: OcrLanguage, aiConsent?: boolean): Promise<RecordPreview>;
   recordContext(encounterId: string): Promise<RecordContext>;
   uploadDocument(encounterId: string, file: File, kind: DocumentKind): Promise<{ id: string; metadataBytesRemoved: number; quality?: { warnings: { code: string; text: string }[] } }>;
   documentFile(id: string): Promise<{ blob: Blob; filename: string }>;

@@ -10,6 +10,8 @@ import type { RouteCtx, RouteHelpers } from './intake.js';
 import { makeSafe } from '../files/safe.js';
 import { inspectPdf, stripLinks } from '../files/pdf.js';
 import { OcrUnavailable } from '../ocr/engines.js';
+import { AiError } from '../ai/provider.js';
+import { MAX_VISION_BYTES, type VisionMime } from '../ai/vision.js';
 import { parseIdentity } from '../ocr/identity.js';
 import { parseLabText } from '../ocr/labParser.js';
 import { summariseRecords, type ContextDoc } from '../ocr/recordContext.js';
@@ -40,10 +42,10 @@ export function registerRecordRoutes(c: RouteCtx, h: RouteHelpers): void {
     if (!me.memberships.some(m => CLINICAL.includes(m.role))) return fail(reply, 403, 'forbidden', 'Only clinical staff at a facility can register patients from records.');
     if (!req.isMultipart()) return fail(reply, 415, 'not-supported', 'Send the file as multipart form data.');
 
-    let buf: Buffer | null = null; let claimed: string | undefined; let language: 'en' | 'hi' | 'or' | undefined; let truncated = false;
+    let buf: Buffer | null = null; let claimed: string | undefined; let language: 'en' | 'hi' | 'or' | undefined; let truncated = false; let aiConsent = false;
     try {
       for await (const part of req.parts()) {
-        if (part.type === 'field') { if (part.fieldname === 'language') { const l = lang.safeParse(String(part.value)); if (l.success) language = l.data; } }
+        if (part.type === 'field') { if (part.fieldname === 'language') { const l = lang.safeParse(String(part.value)); if (l.success) language = l.data; } else if (part.fieldname === 'aiConsent') aiConsent = String(part.value) === 'yes'; }
         else if (!buf) { claimed = part.mimetype; buf = await part.toBuffer(); truncated = part.file.truncated; }
         else part.file.resume();
       }
@@ -59,6 +61,26 @@ export function registerRecordRoutes(c: RouteCtx, h: RouteHelpers): void {
       const c = await stripLinks(safe.bytes).catch(() => null); if (c) safe.bytes = c.bytes;
       const p = await inspectPdf(safe.bytes).catch(() => ({ ok: false as const, reason: 'The PDF could not be checked.' }));
       if (!p.ok) return fail(reply, 400, 'invalid', p.reason);
+    }
+
+    // A photo can be read by the outside AI image reader instead of this server (OCR_PHOTOS). The patient is not registered yet, so the person
+    // registering must confirm the patient agrees; nothing is sent without that. The disclosure is audited here and recorded as a consent later.
+    const v = deps.vision;
+    const aiAvailable = !!v && v.supported && v.name !== 'mock' && v.accepts(safe.mime) && safe.mime !== 'application/pdf' && c.ocrPhotos !== 'local';
+    if (aiAvailable && !aiConsent && c.ocrPhotos === 'ai') {
+      return reply.send({ identity: {}, rows: 0, readable: false, needsAiConsent: true, note: 'Reading a photo uses an outside AI service, and names and numbers on a photo cannot be removed first. Confirm the patient agrees, then read it.', averageConfidence: null });
+    }
+    if (aiAvailable && aiConsent && v) {
+      if (safe.bytes.length > MAX_VISION_BYTES) return reply.send({ identity: {}, rows: 0, readable: false, note: 'The photo is too large to send for reading (over 8 MB). Retake it smaller, or use a PDF.', averageConfidence: null });
+      try {
+        const read = await v.read({ bytes: safe.bytes, mime: safe.mime as VisionMime, identity: true });
+        await h.note(req, { action: 'read', entityType: 'record_preview_ai', outcome: 'success', details: { provider: read.provider, model: read.model, bytes: safe.bytes.length, foundName: !!read.identity?.fullName, rows: read.rows.length } });
+        return reply.send({ identity: read.identity ?? {}, rows: read.rows.length, readable: true, note: null, averageConfidence: null, readBy: 'ai' });
+      } catch (err) {
+        await h.note(req, { action: 'read', entityType: 'record_preview_ai', outcome: 'error', details: { kind: err instanceof AiError ? err.kind : 'unknown', bytes: safe.bytes.length } });
+        if (c.ocrPhotos === 'ai') return reply.send({ identity: {}, rows: 0, readable: false, note: err instanceof AiError && err.kind === 'busy' ? 'The outside reading service is busy. Try again in a moment.' : 'The outside reading service could not read this photo. Try again, or use a PDF.', averageConfidence: null });
+        // ai_then_local: carry on with the local reader below
+      }
     }
 
     let text = ''; let confidence: number | null = null; let note: string | null = null;

@@ -35,6 +35,8 @@ export interface RouteCtx {
   /** Sends the refusal and returns false when this action needs a second factor the caller has not verified. */
   requireMfa: (req: FastifyRequest, reply: FastifyReply, what: string) => Promise<boolean>;
   mfaRequired: boolean;
+  /** Who reads photos of reports: this server (local), the outside AI image reader (ai), or the AI first and then this server. */
+  ocrPhotos: 'local' | 'ai' | 'ai_then_local';
   /** Slow work (reading a report photo) can run here so the request returns at once. */
   jobs: import('../jobs/queue.js').JobQueue;
 }

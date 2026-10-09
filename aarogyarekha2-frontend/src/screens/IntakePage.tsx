@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { useI18n } from '../i18n/I18n';
-import { ConsentForm } from '../components/ConsentForm';
+import { AI_NOTICE_VERSION, ConsentForm } from '../components/ConsentForm';
+import { useMe } from './meContext';
 import { RecordsPicker } from '../components/RecordsPicker';
 import { buildRegistration, RegisterPatientForm } from '../components/RegisterPatientForm';
 import { TemplateFields } from '../components/TemplateFields';
@@ -144,6 +145,7 @@ function Intake() {
     return { vitalValues, symptomRows };
   }
 
+  const staffName = useMe()?.displayName?.trim() || null;
   async function run(e?: FormEvent, justRegistered?: PatientBrief) {
     e?.preventDefault();
     const pt = justRegistered ?? patient;
@@ -158,6 +160,8 @@ function Intake() {
       ...v.symptomRows.map((s, i) => ({ key: `sym${i}`, label: `Save symptom: ${s.text}`, go: () => api.addSymptom(done.current.encounterId!, s) })),
       ...v.vitalValues.map(([kind, value]) => ({ key: `vit-${kind}`, label: `Save ${VITAL_ROWS.find(r => r.kind === kind)!.label.split(' (')[0]!.toLowerCase()}`, go: () => api.addVital(done.current.encounterId!, { kind, value }) })),
       ...(consciousness || oxygen ? [{ key: 'inputs', label: 'Save responsiveness and oxygen', go: () => api.saveInputs(done.current.encounterId!, { ...(consciousness ? { consciousness: consciousness as never } : {}), ...(oxygen ? { onSupplementalOxygen: oxygen === 'yes' } : {}) }) }] : []),
+      // A photo read by the outside AI service needs the patient's separate agreement on record (the person registering confirmed it above).
+      ...(recordFiles.some(r => r.aiConsent) && staffName ? [{ key: 'ai-consent', label: 'Record the patient’s agreement to the outside AI reader', go: () => api.recordConsent(pt.id, { purpose: 'external_ai_processing', givenBy: 'self', method: 'verbal_witnessed', noticeVersion: AI_NOTICE_VERSION, witnessName: staffName }) }] : []),
       ...recordFiles.flatMap(r => [
         { key: `doc-${r.key}`, label: `Attach ${r.file.name}`, go: async () => { docIds.current[r.key] = (await api.uploadDocument(done.current.encounterId!, r.file, r.kind)).id; } },
         // Reading is best effort: a record that cannot be read stays attached and can be read again from the patient's page.

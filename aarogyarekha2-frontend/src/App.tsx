@@ -14,7 +14,7 @@ import { AdminPage } from './screens/AdminPage';
 import { PlatformPage } from './screens/PlatformPage';
 import { ReferralsPage } from './screens/ReferralsPage';
 import { BreakGlassPage } from './screens/BreakGlassPage';
-import { HackathonBar, SlowServerBar } from './components/HackathonBar';
+import { NoticeBars } from './components/HackathonBar';
 import { I18nProvider } from './i18n/I18n';
 import { SignIn } from './screens/SignIn';
 import { Landing } from './screens/Landing';
@@ -45,5 +45,5 @@ function Gate() {
 }
 
 export default function App() {
-  return <BrowserRouter><I18nProvider><AuthProvider><div className="app-root"><div className="bars"><HackathonBar /><SlowServerBar /></div><Gate /></div></AuthProvider></I18nProvider></BrowserRouter>;
+  return <BrowserRouter><I18nProvider><AuthProvider><div className="app-root"><NoticeBars /><Gate /></div></AuthProvider></I18nProvider></BrowserRouter>;
 }

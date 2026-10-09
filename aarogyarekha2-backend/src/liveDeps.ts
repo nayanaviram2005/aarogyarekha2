@@ -408,6 +408,31 @@ export function makeLiveDeps(config: Config, pool: pg.Pool): Deps {
         return ((data ?? []) as any[]).map(r => ({ kind: r.kind, value: Number(r.value), unit: r.unit, measured_at: r.measured_at, encounter_id: r.encounter_id })).reverse();
       },
     }),
+    labHistory: token => ({
+      async forPatient(patientId, limit) {
+        const sb = client(token);
+        const enc = await sb.from('encounters').select('id').eq('patient_id', patientId).limit(200);
+        if (enc.error) throw new Error(enc.error.message);
+        const encIds = ((enc.data ?? []) as { id: string }[]).map(r => r.id);
+        if (encIds.length === 0) return [];
+        const docs = await sb.from('documents').select('id, encounter_id, created_at').in('encounter_id', encIds).eq('scan_status', 'clean').is('deleted_at', null);
+        if (docs.error) throw new Error(docs.error.message);
+        const docRows = (docs.data ?? []) as { id: string; encounter_id: string; created_at: string }[];
+        if (docRows.length === 0) return [];
+        const ex = await sb.from('extractions').select('id, document_id, created_at').in('document_id', docRows.map(d => d.id)).eq('status', 'completed').order('created_at', { ascending: false });
+        if (ex.error) throw new Error(ex.error.message);
+        const latest = new Map<string, string>();
+        for (const r of (ex.data ?? []) as { id: string; document_id: string }[]) if (!latest.has(r.document_id)) latest.set(r.document_id, r.id);
+        const byEx = new Map([...latest.entries()].map(([docId, exId]) => [exId, docRows.find(d => d.id === docId)!]));
+        if (byEx.size === 0) return [];
+        const f = await sb.from('extracted_fields').select('extraction_id, field_name, value_num, value_text, extracted_value_text, unit, printed_flag, verified_at').in('extraction_id', [...byEx.keys()]);
+        if (f.error) throw new Error(f.error.message);
+        return ((f.data ?? []) as any[]).slice(0, limit).map(r => {
+          const d = byEx.get(r.extraction_id)!;
+          return { name: r.field_name, valueNum: r.value_num === null ? null : Number(r.value_num), valueText: r.value_text ?? r.extracted_value_text ?? null, unit: r.unit ?? null, printedFlag: r.printed_flag ?? null, verified: !!r.verified_at, at: d.created_at, documentId: d.id, encounterId: d.encounter_id };
+        });
+      },
+    }),
     history: (token, userId) => makeHistoryStore(client(token), userId),
     referralBoard: token => makeReferralBoard(client(token), BRIEF_COLS),
     systemAdmin: makeSystemAdmin({ query: (sql, p) => pool.query(sql, p as unknown[]) }),

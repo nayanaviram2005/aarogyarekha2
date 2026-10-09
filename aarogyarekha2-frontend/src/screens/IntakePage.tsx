@@ -69,7 +69,7 @@ function Intake() {
 
   const done = useRef<{ encounterId: string | null; keys: Set<string> }>({ encounterId: null, keys: new Set() });
   const docIds = useRef<Record<string, string>>({});
-  const startNow = useRef(false);
+  const [fresh, setFresh] = useState(false);
 
   useEffect(() => {
     if (!api || patient) return;
@@ -108,11 +108,11 @@ function Intake() {
   }
 
   function registered(p: PatientBrief) {
-    choose(p); startNow.current = true; void run(undefined, p);
+    choose(p); setFresh(true);
   }
 
   function choose(p: PatientBrief) {
-    startNow.current = false;
+    setFresh(false);
     setPatient(p); setLanguage(p.preferred_language in { en: 1, hi: 1, or: 1 } ? p.preferred_language : 'en');
     done.current = { encounterId: null, keys: new Set() }; setSteps([]); setProblem(null); setNeedConsent(false); setSavedId(null);
   }
@@ -133,7 +133,7 @@ function Intake() {
       symptomRows.push(row);
     }
     for (const f of TEMPLATES[scenario]?.fields ?? []) { const a = (tpl[f.key] ?? '').trim(); if (a) symptomRows.push({ text: noteFor(f, a), lang: language }); }
-    if (!complaint.trim() && symptomRows.length === 0 && recordFiles.length === 0 && !startNow.current) return 'Enter the main complaint or at least one symptom, or add the patient records.';
+    if (!complaint.trim()) return 'Enter the main complaint. For a routine check-up, write "Routine".';
     return { vitalValues, symptomRows };
   }
 
@@ -146,9 +146,8 @@ function Intake() {
     if (typeof v === 'string') { setFormErr(v); return; }
     setFormErr(null); setProblem(null); setNeedConsent(false); setBusy(true);
 
-    const nothingYet = !complaint.trim() && v.symptomRows.length === 0 && v.vitalValues.length === 0;
     const plan: { key: string; label: string; go: () => Promise<unknown> }[] = [
-      { key: 'encounter', label: 'Start the encounter', go: async () => { const r = await api.createEncounter({ patientId: pt.id, scenario, language, ...(complaint.trim() ? { chiefComplaint: complaint.trim() } : {}) }); done.current.encounterId = r.id; } },
+      { key: 'encounter', label: 'Start the encounter', go: async () => { const r = await api.createEncounter({ patientId: pt.id, scenario, language, chiefComplaint: complaint.trim() }); done.current.encounterId = r.id; } },
       ...v.symptomRows.map((s, i) => ({ key: `sym${i}`, label: `Save symptom: ${s.text}`, go: () => api.addSymptom(done.current.encounterId!, s) })),
       ...v.vitalValues.map(([kind, value]) => ({ key: `vit-${kind}`, label: `Save ${VITAL_ROWS.find(r => r.kind === kind)!.label.split(' (')[0]!.toLowerCase()}`, go: () => api.addVital(done.current.encounterId!, { kind, value }) })),
       ...(consciousness || oxygen ? [{ key: 'inputs', label: 'Save responsiveness and oxygen', go: () => api.saveInputs(done.current.encounterId!, { ...(consciousness ? { consciousness: consciousness as never } : {}), ...(oxygen ? { onSupplementalOxygen: oxygen === 'yes' } : {}) }) }] : []),
@@ -158,7 +157,7 @@ function Intake() {
         { key: `read-${r.key}`, label: `Read ${r.file.name}`, go: async () => { try { await api.extractDocument(docIds.current[r.key]!, language as 'en' | 'hi' | 'or'); } catch { } } },
       ]),
       { key: 'submit', label: 'Submit to the queue', go: () => api.submit(done.current.encounterId!) },
-      ...(nothingYet ? [] : [{ key: 'assess', label: 'Assess priority', go: () => api.assess(done.current.encounterId!) }]),
+      { key: 'assess', label: 'Assess priority', go: () => api.assess(done.current.encounterId!) },
     ];
     setSteps(plan.map(p => ({ key: p.key, label: p.label, status: done.current.keys.has(p.key) ? 'done' : 'todo' })));
     const mark = (key: string, status: Status) => setSteps(cur => cur.map(s => (s.key === key ? { ...s, status } : s)));
@@ -239,7 +238,8 @@ function Intake() {
         <div className="block__head"><h3>{t('intake.observed')}</h3></div>
         <div className="block__body">
           {api && <RecordsPicker api={api} files={recordFiles} setFiles={setRecordFiles} language={language} disabled={busy || !!done.current.encounterId} />}
-          <div className="field"><label htmlFor="cc">{t('intake.complaint')}</label><textarea id="cc" autoFocus className="textarea" lang={language} value={complaint} onChange={e => setComplaint(e.target.value)} maxLength={2000} disabled={busy} /></div>
+          {fresh && !busy && !savedId && <Banner kind="info" title={`${patient.full_name} is registered`}>Enter the main complaint to put them in the queue. You can add symptoms and measurements too. For a routine check-up, write "Routine".</Banner>}
+          <div className="field"><label htmlFor="cc">{t('intake.complaint')} (required)</label><textarea id="cc" autoFocus required aria-required="true" aria-describedby="cc-hint" className="textarea" lang={language} value={complaint} onChange={e => setComplaint(e.target.value)} maxLength={2000} disabled={busy} /><span id="cc-hint" className="hint">For a routine check-up, write "Routine".</span></div>
           <TextHints text={complaint} language={language} onPickLanguage={setLanguage} />
 
           <fieldset style={{ border: 0, padding: 0, margin: 0 }} disabled={busy}>

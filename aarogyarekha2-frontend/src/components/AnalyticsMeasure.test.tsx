@@ -5,7 +5,7 @@ import type { AnalyticsView, Api } from '../lib/types';
 import { AnalyticsPanel } from './AnalyticsPanel';
 import { MeasurementForm, MEASUREMENTS } from './MeasurementForm';
 
-const an = (o: Partial<AnalyticsView> = {}): AnalyticsView => ({ days: 30, encounters: 128, submitted: 121, assessed: 118, reviewed: 96, byScenario: [{ scenario: 'opd_queue', n: 90 }], byUrgency: [{ urgency: 'red', n: 7 }, { urgency: 'green', n: 51 }], secondsToAssessment: { n: 118, median: 1.4, p90: 3.8 }, minutesToReview: { n: 96, median: 14.2, p90: 90 }, review: { approved: 81, changed: 15, loweredBelowRules: 2, agreementRate: 0.844 }, feedback: { helpful: 22, notHelpful: 3 }, note: 'Counts and times only.', ...o });
+const an = (o: Partial<AnalyticsView> = {}): AnalyticsView => ({ days: 30, referralsSent: 9, perDay: [{ day: '2026-10-05', n: 14 }, { day: '2026-10-06', n: 22 }], encounters: 128, submitted: 121, assessed: 118, reviewed: 96, byScenario: [{ scenario: 'opd_queue', n: 90 }], byUrgency: [{ urgency: 'red', n: 7 }, { urgency: 'green', n: 51 }], secondsToAssessment: { n: 118, median: 1.4, p90: 3.8 }, minutesToReview: { n: 96, median: 14.2, p90: 90 }, review: { approved: 81, changed: 15, loweredBelowRules: 2, agreementRate: 0.844 }, feedback: { helpful: 22, notHelpful: 3 }, note: 'Counts and times only.', ...o });
 
 describe('AnalyticsPanel', () => {
   it('shows counts, typical and 9-in-10 times, agreement as a percentage, and the note', async () => {

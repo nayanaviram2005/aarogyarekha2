@@ -39,7 +39,7 @@ export function MembersPanel({ api }: { api: Api }) {
         {members === null && !error && <p className="small muted" role="status">Loading…</p>}
         {members && members.length === 0 && <p className="small muted">No one is listed yet.</p>}
         {members && members.length > 0 && (
-          <table className="table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+          <table className="table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Last sign-in</th><th>Second factor</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>{members.map(m => {
               const key = m.userId + m.facilityId; const label = m.name ?? m.email ?? m.userId.slice(0, 8); const fac = many ? m.facilityId : undefined;
               return (
@@ -51,6 +51,8 @@ export function MembersPanel({ api }: { api: Api }) {
                         {!isRole(m.role) && <option value="" disabled>{ROLE_LABEL[m.role] ?? m.role}</option>}
                         {ROLES.map(r => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}</select>
                     : ROLE_LABEL[m.role] ?? m.role}</td>
+                  <td>{m.lastSignIn ? formatTime(m.lastSignIn) : 'Never'}</td>
+                  <td>{m.mfa ? <span className="chip chip--ok">On</span> : <span className="chip">Not set up</span>}</td>
                   <td>{m.active ? <span className="chip chip--ok">Active</span> : <span className="chip">Removed</span>}</td>
                   <td>
                     {m.canChange && m.active && <button type="button" className="btn btn--small" disabled={busy === key} onClick={() => { if (window.confirm(`Remove ${label} from this facility? Their history stays.`)) void run(key, () => api.removeMember(m.userId, fac), `${label} was removed.`); }}>Remove</button>}

@@ -98,6 +98,8 @@ export function createApi(baseUrl: string, getToken: TokenSource, fetchImpl: typ
     breakGlassList: async () => (await call<{ grants: never[] }>('GET', '/admin/break-glass')).grants,
     reviewBreakGlass: id => call('POST', `/admin/break-glass/${enc(id)}/review`),
     requestBreakGlass: body => call('POST', '/break-glass', body),
+    searchBreakGlassPatients: q => call('GET', `/break-glass/patients?q=${encodeURIComponent(q)}`),
+    patientTriageHistory: id => call('GET', `/patients/${enc(id)}/triage-history`),
     patientEncounters: id => call('GET', `/patients/${enc(id)}/encounters`),
     incomingReferrals: async s => (await call<{ referrals: never[] }>('GET', '/referrals/incoming' + (s?.length ? '?status=' + s.join(',') : ''))).referrals,
     sentReferrals: async s => (await call<{ referrals: never[] }>('GET', '/referrals/sent' + (s?.length ? '?status=' + s.join(',') : ''))).referrals,
@@ -137,6 +139,7 @@ export function createApi(baseUrl: string, getToken: TokenSource, fetchImpl: typ
       return json as never;
     },
     recordContext: id => call('GET', `/encounters/${enc(id)}/record-context`),
+    labTrends: id => call('GET', `/patients/${enc(id)}/lab-trends`),
     documentFile: async id => {
       const token = await getToken();
       if (!token) throw new ApiError(401, FALLBACK[401]!);
@@ -171,6 +174,27 @@ export function createApi(baseUrl: string, getToken: TokenSource, fetchImpl: typ
     },
     extraction: async id => (await call<{ extraction: never | null }>('GET', `/documents/${enc(id)}/extraction`)).extraction,
     verifyField: (docId, fieldId, body) => call('PUT', `/documents/${enc(docId)}/fields/${enc(fieldId)}`, body),
+    downloadAuditExport: async days => {
+      const token = await getToken();
+      if (!token) throw new ApiError(401, FALLBACK[401]!);
+      let res: Response;
+      try { res = await fetchImpl(`${baseUrl}/admin/audit/export?days=${days}`, { headers: { authorization: `Bearer ${token}` } }); }
+      catch { throw new ApiError(0, FALLBACK[0]!); }
+      if (!res.ok) throw new ApiError(res.status, messageFromBody(res.status, await res.json().catch(() => null)));
+      const m = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '');
+      const c = res.headers.get('x-audit-chain');
+      return { filename: m?.[1] ?? `audit-${days}d.csv`, blob: await res.blob(), chain: c === 'intact' || c === 'broken' ? c : 'unchecked', rows: Number(res.headers.get('x-audit-rows') ?? 0), truncated: res.headers.get('x-audit-truncated') === 'true' };
+    },
+    downloadHandoverPdf: async (id, lang) => {
+      const token = await getToken();
+      if (!token) throw new ApiError(401, FALLBACK[401]!);
+      let res: Response;
+      try { res = await fetchImpl(`${baseUrl}/encounters/${enc(id)}/handover.pdf?lang=${lang}`, { headers: { authorization: `Bearer ${token}` } }); }
+      catch { throw new ApiError(0, FALLBACK[0]!); }
+      if (!res.ok) throw new ApiError(res.status, messageFromBody(res.status, await res.json().catch(() => null)));
+      const m = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '');
+      return { filename: m?.[1] ?? `handover-${id.slice(0, 8)}.pdf`, blob: await res.blob() };
+    },
     downloadReferralPdf: async id => {
       const token = await getToken();
       if (!token) throw new ApiError(401, FALLBACK[401]!);

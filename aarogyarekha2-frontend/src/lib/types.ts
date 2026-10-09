@@ -30,7 +30,10 @@ export interface QueueEntry {
   queueStatus: string | null; waitingSince: string | null; assessmentVersion: number | null;
   engineTier: number | null;
   reviewed: boolean;
+  order?: QueueOrder;
 }
+export type QueueOrderWhy = 'first' | 'tier' | 'unassessed' | 'vulnerable' | 'wait';
+export interface QueueOrder { position: number; of: number; effectiveTier: number; promoted: boolean; why: QueueOrderWhy; waitedMin: number }
 export interface QueueResponse { generatedAt: string; entries: QueueEntry[] }
 
 export interface EncounterRow {
@@ -107,23 +110,29 @@ export interface ChainStatus { intact: boolean; checked: number; brokenIds: numb
 export type VisitOutcome = 'treated_here' | 'sent_home' | 'did_not_wait' | 'referred';
 export interface DoneEntry { encounterId: string; facilityId: string; patientRef: string; patientName: string | null; sex: string | null; urgencyCode: string | null; outcome: VisitOutcome | null; finishedAt: string; by: string | null; waitedMinutes: number | null }
 export type MemberRole = 'health_worker' | 'nurse' | 'doctor' | 'medical_officer';
-export interface MemberView { userId: string; facilityId: string; role: string; active: boolean; since: string; name: string | null; email: string | null; isSelf: boolean; canChange: boolean }
-export interface PlatformFacilityView { id: string; name: string; type: string; state: string | null; district: string | null; code: string | null; active: boolean; staff: number; admins: { userId: string; name: string | null; email: string | null }[] }
+export interface MemberView { userId: string; facilityId: string; role: string; active: boolean; since: string; name: string | null; email: string | null; lastSignIn: string | null; mfa: boolean; isSelf: boolean; canChange: boolean }
+export interface PlatformFacilityView { id: string; name: string; type: string; state: string | null; district: string | null; code: string | null; active: boolean; staff: number; lastActivity: string | null; visits30: number; referrals30: number; admins: { userId: string; name: string | null; email: string | null }[] }
 export interface MemberChangeView { at: string; facilityId: string; op: string; role: string | null; previous: string | null; actor: string | null; target: string | null }
 export interface BreakGlassGrantView { id: string; who: string | null; userId: string; patientRef: string; facilityId: string; reason: string; createdAt: string; expiresAt: string; reviewedAt: string | null; reviewed: boolean }
 export type HistoryKind = 'reported_condition' | 'allergy' | 'medication' | 'family_history' | 'occupational_exposure' | 'immunisation' | 'other';
 export interface HistoryEntry { id: string; kind: HistoryKind; text: string; lang: string | null; source: string; createdAt: string; confirmed: boolean; confirmedAt: string | null; confirmedBy: string | null }
 export interface TrendReading { kind: string; value: number; unit: string; at: string; encounterId: string }
-export type NoteKind = 'comment' | 'escalation' | 'feedback_up' | 'feedback_down';
+export type NoteKind = 'comment' | 'escalation' | 'feedback_up' | 'feedback_down' | 'doctor_note';
+export interface PatientSearchHit { publicRef: string; name: string; sex: string | null; age: number | null; facility: string; ownFacility: boolean }
+export interface TriageVisit {
+  id: string; createdAt: string; facility: string | null; scenario: string; status: string; outcome: string | null; complaint: string | null;
+  assessedUrgency: string | null; finalUrgency: string | null; reviewedBy: string | null; reviewedAt: string | null; notes: { id: string; body: string; author: string | null; at: string }[];
+}
+export interface TriageHistory { patientRef: string; patientName: string; visits: TriageVisit[] }
 export interface ReviewerNote { id: string; kind: NoteKind; body: string | null; assessmentId: string | null; author: string | null; at: string }
 export interface Spread { n: number; median: number | null; p90: number | null }
 export interface AnalyticsView {
-  days: number; encounters: number; submitted: number; assessed: number; reviewed: number; byScenario: { scenario: string; n: number }[]; byUrgency: { urgency: string; n: number }[];
+  days: number; referralsSent: number; perDay: { day: string; n: number }[]; encounters: number; submitted: number; assessed: number; reviewed: number; byScenario: { scenario: string; n: number }[]; byUrgency: { urgency: string; n: number }[];
   secondsToAssessment: Spread; minutesToReview: Spread; review: { approved: number; changed: number; loweredBelowRules: number; agreementRate: number | null };
   feedback: { helpful: number; notHelpful: number } | null; note: string;
 }
 export interface ConsentInput { purpose?: 'care_triage' | 'referral_sharing' | 'external_ai_processing' | 'reminders' | 'status_messages'; givenBy: 'self' | 'guardian' | 'representative'; method: 'digital' | 'verbal_witnessed' | 'paper'; noticeVersion: string; witnessName?: string }
-export interface EncounterInput { patientId: string; scenario: string; language: string; chiefComplaint?: string }
+export interface EncounterInput { patientId: string; scenario: string; language: string; chiefComplaint: string }
 export interface SymptomInput { text: string; lang?: string; durationValue?: number; durationUnit?: 'minutes' | 'hours' | 'days' | 'weeks' | 'months' | 'years'; severity?: number }
 export interface InputsPatch { consciousness?: TriageContext['consciousness']; onSupplementalOxygen?: boolean | null; pregnant?: boolean | null; signs?: Record<string, boolean> }
 
@@ -150,9 +159,15 @@ export interface ReferralInput { toFacilityId: string; priority?: ReferralPriori
 export type DocumentKind = 'lab_report' | 'prescription' | 'discharge_summary' | 'imaging_report' | 'vaccination_record' | 'referral_letter' | 'photo' | 'other';
 export interface RecordIdentity { fullName?: string; sex?: 'female' | 'male' | 'other'; ageYears?: number; birthDate?: string; phone?: string }
 export interface RecordPreview { identity: RecordIdentity; rows: number; readable: boolean; note: string | null; averageConfidence: number | null; needsAiConsent?: boolean; readBy?: 'ai' | 'local' }
+export interface LabTrendPoint { at: string; value: number | null; text: string | null; flag: string | null; verified: boolean; documentId: string; encounterId: string }
+export interface LabTrend {
+  name: string; label: string; unit: string | null; points: LabTrendPoint[]; unitsDiffer: boolean;
+  change: null | { from: number; to: number; direction: 'up' | 'down' | 'same'; unit: string | null };
+}
+export interface LabTrends { tests: LabTrend[]; rows: number; unverified: number; visits: number }
 export interface RecordContextRow { name: string; valueText: string | null; valueNum: number | null; unit: string | null; printedFlag: string | null; verified: boolean }
 export interface RecordContext {
-  summary: { documents: number; read: number; notRead: number; rows: number; verified: number; flagged: number; lines: string[] };
+  summary: { documents: number; read: number; notRead: number; rows: number; verified: number; flagged: number; lines: string[]; gaps?: { code: 'unread' | 'readers_differ' | 'low_confidence'; text: string }[] };
   documents: { id: string; kind: DocumentKind; filename: string | null; createdAt: string; status: string; rows: RecordContextRow[] }[];
 }
 export interface DocumentMeta { id: string; encounterId: string | null; kind: DocumentKind; mimeType: string; sizeBytes: number; filename: string | null; status: 'pending' | 'clean' | 'infected' | 'failed'; createdAt: string }
@@ -188,6 +203,7 @@ export interface Api {
   sendReferral(id: string): Promise<{ id: string; status: string; sentAt: string; bundleSha256: string }>;
   downloadReferral(id: string): Promise<{ filename: string; text: string }>;
   downloadReferralPdf(id: string): Promise<{ filename: string; blob: Blob }>;
+  downloadHandoverPdf(encounterId: string, lang: 'en' | 'hi' | 'or'): Promise<{ filename: string; blob: Blob }>;
   translate(encounterId: string): Promise<{ translated: number; rejected: number; nothingToDo?: boolean; provider: string; model: string; machineTranslation: true }>;
   transcribe(encounterId: string, audio: Blob, language?: 'en' | 'hi' | 'or'): Promise<{ text: string; language: string | null; provider: string; model: string; machineTranscript: true }>;
   followups(encounterId: string): Promise<Followup[]>;
@@ -196,6 +212,7 @@ export interface Api {
   stopFollowup(followupId: string): Promise<{ id: string; active: false }>;
   auditFlags(hours?: number): Promise<FlagsResponse>;
   auditChain(): Promise<ChainStatus>;
+  downloadAuditExport(days: 7 | 30 | 90): Promise<{ filename: string; blob: Blob; chain: 'intact' | 'broken' | 'unchecked'; rows: number; truncated: boolean }>;
   callIn(encounterId: string): Promise<{ encounterId: string; status: string }>;
   completeVisit(encounterId: string, outcome: Exclude<VisitOutcome, 'referred'>): Promise<{ encounterId: string; outcome: VisitOutcome; queueStatus: string }>;
   queueDone(hours?: number): Promise<DoneEntry[]>;
@@ -212,6 +229,8 @@ export interface Api {
   breakGlassList(): Promise<BreakGlassGrantView[]>;
   reviewBreakGlass(id: string): Promise<{ id: string; reviewed: true }>;
   requestBreakGlass(body: { publicRef: string; reason: string; facilityId?: string }): Promise<{ id: string; patientId: string; patientRef: string; expiresAt: string }>;
+  searchBreakGlassPatients(q: string): Promise<{ truncated: boolean; patients: PatientSearchHit[] }>;
+  patientTriageHistory(patientId: string): Promise<TriageHistory>;
   patientEncounters(patientId: string): Promise<{ patientRef: string; encounters: { id: string; status: string; scenario: string; created_at: string }[] }>;
   incomingReferrals(statuses?: ReferralStatus[]): Promise<BoardReferral[]>;
   sentReferrals(statuses?: ReferralStatus[]): Promise<BoardReferral[]>;
@@ -226,6 +245,7 @@ export interface Api {
   documents(encounterId: string): Promise<DocumentMeta[]>;
   readRecord(file: File, language?: OcrLanguage, aiConsent?: boolean): Promise<RecordPreview>;
   recordContext(encounterId: string): Promise<RecordContext>;
+  labTrends(patientId: string): Promise<LabTrends>;
   uploadDocument(encounterId: string, file: File, kind: DocumentKind): Promise<{ id: string; metadataBytesRemoved: number; quality?: { warnings: { code: string; text: string }[] } }>;
   documentFile(id: string): Promise<{ blob: Blob; filename: string }>;
   extractDocument(id: string, language?: OcrLanguage): Promise<Extraction>;

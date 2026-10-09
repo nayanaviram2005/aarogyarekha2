@@ -9,13 +9,11 @@ import { AccountMenu } from '../components/AccountMenu';
 import type { Me } from '../lib/types';
 import { QueueProvider } from './queueContext';
 import { MeContext } from './meContext';
-import { useApiHealth } from '../lib/useApiHealth';
 
 export function Shell() {
   const { api, demo, signOut, mfa } = useAuth();
   const { t } = useI18n();
   const [me, setMe] = useState<Me | null>(null);
-  const health = useApiHealth(api ?? null);
   const [mfaOpen, setMfaOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
   const [lowData, setLowData] = useLowData();
@@ -43,10 +41,6 @@ export function Shell() {
         </div>
         <div className="topbar__right">
           {demo && <span className="demo-flag" title="Synthetic data held in memory. Not connected to any database.">DEMO DATA</span>}
-          <span className={`status ${health === 'online' ? 'status--ok' : health === 'offline' ? 'status--bad' : 'status--wait'}`} role="status">
-            <span className="status__mark" aria-hidden="true" />
-            {health === 'online' ? t('shell.connected') : health === 'offline' ? t('shell.offline') : t('shell.connecting')}
-          </span>
           <NavLink className="btn btn--small btn--primary topbar__new" to="/intake">New patient</NavLink>
           <button className="btn btn--small" onClick={() => setSwitchOpen(true)} aria-keyshortcuts="Control+K">Switch patient</button>
           <AccountMenu me={me} loadFailed={meFailed} onRetry={reloadMe} lowData={lowData} setLowData={setLowData} needMfa={needMfa} onVerifyMfa={() => setMfaOpen(true)} onSignOut={() => void signOut()} />

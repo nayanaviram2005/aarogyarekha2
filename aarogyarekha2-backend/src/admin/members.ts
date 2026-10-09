@@ -14,11 +14,12 @@ export function makeMemberAdmin(db: Queryable): MemberAdmin {
     async list(facilityIds) {
       if (facilityIds.length === 0) return [];
       const r = await db.query(
-        `select distinct on (m.facility_id, m.user_id) m.user_id, m.facility_id, m.role::text role, m.is_active, m.created_at, p.display_name, u.email
+        `select distinct on (m.facility_id, m.user_id) m.user_id, m.facility_id, m.role::text role, m.is_active, m.created_at, p.display_name, u.email, u.last_sign_in_at,
+                exists (select 1 from auth.mfa_factors f where f.user_id = u.id and f.status = 'verified') mfa
            from public.memberships m left join public.profiles p on p.user_id = m.user_id left join auth.users u on u.id = m.user_id
           where m.facility_id = any($1::uuid[])
           order by m.facility_id, m.user_id, m.is_active desc, m.created_at desc`, [facilityIds]);
-      return r.rows.map(x => ({ userId: x.user_id, facilityId: x.facility_id, role: x.role, active: x.is_active === true, since: new Date(x.created_at).toISOString(), name: x.display_name ?? null, email: x.email ?? null }))
+      return r.rows.map(x => ({ userId: x.user_id, facilityId: x.facility_id, role: x.role, active: x.is_active === true, since: new Date(x.created_at).toISOString(), name: x.display_name ?? null, email: x.email ?? null, lastSignIn: x.last_sign_in_at ? new Date(x.last_sign_in_at).toISOString() : null, mfa: x.mfa === true }))
         .sort((a, b) => Number(b.active) - Number(a.active) || (a.name ?? '').localeCompare(b.name ?? ''));
     },
     async findByEmail(email) {

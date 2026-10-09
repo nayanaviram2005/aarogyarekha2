@@ -11,7 +11,7 @@ const make = async () => {
   const reader = (t: string) => ({ getMe: async () => ({ displayName: t, memberships: t === 'nurse' ? [{ facilityId: F, facilityName: 'F', facilityType: 'phc', role: 'nurse' }] : [] }) }) as unknown as UserReader;
   const platformAdmin: PlatformAdmin = {
     isPlatform: async id => id === 'u-plat' || id === 'u-plat1',
-    facilities: async () => [{ id: F, name: 'Khordha PHC', type: 'phc', state: null, district: null, code: null, active: true, staff: 3, admins: [{ userId: T, name: 'Asha', email: 'a@x.in' }] }],
+    facilities: async () => [{ id: F, name: 'Khordha PHC', type: 'phc', state: null, district: null, code: null, active: true, staff: 3, lastActivity: '2026-10-07T08:00:00.000Z', visits30: 12, referrals30: 2, admins: [{ userId: T, name: 'Asha', email: 'a@x.in' }] }],
     create: async a => { w.calls.push({ op: 'create', a }); if (w.fail) throw w.fail; return { id: F }; },
     setActive: async a => { w.calls.push({ op: 'active', a }); if (w.fail) throw w.fail; },
   };

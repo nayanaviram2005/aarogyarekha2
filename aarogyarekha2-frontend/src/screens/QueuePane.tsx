@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { UrgencyPlate } from '../components/Plate';
 import { useI18n } from '../i18n/I18n';
 import { ageSex, formatWait, isTier } from '../lib/format';
+import { whyText } from '../lib/queueWhy';
 import { QueueFilterBar } from '../components/QueueFilterBar';
 import { applyQueueFilter, NO_FILTER, type QueueFilter } from '../lib/queueFilter';
 import { useAuth } from '../auth/AuthProvider';
@@ -19,6 +20,7 @@ export function QueuePane({ onOpen }: { onOpen?: () => void }) {
   const { api } = useAuth();
   const [filter, setFilter] = useState<QueueFilter>(NO_FILTER);
   const [showDone, setShowDone] = useState(false);
+  const [showWhy, setShowWhy] = useState(false);
   const [doneCount, setDoneCount] = useState<number | null>(null);
   const facilityNames = Object.fromEntries((me?.memberships ?? []).map(m => [m.facilityId, m.facilityName ?? m.facilityId.slice(0, 8)]));
   const [now, setNow] = useState(() => new Date());
@@ -28,10 +30,10 @@ export function QueuePane({ onOpen }: { onOpen?: () => void }) {
     <section className="pane pane--queue" aria-label={t('queue.title')}>
       <div className="pane__head">
         <h2>{t('queue.title')}</h2>
-        <span className="muted small" aria-live="polite">{loading ? t('queue.loading') : t('queue.waiting', { n: entries.length })}</span>
+        <span className="muted small" aria-live="polite">{loading ? t('queue.loading') : ''}</span>
         <span className="grow" />
+        {entries.some(e => e.order) && <button className="btn btn--small btn--quiet" aria-pressed={showWhy} onClick={() => setShowWhy(v => !v)}>Why this order?</button>}
         <button className="btn btn--small btn--quiet" onClick={() => void refresh()}>{t('queue.refresh')}</button>
-        <Link className="btn btn--small btn--primary" to="/intake">{t('queue.new')}</Link>
       </div>
       {api && <QueueCounts entries={entries} doneCount={doneCount} showingDone={showDone} onShowDone={() => setShowDone(v => !v)} />}
       {showDone && api ? <DoneToday api={api} onLoaded={setDoneCount} /> : <>
@@ -59,6 +61,7 @@ export function QueuePane({ onOpen }: { onOpen?: () => void }) {
                   <span className="queue-row__wait">{formatWait(e.waitingSince, now)}</span>
                 </span>
                 <span className="queue-row__sub" lang={e.patient.preferred_language}>{e.chiefComplaint ?? t('queue.noComplaint')}</span>
+                {showWhy && e.order && <span className="queue-row__why">{whyText(e, n => t(`tier.${n}` as never))}</span>}
                 {e.assessed && isTier(e.potentialTier) && isTier(e.tier) && e.potentialTier < e.tier && (
                   <span className="queue-row__sub tiny strong" style={{ gridColumn: '1 / -1' }}>{t('queue.couldBe', { tier: t(`tier.${e.potentialTier}`).toLowerCase(), n: e.missingCount })}</span>
                 )}

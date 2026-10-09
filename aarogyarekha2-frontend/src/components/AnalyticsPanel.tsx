@@ -13,6 +13,7 @@ export function AnalyticsPanel({ api }: { api: Api }) {
   const [error, setError] = useState<Error | null>(null);
   useEffect(() => { let live = true; setA(null); api.analytics(days).then(x => { if (live) { setA(x); setError(null); } }).catch(e => { if (live) setError(e as Error); }); return () => { live = false; }; }, [api, days]);
 
+  const busiest = a && a.perDay.length > 0 ? a.perDay.reduce((m, d) => (d.n > m.n ? d : m)) : null;
   return (
     <section className="block" aria-label="Activity and agreement">
       <div className="block__head"><h3>Activity and agreement</h3></div>
@@ -29,6 +30,8 @@ export function AnalyticsPanel({ api }: { api: Api }) {
               <tr><th scope="row">Submitted to the queue</th><td className="num">{a.submitted}</td></tr>
               <tr><th scope="row">Assessed by the rules</th><td className="num">{a.assessed}</td></tr>
               <tr><th scope="row">Signed off by a reviewer</th><td className="num">{a.reviewed}</td></tr>
+              <tr><th scope="row">Referrals sent</th><td className="num">{a.referralsSent}</td></tr>
+              {busiest && <tr><th scope="row">Busiest day</th><td>{busiest.day} ({busiest.n} visits)</td></tr>}
               <tr><th scope="row">Time to a draft assessment</th><td>{spread(a.secondsToAssessment, fmtSec)}</td></tr>
               <tr><th scope="row">Wait until a reviewer acts</th><td>{spread(a.minutesToReview, fmtMin)}</td></tr>
               <tr><th scope="row">Reviewer confirmed the rules' priority</th><td className="num">{a.review.approved}</td></tr>
@@ -36,6 +39,7 @@ export function AnalyticsPanel({ api }: { api: Api }) {
               <tr><th scope="row">Agreement</th><td className="num">{a.review.agreementRate === null ? 'no data' : `${Math.round(a.review.agreementRate * 1000) / 10}%`}</td></tr>
               {a.feedback && <tr><th scope="row">Feedback on drafts</th><td>{a.feedback.helpful} helpful, {a.feedback.notHelpful} not helpful</td></tr>}
             </tbody></table>
+            {a.perDay.length > 1 && <p className="small">Visits per day: {a.perDay.map(d => `${d.day.slice(5)} ${d.n}`).join(', ')}</p>}
             {a.byUrgency.length > 0 && <p className="small">By priority: {a.byUrgency.map(u => { const t = tierOfUrgency(u.urgency); return `${t ? TIER_WORD[t] : u.urgency} ${u.n}`; }).join(', ')}</p>}
             {a.byScenario.length > 0 && <p className="small">By type of visit: {a.byScenario.map(s => `${scenarioLabel(s.scenario)} ${s.n}`).join(', ')}</p>}
           </>

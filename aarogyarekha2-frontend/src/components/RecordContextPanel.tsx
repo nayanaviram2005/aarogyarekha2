@@ -29,6 +29,12 @@ export function RecordContextPanel({ api, encounterId, refreshKey = 0 }: { api: 
             </>
           )}
         {s.notRead > 0 && s.rows > 0 && <p className="tiny muted">{s.notRead} record{s.notRead === 1 ? ' was' : 's were'} not readable (for example a photo that is too dark). Open it to check by eye.</p>}
+        {(s.gaps ?? []).length > 0 && (
+          <div role="group" aria-label="What the records cannot tell you yet">
+            <h4 className="small strong" style={{ margin: '8px 0 4px' }}>What the records cannot tell you yet</h4>
+            <ul className="small">{(s.gaps ?? []).map(g => <li key={g.code + g.text}>{g.text}</li>)}</ul>
+          </div>
+        )}
         <p className="tiny muted">Copied from the reports as printed. This is not a diagnosis and does not change the priority by itself.</p>
       </div>
     </section>

@@ -26,6 +26,8 @@ import { registerTrendRoutes } from './routes/trends.js';
 import { registerNoteRoutes } from './routes/notes.js';
 import { registerMemberRoutes } from './routes/members.js';
 import { registerPlatformRoutes } from './routes/platform.js';
+import { registerLabTrendRoutes } from './routes/labTrends.js';
+import { registerHandoverRoutes } from './routes/handover.js';
 import { registerVisitRoutes } from './routes/visits.js';
 import { registerSmsRoutes } from './routes/sms.js';
 import { makeAccessBudget } from './guard/accessBudget.js';
@@ -142,6 +144,8 @@ export async function buildApp(config: Pick<Config, 'allowedOrigins'> & { triage
   registerNoteRoutes(routeCtx, helpers);
   registerMemberRoutes(routeCtx, helpers);
   registerPlatformRoutes(routeCtx, helpers);
+  registerLabTrendRoutes(routeCtx, helpers);
+  registerHandoverRoutes(routeCtx, helpers);
   registerVisitRoutes(routeCtx, helpers);
   registerSmsRoutes(routeCtx);
 

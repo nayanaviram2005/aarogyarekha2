@@ -7,10 +7,10 @@ interface Props {
   checks?: string | null;
   draft?: Draft; onDraft: (d: Draft | null) => void;
   translated?: string | null; translatedLang?: 'en' | 'hi' | 'or';
-  needsClinician?: boolean;
+  needsClinician?: boolean; showEffect?: boolean;
 }
 
-export function FollowUpControl({ fieldCode, question, checks, rank, potentialTier, disabled, draft, onDraft, translated, translatedLang, needsClinician }: Props) {
+export function FollowUpControl({ fieldCode, question, checks, rank, potentialTier, disabled, draft, onDraft, translated, translatedLang, needsClinician, showEffect = true }: Props) {
   const yes = draft?.kind === 'bool' ? draft.value : undefined;
   const pick = (v: boolean) => onDraft(yes === v ? null : { kind: 'bool', value: v });
 
@@ -53,7 +53,7 @@ export function FollowUpControl({ fieldCode, question, checks, rank, potentialTi
         {translated && <p className="q__text" lang={translatedLang} style={{ fontWeight: 500 }}>{translated}</p>}
         {needsClinician && <p className="tiny muted">A nurse or doctor should check this one.</p>}
         {control}
-        {isTier(potentialTier) && <p className="q__could">Could change the priority to {TIER_WORD[potentialTier].toLowerCase()}.</p>}
+        {showEffect && isTier(potentialTier) && <p className="q__could">Could change the priority to {TIER_WORD[potentialTier].toLowerCase()}.</p>}
       </div>
     </li>
   );

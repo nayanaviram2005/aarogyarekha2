@@ -34,6 +34,9 @@ function Admin() {
   const [chainBusy, setChainBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [exportDays, setExportDays] = useState<7 | 30 | 90>(30);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportNote, setExportNote] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!api) return;
@@ -48,6 +51,16 @@ function Admin() {
     if (!api) return; setChainBusy(true);
     try { setChain(await api.auditChain()); } catch (e) { setError((e as Error).message); } finally { setChainBusy(false); }
   }
+  async function exportCsv() {
+    if (!api) return; setExportBusy(true); setExportNote(null);
+    try {
+      const f = await api.downloadAuditExport(exportDays);
+      const url = URL.createObjectURL(f.blob);
+      const a = document.createElement('a'); a.href = url; a.download = f.filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      const chainWord = f.chain === 'intact' ? 'The audit log was checked and is intact.' : f.chain === 'broken' ? 'WARNING: the audit log does not match its checks. Treat this file with care.' : 'The audit log could not be checked just now.';
+      setExportNote(`${f.rows} entries saved as ${f.filename}. ${chainWord}${f.truncated ? ' The list was cut at the first 50,000 entries; choose a shorter period.' : ''}`);
+    } catch (e) { setError((e as Error).message); } finally { setExportBusy(false); }
+  }
   async function review(id: string) {
     if (!api) return; setBusyId(id);
     try { await api.reviewBreakGlass(id); await load(); } catch (e) { setError((e as Error).message); } finally { setBusyId(null); }
@@ -60,7 +73,16 @@ function Admin() {
 
       <section className="block" aria-label="Audit log check">
         <div className="block__head"><h3>Audit log</h3></div>
-        <div className="block__body"><ChainBadge chain={chain} busy={chainBusy} onCheck={() => void check()} /></div>
+        <div className="block__body">
+          <ChainBadge chain={chain} busy={chainBusy} onCheck={() => void check()} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 12 }}>
+            <label htmlFor="adm-export" className="small">Export as CSV</label>
+            <select id="adm-export" className="select" style={{ width: 160 }} value={exportDays} onChange={e => setExportDays(Number(e.target.value) as 7 | 30 | 90)}><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option></select>
+            <button type="button" className="btn btn--small" onClick={() => void exportCsv()} disabled={exportBusy}>{exportBusy ? 'Preparing…' : 'Download CSV'}</button>
+          </div>
+          {exportNote && <p className="small" role="status">{exportNote}</p>}
+          <p className="tiny muted">Names of staff and record numbers only. No patient names. The export is itself recorded in the audit log.</p>
+        </div>
       </section>
 
       {api && <MembersPanel api={api} />}

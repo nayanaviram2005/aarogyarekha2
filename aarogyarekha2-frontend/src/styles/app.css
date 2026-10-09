@@ -31,7 +31,7 @@
 .pane:last-child { border-right: 0; }
 .pane--center { background: var(--paper); }
 .pane__head {
-  display: flex; align-items: center; gap: var(--s3); min-height: 44px; padding: var(--s2) var(--s4);
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3); min-height: 44px; padding: var(--s2) var(--s4);
   border-bottom: 1px solid var(--rule-strong); background: var(--panel);
 }
 .pane__head h2 { font-size: var(--fs-16); }
@@ -170,7 +170,9 @@
 .queue-row[aria-current='true'] { background: var(--action-tint); border-left-color: var(--action); }
 .queue-row__name { font-weight: 600; display: flex; gap: var(--s2); align-items: baseline; min-width: 0; }
 .queue-row__name span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.queue-row__sub { grid-column: 1; color: var(--ink-2); font-size: var(--fs-13); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queue-row__sub { grid-column: 1; color: var(--ink-2); font-size: var(--fs-13); overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.queue-row__why { grid-column: 1 / -1; color: var(--ink-2); font-size: var(--fs-12); white-space: normal; overflow-wrap: anywhere; }
+.bars[data-paused='true'] .hbar__track { animation-play-state: paused; }
 .queue-row__side { grid-row: 1 / span 2; grid-column: 2; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .queue-row__wait { font-size: var(--fs-12); color: var(--ink-2); }
 
@@ -274,8 +276,7 @@ html, body { overflow-x: hidden; }
   .topbar { flex-wrap: wrap; align-items: center; row-gap: 0; padding: 6px var(--s3) 0; }
   .topbar__brand { order: 1; }
   .topbar__right { order: 2; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; row-gap: 4px; }
-  .topbar__nav { order: 3; flex: 0 0 100%; overflow-x: auto; gap: 0; margin: 0 calc(-1 * var(--s3)); padding: 0 var(--s3); scrollbar-width: none; }
-  .topbar__nav::-webkit-scrollbar { display: none; }
+  .topbar__nav { order: 3; flex: 0 0 100%; flex-wrap: wrap; gap: 0; margin: 0 calc(-1 * var(--s3)); padding: 0 var(--s3); }
   .topbar__nav a { white-space: nowrap; padding: 12px 10px 8px; }
   .lang-switch__label { display: none; }
 }

@@ -15,6 +15,10 @@ const run = (reply: unknown) => getAiOpinion(gen(reply), input, { complaint: 'st
 
 describe('cleanQuestion', () => {
   it('keeps one short plain question', () => { expect(cleanQuestion('  Has the stomach pain spread to the back?  ')).toBe('Has the stomach pain spread to the back?'); });
+  it('rejects questions put to the patient in the first or second person, so the rule text (third person) is used instead', () => {
+    for (const bad of ['Is your airway blocked?', 'Are you struggling to breathe?', 'Do I feel dizzy?', 'Have we seen blood in the vomit?', 'Is my chest tight?', 'Are your lips blue?']) expect(cleanQuestion(bad), bad).toBeNull();
+    expect(cleanQuestion('Is the patient struggling to breathe?')).toBe('Is the patient struggling to breathe?');
+  });
   it('rejects statements, run-ons, tokens, links, long digit runs, and diagnosing or advising wording', () => {
     for (const bad of ['Is it appendicitis?', 'Start antibiotics now?', 'Has the pain spread to the back', 'Is it bad? Is it spreading?', 'Is [[NAME_1]] vomiting?', 'Is it at http://x.y?', 'Call 9876543210 now?', 'Why?', 'x'.repeat(250) + '?'])
       expect(cleanQuestion(bad), bad).toBeNull();

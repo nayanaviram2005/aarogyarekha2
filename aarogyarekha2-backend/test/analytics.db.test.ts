@@ -65,3 +65,50 @@ describe('analytics', () => {
   });
   it('contains nothing that identifies a person', async () => { expect(JSON.stringify(await sys().analytics([F1], 30))).not.toMatch(/Analytics Test|r@t\.test|[0-9a-f]{8}-[0-9a-f]{4}-/); });
 });
+
+describe('referrals sent and visits per day', () => {
+  it('counts referrals that were sent from the facility, not drafts, and breaks visits down by day', async () => {
+    const e = await visit({ assessAfterSec: 3 }); const e2 = await visit({ assessAfterSec: 3 });
+    await db.query(`insert into public.referrals (encounter_id, patient_id, from_facility_id, to_facility_id, requested_by, status, bundle, bundle_sha256, sent_at) values ($1,$2,$3,$4,$5,'requested','{}'::jsonb,decode(repeat('ab',32),'hex'), now())`, [e, PT, F1, F2, U]);
+    await db.query(`insert into public.referrals (encounter_id, patient_id, from_facility_id, requested_by, status) values ($1,$2,$3,$4,'draft')`, [e2, PT, F1, U]);
+    const a = await sys().analytics([F1], 30);
+    expect(a.referralsSent).toBe(1); expect((await sys().analytics([F2], 30)).referralsSent).toBe(0);
+    expect(a.perDay.length).toBeGreaterThan(0); for (const d of a.perDay) expect(d.day).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(a.perDay.reduce((n, d) => n + d.n, 0)).toBe(a.encounters);
+  });
+  it('an empty facility list gives empty figures', async () => { const a = await sys().analytics([], 30); expect(a.referralsSent).toBe(0); expect(a.perDay).toEqual([]); });
+});
+
+describe('audit export rows', () => {
+  it('lists only the facility entries, newest first, with the person, facility and record number', async () => {
+    await db.query(`insert into public.audit_events (actor_user_id, actor_role, facility_id, action, entity_type, patient_id, outcome) values ($1,'nurse',$2,'read','encounter_summary',$3,'success'), ($1,'nurse',$4,'read','encounter_summary',null,'denied')`, [U, F1, PT, F2]);
+    await db.query(`insert into public.profiles (user_id, display_name) values ($1,'Export Nurse') on conflict (user_id) do nothing`, [U]);
+    const rows = await sys().auditExport([F1], new Date(Date.now() - 86_400_000).toISOString(), 100);
+    expect(rows.length).toBeGreaterThan(0); expect(rows.every(r => r.facility_id === F1)).toBe(true);
+    expect(rows[0]).toMatchObject({ actor_name: 'Export Nurse', facility_name: 'A', action: 'read', entity_type: 'encounter_summary', outcome: 'success' }); expect(rows[0]!.patient_ref).toMatch(/^AR/);
+    expect(await sys().auditExport([], new Date(0).toISOString(), 10)).toEqual([]);
+    expect((await sys().auditExport([F1], new Date(Date.now() + 60_000).toISOString(), 10)).length).toBe(0);
+  });
+});
+
+describe('finding a patient for emergency access', () => {
+  beforeAll(async () => {
+    await db.query(`insert into public.patients (registered_facility_id, full_name, sex, age_years_reported) values ($1,'Sita Mohanty','female',34), ($1,'Ramesh Sita Das','male',60), ($2,'Gopal 100% Behera','male',45)`, [F2, F2]);
+    await db.query(`insert into public.patients (registered_facility_id, full_name, deleted_at) values ($1,'Sita Removed', now())`, [F2]);
+  });
+  it('matches the start of the record number or any part of the name, across facilities, and never a removed patient', async () => {
+    const byName = await sys().searchPatients('sita', 20);
+    expect(byName.map(r => r.name).sort()).toEqual(['Ramesh Sita Das', 'Sita Mohanty']);
+    expect(byName[0]).toMatchObject({ facilityName: 'B' });
+    const ref = (await db.query(`select public_ref from public.patients where full_name = 'Sita Mohanty'`)).rows[0] as { public_ref: string };
+    expect((await sys().searchPatients(ref.public_ref.toLowerCase(), 5)).map(r => r.name)).toEqual(['Sita Mohanty']);
+  });
+  it('gives the reported age and sex, and leaves an unknown sex out', async () => {
+    const r = (await sys().searchPatients('Sita Mohanty', 5))[0]!; expect(r).toMatchObject({ sex: 'female', age: 34 });
+  });
+  it('treats % and _ as plain characters, and respects the limit', async () => {
+    expect((await sys().searchPatients('100%', 5)).map(r => r.name)).toEqual(['Gopal 100% Behera']);
+    expect((await sys().searchPatients('%', 5)).map(r => r.name)).toEqual(['Gopal 100% Behera']); expect(await sys().searchPatients('_o', 5)).toEqual([]);
+    expect((await sys().searchPatients('sita', 1)).length).toBe(1);
+  });
+});

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Banner } from '../components/Provenance';
-import { FACILITY_TYPE_LABEL } from '../lib/format';
+import { FACILITY_TYPE_LABEL, formatTime } from '../lib/format';
 import type { PlatformFacilityView } from '../lib/types';
 import { useAuth } from '../auth/AuthProvider';
 
@@ -49,6 +49,7 @@ export function PlatformPage() {
                 <span className="muted small">{FACILITY_TYPE_LABEL[f.type] ?? f.type}{f.district ? ` · ${f.district}` : ''}{f.state ? `, ${f.state}` : ''}{f.code ? ` · ${f.code}` : ''}</span>
                 <span className={f.active ? 'chip chip--ok' : 'chip'}>{f.active ? 'Active' : 'Switched off'}</span>
                 <span className="small muted">{f.staff} staff</span>
+                <span className="small muted">{f.visits30} visits and {f.referrals30} referrals sent in 30 days · {f.lastActivity ? `last activity ${formatTime(f.lastActivity)}` : 'no activity yet'}</span>
                 <button type="button" className="btn btn--small" disabled={busy === f.id}
                   onClick={() => { if (f.active && !window.confirm(`Switch off ${f.name}? Its staff keep their accounts, and nothing is deleted.`)) return; void run(f.id, () => api.setFacilityActive(f.id, !f.active), `${f.name} is now ${f.active ? 'switched off' : 'active'}.`); }}>
                   {f.active ? 'Switch off' : 'Switch on'}

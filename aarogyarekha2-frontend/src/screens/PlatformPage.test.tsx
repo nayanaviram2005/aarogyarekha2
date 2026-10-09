@@ -8,7 +8,7 @@ import { PlatformPage } from './PlatformPage';
 let current: Api;
 vi.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ api: current }) }));
 
-const fac = (o: Partial<PlatformFacilityView> = {}): PlatformFacilityView => ({ id: 'f1', name: 'Khordha PHC', type: 'phc', state: 'Odisha', district: 'Khordha', code: null, active: true, staff: 3, admins: [{ userId: 'a1', name: 'Asha', email: 'asha@x.in' }], ...o });
+const fac = (o: Partial<PlatformFacilityView> = {}): PlatformFacilityView => ({ id: 'f1', name: 'Khordha PHC', type: 'phc', state: 'Odisha', district: 'Khordha', code: null, active: true, staff: 3, lastActivity: '2026-10-07T08:00:00.000Z', visits30: 12, referrals30: 2, admins: [{ userId: 'a1', name: 'Asha', email: 'asha@x.in' }], ...o });
 const api = (o: Record<string, unknown> = {}) => ({
   platformFacilities: vi.fn().mockResolvedValue([fac()]), createFacility: vi.fn().mockResolvedValue({ id: 'f2' }), setFacilityActive: vi.fn().mockResolvedValue({ id: 'f1', active: false }),
   appointFacilityAdmin: vi.fn().mockResolvedValue({ userId: 'x' }), removeFacilityAdmin: vi.fn().mockResolvedValue({ userId: 'a1', removed: true }), ...o,
@@ -45,5 +45,13 @@ describe('PlatformPage', () => {
     current = api({ appointFacilityAdmin: vi.fn().mockRejectedValue(new Error('That person has no profile yet. Ask them to sign in once, then appoint them.')) }); render(<PlatformPage />);
     await userEvent.type(await screen.findByLabelText(/Appoint an administrator/), 'x@y.in'); await userEvent.click(screen.getByRole('button', { name: 'Appoint' }));
     expect(await screen.findByText(/sign in once/)).toBeInTheDocument();
+  });
+});
+
+describe('facility health', () => {
+  it('shows visits, referrals and last activity for each facility, and says when there is none', async () => {
+    current = api({ platformFacilities: vi.fn().mockResolvedValue([fac(), fac({ id: 'f2', name: 'Quiet CHC', visits30: 0, referrals30: 0, lastActivity: null })]) }); render(<PlatformPage />);
+    expect(await screen.findByText(/12 visits and 2 referrals sent in 30 days · last activity/)).toBeInTheDocument();
+    expect(screen.getByText(/0 visits and 0 referrals sent in 30 days · no activity yet/)).toBeInTheDocument();
   });
 });

@@ -89,18 +89,19 @@ beforeEach(() => {
 describe('consent gate (server-side)', () => {
   it('refuses to start an encounter without consent, and creates nothing', async () => {
     s.consent = false; s.encounters.clear();
-    const r = await call(await make(), 'POST', '/encounters', { patientId: P });
+    const r = await call(await make(), 'POST', '/encounters', { patientId: P, chiefComplaint: 'cough' });
     expect(r.statusCode).toBe(403);
     expect(r.json().issue[0].details.text).toMatch(/consent/i);
     expect(s.encounters.size).toBe(0);
   });
 
   it('starts an encounter once consent exists', async () => {
-    const r = await call(await make(), 'POST', '/encounters', { patientId: P, scenario: 'campus_fever', language: 'hi' });
+    const r = await call(await make(), 'POST', '/encounters', { patientId: P, scenario: 'campus_fever', language: 'hi', chiefComplaint: 'cough' });
     expect(r.statusCode).toBe(201);
     expect(r.json().status).toBe('draft');
     expect([...s.encounters.values()].some(e => e.scenario === 'campus_fever' && e.language === 'hi')).toBe(true);
   });
+it.each([[{}], [{ chiefComplaint: '   ' }], [{ chiefComplaint: '' }]])('refuses a visit with no main complaint (%j), and creates nothing', async body => {    const before = s.encounters.size;    const r = await call(await make(), 'POST', '/encounters', { patientId: P, ...body });    expect(r.statusCode).toBe(400);    expect(s.encounters.size).toBe(before);  });  it('accepts Routine as the complaint for a routine check-up', async () => {    const r = await call(await make(), 'POST', '/encounters', { patientId: P, chiefComplaint: 'Routine' });    expect(r.statusCode).toBe(201);  });
 
   it.each([
     ['symptoms', 'POST', { text: 'Fever' }], ['vitals', 'POST', { kind: 'temperature_c', value: 38 }],
@@ -113,7 +114,7 @@ describe('consent gate (server-side)', () => {
   });
 
   it('a user who cannot see the patient gets 404 and consent is never even checked (no information leak)', async () => {
-    const r = await call(await make(), 'POST', '/encounters', { patientId: P }, 'outsider');
+    const r = await call(await make(), 'POST', '/encounters', { patientId: P, chiefComplaint: 'cough' }, 'outsider');
     expect(r.statusCode).toBe(404);
     expect(s.writerCalls).toEqual([]);
   });

@@ -20,7 +20,7 @@ export async function loadRecordContext(req: FastifyRequest, encounterId: string
     const e = await req.reader!.getExtraction(d.id).catch(() => null);
     out.push({
       id: d.id, kind: d.kind, filename: d.original_filename ?? null, createdAt: d.created_at, status: e ? e.status : 'none',
-      fields: (e?.fields ?? []).map(f => ({ name: f.field_name, valueText: f.value_text ?? f.extracted_value_text, valueNum: f.value_num === null ? null : Number(f.value_num), unit: f.unit, printedFlag: f.printed_flag, verified: !!f.verified_at })),
+      fields: (e?.fields ?? []).map(f => ({ name: f.field_name, valueText: f.value_text ?? f.extracted_value_text, valueNum: f.value_num === null ? null : Number(f.value_num), unit: f.unit, printedFlag: f.printed_flag, verified: !!f.verified_at, agreement: f.agreement ?? null, confidence: f.confidence === null || f.confidence === undefined ? null : Number(f.confidence) })),
     });
   }
   return out;

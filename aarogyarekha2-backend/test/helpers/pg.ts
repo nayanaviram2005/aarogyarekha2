@@ -7,7 +7,8 @@ export async function makeDb(): Promise<PGlite> {
   await db.exec(`
     create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
     create schema auth;
-    create table auth.users (id uuid primary key default gen_random_uuid(), email text);
+    create table auth.users (id uuid primary key default gen_random_uuid(), email text, last_sign_in_at timestamptz);
+    create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid, status text);
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
     create function auth.role() returns text language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claim.role', true), ''), 'service_role') $$;
     grant usage on schema public, auth to anon, authenticated, service_role;

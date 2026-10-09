@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { RouteCtx } from './intake.js';
-import { isWaitingLong, sortQueue } from '../queue/sort.js';
+import { explainOrder, isWaitingLong, sortQueue } from '../queue/sort.js';
 
 const patientQuery = z.object({
   q: z.string().trim().regex(/^[\p{L}\p{M}\p{N} .-]{1,60}$/u, 'Use letters, numbers, spaces, dots or hyphens (up to 60).').optional(),
@@ -32,7 +32,8 @@ export function registerViewRoutes(c: RouteCtx): void {
     if (rows === undefined) return fail(reply, 502, 'transient', 'The queue could not be loaded. Try again.');
     if (!(await c.auditOrFail(req, reply, { action: 'read', entityType: 'queue', outcome: 'success', details: { count: rows.length } }))) return;
     const now = new Date();
-    return reply.send({ generatedAt: now.toISOString(), entries: sortQueue(rows, 3, now).map(e => ({ ...e, waitingLong: isWaitingLong(e, now) })) });
+    const sorted = sortQueue(rows, 3, now); const order = explainOrder(sorted, 3, now);
+    return reply.send({ generatedAt: now.toISOString(), entries: sorted.map((e, i) => ({ ...e, waitingLong: isWaitingLong(e, now), order: order[i] })) });
   });
 
   app.get('/encounters/:id/summary', { preHandler: authenticate }, async (req, reply) => {

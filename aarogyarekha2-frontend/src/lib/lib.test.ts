@@ -72,7 +72,7 @@ describe('createApi', () => {
   it('sends the bearer token and JSON body, and parses the response', async () => {
     const f = vi.fn().mockReturnValue(ok({ id: 'e1', status: 'draft' }, 201));
     const api = createApi('http://api', async () => 'tok', f as never);
-    expect(await api.createEncounter({ patientId: 'p', scenario: 'opd_queue', language: 'en' })).toEqual({ id: 'e1', status: 'draft' });
+    expect(await api.createEncounter({ patientId: 'p', scenario: 'opd_queue', language: 'en', chiefComplaint: 'cough' })).toEqual({ id: 'e1', status: 'draft' });
     const [url, init] = f.mock.calls[0]!;
     expect(url).toBe('http://api/encounters');
     expect(init.method).toBe('POST');
@@ -99,7 +99,7 @@ describe('createApi', () => {
   });
   it('recognises a consent refusal and a rules-not-approved refusal', async () => {
     const consent = createApi('http://api', async () => 't', (() => ok({ issue: [{ details: { text: 'No active consent for triage is recorded for this patient. Record consent first.' } }] }, 403)) as never);
-    expect(await consent.createEncounter({ patientId: 'p', scenario: 'x', language: 'en' }).catch(x => x)).toMatchObject({ isConsent: true });
+    expect(await consent.createEncounter({ patientId: 'p', scenario: 'x', language: 'en', chiefComplaint: 'cough' }).catch(x => x)).toMatchObject({ isConsent: true });
     const rules = createApi('http://api', async () => 't', (() => ok({ issue: [{ details: { text: 'Triage rules are not approved yet, so no assessment was stored.' } }] }, 503)) as never);
     expect(await rules.assess('e').catch(x => x)).toMatchObject({ isRulesNotApproved: true });
   });

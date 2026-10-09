@@ -47,12 +47,9 @@ function StartHere() {
         </section>
       )}
 
-      {entries.length > 0 && (
+      {s.needsSignoff > 0 && (
         <ul className="starthere__counts" aria-label="Queue summary">
-          <li><strong>{s.waiting}</strong> waiting</li>
-          {s.needsAssess > 0 && <li><strong>{s.needsAssess}</strong> not assessed</li>}
           <li><strong>{s.needsSignoff}</strong> waiting for a nurse or doctor to sign off</li>
-          <li><strong>{s.inReview}</strong> in review</li>
         </ul>
       )}
     </div>

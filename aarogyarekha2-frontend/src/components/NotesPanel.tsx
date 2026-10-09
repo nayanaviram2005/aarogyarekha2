@@ -3,7 +3,7 @@ import { formatTime } from '../lib/format';
 import type { Api, NoteKind, ReviewerNote } from '../lib/types';
 import { Banner } from './Provenance';
 
-const KIND_LABEL: Record<NoteKind, string> = { comment: 'Note', escalation: 'Needs a senior look', feedback_up: 'Assessment was helpful', feedback_down: 'Assessment was not helpful' };
+const KIND_LABEL: Record<NoteKind, string> = { comment: 'Note', escalation: 'Needs a senior look', feedback_up: 'Assessment was helpful', feedback_down: 'Assessment was not helpful', doctor_note: 'Doctor’s note' };
 
 export function NotesPanel({ api, encounterId, assessmentId, canWrite, disabled }: { api: Api; encounterId: string; assessmentId: string | null; canWrite: boolean; disabled?: boolean }) {
   const [notes, setNotes] = useState<ReviewerNote[] | null>(null);

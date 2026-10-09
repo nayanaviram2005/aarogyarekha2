@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { Banner } from '../components/Provenance';
 import { LanguageSwitcher, useI18n } from '../i18n/I18n';
+import { SHOW_SLOW_SERVER_NOTICE, SLOW_SERVER_SHORT } from '../config';
 
 export function SignIn() {
   const { signIn, notice } = useAuth();
@@ -20,6 +21,7 @@ export function SignIn() {
 
   return (
     <main className="signin">
+      {SHOW_SLOW_SERVER_NOTICE && <div style={{ width: '100%', maxWidth: 420, margin: '0 auto var(--s3)' }}><Banner kind="warn" title="Responses may be slow">{SLOW_SERVER_SHORT}</Banner></div>}
       <form className="signin__card" onSubmit={submit} noValidate>
         <div className="signin__head">
           <h1>AarogyaRekha</h1>

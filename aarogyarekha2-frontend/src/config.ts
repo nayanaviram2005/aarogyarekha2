@@ -9,6 +9,14 @@ export const SHOW_HACKATHON_BAR = true;
  */
 export const RULES_CLINICALLY_VALIDATED = false;
 
+/**
+ * Warns that the server may be far away, so answers can be slow. Set to false once the API runs close to its users.
+ * It is shown above the sign-in card and as a sliding strip on every other page.
+ */
+export const SHOW_SLOW_SERVER_NOTICE = true;
+export const SLOW_SERVER_MESSAGE = 'Warning: responses may be slow, because the backend is running on a server far from you. Please wait a few seconds after each action.';
+export const SLOW_SERVER_SHORT = 'The backend is running on a server far from you, so signing in and loading can take a few seconds. Please wait after each action.';
+
 export const HACKATHON_MESSAGE =
   'HACKATHON PROTOTYPE  ·  BPUT Hackathon 2026  ·  Synthetic data only  ·  ' +
   'Triage rules are transcribed from published protocols and have NOT been clinically validated  ·  ' +

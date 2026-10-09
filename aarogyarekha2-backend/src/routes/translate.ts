@@ -1,6 +1,5 @@
 // Translate what the patient said (Hindi, Odia) into English for the reviewer. The original is always kept beside it.
-//  * Needs triage consent AND the patient's separate consent to outside AI processing (external_ai_processing). Without the
-//    second, nothing is sent and the screen says why.
+//  * Needs triage consent, whose notice tells the patient that redacted text goes to an outside service. Without it, nothing is sent.
 //  * Text is redacted before it leaves; the patient's name and identifiers never reach the service (src/ai/translate.ts).
 //  * Every call to the outside service is logged (provider, model, how many items, how many characters; never the text).
 //  * Output is stored only if it passes the checks. A translation that fails stays untranslated.
@@ -21,8 +20,8 @@ export function registerTranslateRoutes(c: RouteCtx, h: RouteHelpers): void {
 
     const consents = await req.reader!.getConsents(enc.patient_id).catch(() => undefined);
     if (consents === undefined) return fail(reply, 502, 'transient', 'Consent could not be checked. Try again.');
-    const ai = consents.filter(x => x.purpose === 'external_ai_processing' && isConsentActive([x]))[0];
-    if (!ai?.id) return fail(reply, 403, 'forbidden', 'The patient has not consented to an outside AI service reading their words. Record that consent first, or read the original text.');
+    const ai = consents.filter(x => x.purpose === 'care_triage' && isConsentActive([x]))[0];
+    if (!ai?.id) return fail(reply, 403, 'forbidden', 'No active consent for triage is recorded for this patient. Record it first, or read the original text.');
 
     const [patient, summary] = await Promise.all([req.reader!.getPatient(enc.patient_id), req.reader!.getEncounterSummary(enc.id)]).catch(() => [undefined, undefined] as const);
     if (!patient || !summary) return fail(reply, 502, 'transient', 'The record could not be loaded. Try again.');

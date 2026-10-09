@@ -330,7 +330,7 @@ describe('assessment', () => {
 });
 
 describe('AI second opinion on priority', () => {
-  const consent = { id: 'c-ai', purpose: 'external_ai_processing', granted_at: '2025-01-01T00:00:00Z', revoked_at: null, expires_at: null };
+  const consent = { id: 'c-ai', purpose: 'care_triage', granted_at: '2025-01-01T00:00:00Z', revoked_at: null, expires_at: null };
   const summary = { symptoms: [{ id: 's1', text_original: 'my son cries and will not drink', text_translated: null, lang: 'en', duration_value: 2, duration_unit: 'days', severity: 6, created_at: '2026-10-06T09:00:00Z' }] };
   let sent: { system: string; user: string }[]; let runs: { purpose?: string; status: string }[]; let reply: string | Error;
   beforeEach(() => {
@@ -357,7 +357,7 @@ describe('AI second opinion on priority', () => {
     const b = (await assess(app)).json();
     expect(b.tier).toBe(2); expect(b.aiOpinion).toMatchObject({ tier: 4, rulesTier: 2, relation: 'lower' });
   });
-  it('sends nothing without the separate AI consent, and says why', async () => {
+  it('sends nothing when no triage consent is active (no separate AI consent exists), and says why', async () => {
     const b = (await assess(await withAi({ consents: [] }))).json();
     expect(sent).toEqual([]); expect(b.aiOpinion).toMatchObject({ status: 'no_consent', tier: null }); expect(s.assessCalls[0]!.input.externalHints).toBeUndefined();
   });
@@ -384,7 +384,7 @@ describe('AI second opinion on priority', () => {
 
 describe('questions that fit the patient', () => {
   const PROPA = { ...RULESET_PROPOSED, status: 'approved' as const };
-  const consent = { id: 'c-ai', purpose: 'external_ai_processing', granted_at: '2025-01-01T00:00:00Z', revoked_at: null, expires_at: null };
+  const consent = { id: 'c-ai', purpose: 'care_triage', granted_at: '2025-01-01T00:00:00Z', revoked_at: null, expires_at: null };
   let askedCandidates: string; let reply: string; let withConsent: boolean;
   beforeEach(() => {
     askedCandidates = ''; withConsent = true;
@@ -419,7 +419,7 @@ describe('questions that fit the patient', () => {
   it('the AI is offered the open signs to choose from, and the core ones only to word, and is told to pick only ones that fit', async () => {
     await go(await app()); expect(askedCandidates).toContain('Possible questions'); expect(askedCandidates).toContain('persistent_vomiting:'); const [always, possible] = askedCandidates.split('Possible questions'); expect(always).toContain('Always asked'); expect(always).toContain('central_cyanosis:'); expect(possible).not.toContain('central_cyanosis:'); expect(askedCandidates).toContain('stomach pain since yesterday');
   });
-  it('without the AI consent it falls back to topic matching: stomach questions, no self-harm questions', async () => {
+  it('without an active consent it falls back to topic matching: stomach questions, no self-harm questions', async () => {
     withConsent = false; const b = await go(await app()); const c = codes(b);
     expect(b.questionsFrom).toBe('topics'); expect(c).toContain('sign.sudden_severe_abdominal_or_back_pain'); expect(c).not.toContain('sign.mental_health_crisis'); expect(c).not.toContain('sign.overdose_poisoning_or_self_harm');
   });

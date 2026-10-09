@@ -1,5 +1,5 @@
 // Gathers the AI second opinion for one assessment. Never throws: any problem becomes a status the reviewer can read, and the
-// rules result stands alone. Needs the patient's separate consent to outside AI processing; every call is logged.
+// rules result stands alone. The patient's triage consent covers it (its notice says redacted text goes to an outside service); every call is logged.
 import type { FastifyRequest } from 'fastify';
 import type { Deps } from '../deps.js';
 import type { EncounterRow } from '../fhir/project.js';
@@ -20,7 +20,7 @@ export async function secondOpinion(deps: Deps, req: FastifyRequest, enc: Encoun
   if (!t || t.name === 'mock') return NO_OPINION('not_set_up');
   try {
     const consents = await req.reader!.getConsents(enc.patient_id);
-    const ai = consents.filter(x => x.purpose === 'external_ai_processing' && isConsentActive([x]))[0];
+    const ai = consents.filter(x => x.purpose === 'care_triage' && isConsentActive([x]))[0];
     if (!ai?.id) return NO_OPINION('no_consent');
     const [patient, summary] = await Promise.all([req.reader!.getPatient(enc.patient_id), req.reader!.getEncounterSummary(enc.id)]);
     if (!patient || !summary) return NO_OPINION('unavailable');

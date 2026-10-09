@@ -27,19 +27,7 @@ describe('TranslateBar', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Translate to English' }));
     expect(await screen.findByText(/2 could not be translated safely and stay in the original language/)).toBeInTheDocument();
   });
-  it('without the patient\'s consent it asks for it, records the right purpose, and tries again by itself', async () => {
-    const translate = vi.fn().mockRejectedValueOnce(new ApiError(403, 'The patient has not consented to an outside AI service reading their words. Record that consent first, or read the original text.')).mockResolvedValue(ok);
-    const a = api(translate);
-    render(<TranslateBar api={a} encounterId="e1" patientId="p1" onDone={() => {}} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Translate to English' }));
-    expect(await screen.findByText('Record consent to use an outside AI service')).toBeInTheDocument();
-    expect(screen.getByText(/remove your name, phone number and other personal details/)).toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText('Witness name'), 'A. Witness');
-    await userEvent.click(screen.getByRole('button', { name: 'Record consent' }));
-    await waitFor(() => expect(a.recordConsent).toHaveBeenCalledWith('p1', expect.objectContaining({ purpose: 'external_ai_processing' })));
-    expect(await screen.findByText('Translated 2.')).toBeInTheDocument();
-    expect(translate).toHaveBeenCalledTimes(2);
-  });
+it('never shows a separate AI consent form: a missing triage consent is just an error message', async () => {    const translate = vi.fn().mockRejectedValue(new ApiError(403, 'No active consent for triage is recorded for this patient. Record it first, or read the original text.'));    const a = api(translate);    render(<TranslateBar api={a} encounterId="e1" patientId="p1" onDone={() => {}} />);    await userEvent.click(screen.getByRole('button', { name: 'Translate to English' }));    expect(await screen.findByRole('alert')).toHaveTextContent('No active consent for triage');    expect(screen.queryByText(/outside AI service/)).not.toBeInTheDocument();    expect(a.recordConsent).not.toHaveBeenCalled();  });
   it('shows other failures in plain words, with no consent form', async () => {
     render(<TranslateBar api={api(vi.fn().mockRejectedValue(new ApiError(503, 'The translation service is not set up. The original text is shown.')))} encounterId="e1" patientId="p1" onDone={() => {}} />);
     await userEvent.click(screen.getByRole('button', { name: 'Translate to English' }));

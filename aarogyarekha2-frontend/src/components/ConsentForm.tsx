@@ -5,10 +5,11 @@ import { Banner } from './Provenance';
 import { useMe } from '../screens/meContext';
 
 // DRAFT wording. It must be reviewed (legal and clinical) before use with real patients.
-export const NOTICE_VERSION = 'notice-v0-draft';
+export const NOTICE_VERSION = 'notice-v1-draft';
 export const NOTICE_TEXT =
   'We are recording your symptoms and health readings so the health team can decide who needs to be seen first. ' +
   'A nurse or doctor reviews every result. This system does not diagnose or decide your treatment. ' +
+  'To help choose the right questions and to translate what you say, the words we keep are sent to an outside computer service, after your name, phone number and other personal details are removed. The service does not make decisions about your care. ' +
   'Only staff at this facility can see your record, and every view is logged. You can withdraw your consent at any time.';
 
 export const SHARING_NOTICE_VERSION = 'sharing-notice-v0-draft';

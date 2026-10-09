@@ -50,20 +50,20 @@ const good: Generate = async r => {
 };
 
 beforeEach(() => {
-  w = { enc: encRow(), symptoms: [sym('s1', 'bukhar', 'hi'), sym('s2', 'khansi', 'or'), sym('s3', 'fever', 'en'), sym('s4', 'sir dard', 'hi', 'headache')], consents: [consent('care_triage'), consent('external_ai_processing')], triageConsent: true,
+  w = { enc: encRow(), symptoms: [sym('s1', 'bukhar', 'hi'), sym('s2', 'khansi', 'or'), sym('s3', 'fever', 'en'), sym('s4', 'sir dard', 'hi', 'headache')], consents: [consent('care_triage')], triageConsent: true,
     gen: good, sentToAi: [], runs: [], runFails: false, savedComplaint: [], savedSymptoms: [], audits: [], saveFails: false };
 });
 
 describe('consent', () => {
   it('without the patient\'s consent to outside AI nothing is sent, with a plain explanation', async () => {
-    w.consents = [consent('care_triage')];
+    w.consents = [];
     const r = await post(await make());
     expect(r.statusCode).toBe(403);
-    expect(r.json().issue[0].details.text).toMatch(/consented to an outside AI service/);
+    expect(r.json().issue[0].details.text).toMatch(/No active consent for triage/);
     expect(w.sentToAi).toHaveLength(0);
   });
   it.each([['revoked', { revoked_at: '2026-10-06T08:30:00Z' }], ['expired', { expires_at: '2026-10-05T00:00:00Z' }]])('a %s consent does not count', async (_n, over) => {
-    w.consents = [consent('external_ai_processing', over)];
+    w.consents = [consent('care_triage', over)];
     expect((await post(await make())).statusCode).toBe(403);
     expect(w.sentToAi).toHaveLength(0);
   });
@@ -95,7 +95,7 @@ describe('what is sent and what is saved', () => {
   });
   it('logs the outside call (sizes only) with the consent it relied on, before saving', async () => {
     await post(await make());
-    expect(w.runs).toEqual([{ status: 'ok', items: 3, chars: expect.any(Number), consentId: 'c-external_ai_processing' }]);
+    expect(w.runs).toEqual([{ status: 'ok', items: 3, chars: expect.any(Number), consentId: 'c-care_triage' }]);
     expect(JSON.stringify(w.runs)).not.toMatch(/bukhar|Anita/);
   });
   it('audits the translation without the text', async () => {

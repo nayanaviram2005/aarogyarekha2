@@ -76,7 +76,6 @@ function Workspace({ summary: s, onChanged }: { summary: EncounterSummary; onCha
   const [assessing, setAssessing] = useState(false);
   const [reportsKey, setReportsKey] = useState(0);
   const [sel, setSel] = useState<StepKey>('checkin');
-  const [aiHelp, setAiHelp] = useState<'ask' | null>(null);
   const [err, setErr] = useState<ApiError | Error | null>(null);
   const [answeredSince, setAnsweredSince] = useState(0);
   const editable = EDITABLE.has(s.encounter.status) && s.consentActive !== false;
@@ -98,7 +97,7 @@ function Workspace({ summary: s, onChanged }: { summary: EncounterSummary; onCha
   async function assess(skipSubmit = false) {
     if (!api) return;
     setAssessing(true); setErr(null);
-    try { if (!skipSubmit && pendingCount > 0) { await submitDrafts(api, s.encounter.id, pending); setDrafts({}); } const r = await api.assess(s.encounter.id); setAnsweredSince(0); setAiHelp(r.aiOpinion?.status === 'no_consent' ? 'ask' : null); await onChanged(); }
+    try { if (!skipSubmit && pendingCount > 0) { await submitDrafts(api, s.encounter.id, pending); setDrafts({}); } const r = await api.assess(s.encounter.id); setAnsweredSince(0); await onChanged(); }
     catch (e) { setErr(e as Error); }
     finally { setAssessing(false); }
   }
@@ -150,16 +149,6 @@ function Workspace({ summary: s, onChanged }: { summary: EncounterSummary; onCha
       <JourneyBar j={jr} selected={sel} onSelect={setSel} />
 
       {api && s.consentActive !== false && <RecordContextPanel api={api} encounterId={s.encounter.id} refreshKey={reportsKey} />}
-
-      {aiHelp === 'ask' && api && (
-        <section className="block" aria-label="Optional AI help">
-          <div className="block__body">
-            <Banner kind="info" title="An outside AI service could help with this patient">It would choose which questions fit the symptoms, word them for this patient, and give a second opinion on priority. It can raise the priority, never lower it. It needs the patient's separate agreement. You can skip this: the rules still work without it.</Banner>
-            <ConsentForm api={api} patientId={s.patient.id} purpose="external_ai_processing" onRecorded={() => { setAiHelp(null); void assess(); }} />
-            <button type="button" className="btn btn--small btn--quiet" onClick={() => setAiHelp(null)}>Skip for now</button>
-          </div>
-        </section>
-      )}
 
       {!EDITABLE.has(s.encounter.status) && <Banner kind="info">This encounter is {s.encounter.status} and can no longer be changed.</Banner>}
 

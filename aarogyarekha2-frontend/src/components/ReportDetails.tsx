@@ -4,10 +4,6 @@ import type { Api, DocumentMeta, Extraction } from '../lib/types';
 
 const AGREE: Record<string, string> = { agree: 'Two readers agree', differ: 'Readers differ', ai_only: 'AI only', ocr_only: 'Local reader only' };
 
-/**
- * The key details read from this encounter's reports, in one place. Values are copied as the report printed them: the printed range
- * and flag are shown as printed and never judged. A row is marked until a person has verified it.
- */
 export function ReportDetails({ api, encounterId, refreshKey = 0 }: { api: Api; encounterId: string; refreshKey?: number }) {
   const [reads, setReads] = useState<{ doc: DocumentMeta; x: Extraction }[] | null>(null);
   const [error, setError] = useState<string | null>(null);

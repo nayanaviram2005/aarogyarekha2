@@ -10,7 +10,6 @@ function Spark({ s }: { s: TrendSummary }) {
   return <svg width={w} height={h} role="img" aria-label={`Last ${pts.length} readings`}><polyline fill="none" stroke="currentColor" strokeWidth="1.5" points={pts.map((p, i) => `${x(i)},${y(p.value)}`).join(' ')} />{pts.map((p, i) => <circle key={i} cx={x(i)} cy={y(p.value)} r="2" fill="currentColor" />)}</svg>;
 }
 
-/** Blood pressure and sugar readings over this patient's visits. It says what the numbers did, never what they mean. */
 export function TrendPanel({ api, patientId, refreshKey }: { api: Api; patientId: string; refreshKey?: unknown }) {
   const [pts, setPts] = useState<TrendReading[] | null>(null);
   const [error, setError] = useState<Error | null>(null);

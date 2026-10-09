@@ -1,4 +1,3 @@
-// Database side of the status messages (migration 0019). System path: the caller has already been checked.
 import type { NotifyContext, SmsLogRow, SmsStore } from './notify.js';
 import type { Tier } from './messages.js';
 

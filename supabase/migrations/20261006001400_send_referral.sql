@@ -1,17 +1,3 @@
--- 0014 Sending a referral, atomically.
---
--- Sending discloses a patient's information to ANOTHER facility, so the rules that guard it live in the database, not only in
--- the API. In one transaction this function: checks the sender is a reviewer at the referring facility, checks the referral is
--- still a draft with a receiver and a written reason, checks the assessment being referred is still the latest AND has been
--- signed off by a reviewer, checks the patient has an active `referral_sharing` consent, then freezes the FHIR Bundle
--- (referrals.bundle + sha256), moves the referral to `requested`, the encounter to `referred` and the queue entry to `referred`.
--- The Bundle is built by the API (it needs every table); this function only accepts it, it does not inspect its contents.
---
--- It sets the transaction-local JWT subject to the sender so the existing triggers (event log, audit, lifecycle guard) record
--- WHO sent it, as they would for a direct user update.
---
--- Errors: P0002 not found · 42501 not allowed (hint 'referral_consent' when consent is missing) · 55000 wrong state
---         (hint 'needs_review' when not signed off) · 40001 assessment changed · 22023 incomplete draft / bad input
 create or replace function app.send_referral(
   p_user uuid, p_referral uuid, p_assessment uuid, p_bundle jsonb, p_sha256 text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -57,7 +43,7 @@ begin
     raise exception 'the patient has not consented to sharing this referral' using errcode = '42501', hint = 'referral_consent';
   end if;
 
-  perform set_config('request.jwt.claim.sub', p_user::text, true);   -- attribute the triggers' records to the sender
+  perform set_config('request.jwt.claim.sub', p_user::text, true);
 
   update public.referrals
      set status = 'requested', bundle = p_bundle, bundle_sha256 = decode(p_sha256, 'hex')

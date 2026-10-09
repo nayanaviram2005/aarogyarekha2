@@ -18,7 +18,7 @@ const auth = { authorization: 'Bearer ok' };
 describe('request bodies', () => {
   it('a POST with a JSON content-type and NO body is accepted as an empty request (not a 500)', async () => {
     const r = await (await make()).inject({ method: 'POST', url: `/encounters/${E}/submit`, headers: { ...auth, 'content-type': 'application/json' } });
-    expect(r.statusCode).toBe(404);          // reaches the route; the encounter is simply not visible
+    expect(r.statusCode).toBe(404);
   });
   it('malformed JSON is a plain 400, not a 500', async () => {
     const r = await (await make()).inject({ method: 'POST', url: '/encounters', headers: { ...auth, 'content-type': 'application/json' }, payload: '{"patientId": ' });

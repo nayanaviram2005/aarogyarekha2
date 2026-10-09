@@ -1,7 +1,3 @@
-// Follow-up schedules and their reminders (maternal visits, chronic check-ins, fever follow-up, vaccination).
-//  * planning a follow-up needs the encounter's triage consent and a clinician at the facility (row-level security),
-//  * a reminder to the PATIENT additionally needs their separate 'reminders' consent, checked here and again when sent,
-//  * nothing is sent from this file: reminders are stored as 'scheduled' and a worker sends them (src/reminders/core.ts).
 import { z } from 'zod';
 import type { RouteCtx, RouteHelpers } from './intake.js';
 import type { FollowupStore } from '../deps.js';

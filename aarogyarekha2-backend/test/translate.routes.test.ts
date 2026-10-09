@@ -43,7 +43,6 @@ const make = async () => {
 type App = Awaited<ReturnType<typeof make>>;
 const post = (app: App, token: string | null = 'clinician') => app.inject({ method: 'POST', url: `/encounters/${E}/translate`, headers: token ? { authorization: `Bearer ${token}` } : {} });
 
-/** A well-behaved model: echoes each id with an English line, keeping name placeholders. */
 const good: Generate = async r => {
   const st = JSON.parse(r.user).statements as { id: string; text: string }[];
   return { text: JSON.stringify({ translations: st.map(s => ({ id: s.id, english: `${s.text.match(/\[\[NAME_\d+\]\]/)?.[0] ?? 'Patient'} has fever for three days` })) }), provider: 'gemini', model: 'gemini-x' };
@@ -79,12 +78,12 @@ describe('consent', () => {
 describe('what is sent and what is saved', () => {
   it('sends only what still needs translating, grouped by language, with the patient\'s name and phone removed', async () => {
     await post(await make());
-    expect(w.sentToAi).toHaveLength(2);                                    // one call for Hindi, one for Odia
+    expect(w.sentToAi).toHaveLength(2);
     const all = w.sentToAi.map(s => s.user).join(' ');
     expect(all).not.toMatch(/Anita|Rao|9876543210|AR-0001/);
     expect(all).toContain('bukhar'); expect(all).toContain('khansi');
-    expect(all).not.toContain('"fever"');                                  // English text is not sent
-    expect(all).not.toContain('sir dard');                                 // already translated
+    expect(all).not.toContain('"fever"');
+    expect(all).not.toContain('sir dard');
   });
   it('saves translations: the complaint on the encounter (with the name restored) and symptoms by id', async () => {
     const r = await post(await make());

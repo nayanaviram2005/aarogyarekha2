@@ -1,4 +1,3 @@
-// Migration 0019 (status text messages) against the REAL schema in an in-process Postgres, including the store's own SQL.
 import type { PGlite } from '@electric-sql/pglite';
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -27,7 +26,7 @@ describe('the schema', () => {
     const e = await rows(`select enumlabel from pg_enum e join pg_type t on t.oid = e.enumtypid where t.typname = 'consent_purpose' order by e.enumsortorder`);
     expect(e.map(x => x.enumlabel)).toContain('status_messages');
     const ok = await rows(`select count(*)::int n from information_schema.columns where table_name = 'sms_log' and column_name in ('phone', 'body', 'text', 'message')`);
-    expect(ok[0].n).toBe(0);                                                          // never the number or the text
+    expect(ok[0].n).toBe(0);
   });
   it('rejects values outside the allowed lists', async () => {
     const e = await encounter(P1);
@@ -49,7 +48,7 @@ describe('the store\'s own SQL', () => {
     await consent(P1, 'status_messages'); expect((await s.context(e))!.consentActive).toBe(true);
     await s.log({ encounterId: e, patientId: P1, facilityId: F, kind: 'status', tier: 3, language: 'hi', result: 'sent', reason: null, provider: 'mock', providerId: 'M1', segments: 2 });
     await s.log({ encounterId: e, patientId: P1, facilityId: F, kind: 'status', tier: 2, language: 'hi', result: 'skipped', reason: 'no_phone', provider: 'mock', providerId: null, segments: null });
-    expect((await s.context(e))!.lastTier).toBe(3);                                    // only a message that was SENT counts as "told"
+    expect((await s.context(e))!.lastTier).toBe(3);
   });
   it('an unknown encounter is null; a revoked or expired consent does not count', async () => {
     expect(await store().context(randomUUID())).toBeNull();
@@ -71,7 +70,7 @@ describe('STOP: app.revoke_sms_consents', () => {
     for (const p of [a, b, other]) { await consent(p, 'status_messages'); await consent(p, 'reminders'); await consent(p, 'care_triage'); }
     const r = (await rows(`select app.revoke_sms_consents('+91 7777777777') r`))[0].r; expect(r.revoked).toBe(4);
     const left = await rows(`select patient_id, purpose::text p from public.consents where revoked_at is null and patient_id in ($1,$2,$3) order by 1, 2`, [a, b, other]);
-    expect(left.filter(x => x.patient_id === a || x.patient_id === b).map(x => x.p)).toEqual(['care_triage', 'care_triage']);        // care consent is untouched
+    expect(left.filter(x => x.patient_id === a || x.patient_id === b).map(x => x.p)).toEqual(['care_triage', 'care_triage']);
     expect(left.filter(x => x.patient_id === other).map(x => x.p).sort()).toEqual(['care_triage', 'reminders', 'status_messages']);
     const audit = (await rows(`select details from public.audit_events where entity_type = 'consent' order by id desc limit 1`))[0].details; expect(audit).toMatchObject({ op: 'sms_stop', revoked: 4 }); expect(JSON.stringify(audit)).not.toMatch(/7777777777/);
   });

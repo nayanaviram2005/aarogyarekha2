@@ -1,4 +1,3 @@
-// Calls app.send_referral (migration 0014) and turns its database errors into typed, plain-language failures.
 import type { Bundle } from 'fhir/r4';
 import type { PoolLike } from '../triage/persist.js';
 
@@ -11,7 +10,6 @@ export class SendError extends Error {
 export interface SendReferralArgs { senderId: string; referralId: string; assessmentId: string; bundle: Bundle; sha256: string }
 export interface SendReferralResult { referralId: string; status: string; sentAt: string; sha256: string; facilityId: string; toFacilityId: string; patientId: string; encounterId: string }
 
-// Wording is ours; database messages are never passed through.
 export const SEND_TEXT: Record<SendFailure, string> = {
   not_found: 'No such referral, or you do not have access.',
   forbidden: 'Only a nurse, doctor or medical officer at the referring facility can send a referral.',

@@ -43,7 +43,7 @@ describe('VoiceInput', () => {
     const box = await screen.findByLabelText(/Machine transcript, not reviewed/);
     expect(box).toHaveValue('bukhar teen din se');
     expect(a.transcribe).toHaveBeenCalledWith('e1', blob, 'hi');
-    expect(a.addSymptom).not.toHaveBeenCalled();                                   // nothing saved until the person says so
+    expect(a.addSymptom).not.toHaveBeenCalled();
     await userEvent.clear(box); await userEvent.type(box, 'bukhar aur khansi');
     await userEvent.click(screen.getByRole('button', { name: 'Save as symptom' }));
     await waitFor(() => expect(a.addSymptom).toHaveBeenCalledWith('e1', { text: 'bukhar aur khansi', lang: 'hi' }));

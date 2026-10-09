@@ -1,5 +1,3 @@
-// Read-only verification of the hosted project against the security properties the schema promises.
-// Usage: node --env-file=.env scripts/verify-live.mjs
 import pg from 'pg';
 
 const url = process.env.DATABASE_URL_POOLER?.replace(':6543/', ':5432/') || process.env.DATABASE_URL_DIRECT;

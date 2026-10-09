@@ -1,10 +1,7 @@
-// A limit on how many DIFFERENT patients' records one person opens in an hour. Someone who needs a few dozen patients in a busy hour is
-// normal; someone who opens hundreds is browsing, or their login is being used by someone else. Reaching the limit stops further
-// opens (until the hour slides on) and writes an audit entry that an administrator can see. It protects records even from a valid login.
 export interface AccessBudget { record(userId: string, patientId: string, now?: number): { count: number; exceeded: boolean; firstTime: boolean } }
 
 export function makeAccessBudget(limit: number, windowMs = 3_600_000): AccessBudget {
-  const seen = new Map<string, Map<string, number>>();   // user -> patient -> last time opened
+  const seen = new Map<string, Map<string, number>>();
   const alerted = new Map<string, number>();
   return {
     record(userId, patientId, now = Date.now()) {

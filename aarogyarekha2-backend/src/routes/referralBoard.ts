@@ -1,9 +1,3 @@
-// The receiving facility's side of a referral: an inbox, and the four responses (accept, decline, patient arrived, complete).
-//  * who may respond and which steps are legal is decided by the DATABASE (row-level security + the referral transition guard);
-//    this file only maps its refusals to plain words,
-//  * every response needs a verified second factor when the deployment requires it, and is audited,
-//  * accepting or starting care needs the patient's sharing consent to still be in force; declining never does,
-//  * a decline needs a reason, so the sending facility can act on it.
 import { z } from 'zod';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { RouteCtx, RouteHelpers } from './intake.js';

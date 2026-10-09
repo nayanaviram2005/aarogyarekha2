@@ -1,25 +1,3 @@
--- 0018 Getting patients off the queue: call in, complete the visit.
---
--- Queue states (queue_items.status) as used by the app:
---   waiting    in the queue, not yet called
---   in_review  called in / being seen (also set when a nurse or doctor signs off the priority)
---   seen       visit completed, treated here          (leaves the queue)
---   closed     visit completed, sent home              (leaves the queue)
---   no_show    did not wait / left before being seen   (leaves the queue)
---   referred   a referral was sent                      (leaves the queue; set by app.send_referral)
---
--- Two atomic functions do the changes, called by the API tier (service_role) with the person's id passed explicitly and re-checked
--- here, so they are safe even if the API is bypassed or buggy:
---   app.call_in(actor, encounter)                    waiting -> in_review, assigned to the actor, time recorded
---   app.complete_visit(actor, encounter, outcome)    in_review/waiting -> a finished state; the encounter is closed with the outcome
--- Rules:
---   * only people with an ACTIVE clinical role at the encounter's facility; completing a visit as treated or sent home needs a nurse,
---     doctor or medical officer, and the CURRENT assessment must already have been reviewed (a human signed it off). Recording that a
---     person did not wait needs no review (there is nothing to sign off).
---   * a patient already called in by someone else cannot be called in by another person (they are being seen),
---   * a referral is NOT completed here: sending the referral already takes the patient off the queue,
---   * every change writes an audit entry holding ids and the outcome code only.
--- SQLSTATEs: P0002 not found · 42501 not allowed · 55000 wrong state or already taken · 22023 bad input
 alter table public.encounters
   add column if not exists outcome text,
   add column if not exists closed_by uuid references auth.users(id) on delete set null;
@@ -99,7 +77,6 @@ begin
   return jsonb_build_object('encounterId', p_encounter, 'outcome', p_outcome, 'queueStatus', v_queue, 'facilityId', enc.facility_id, 'patientId', enc.patient_id);
 end $$;
 
--- The same lesson as 0012 and 0013: functions are PUBLIC-executable by default. Only the service role may call these.
 revoke all on function app.call_in(uuid, uuid) from public, anon, authenticated;
 grant execute on function app.call_in(uuid, uuid) to service_role;
 revoke all on function app.complete_visit(uuid, uuid, text) from public, anon, authenticated;

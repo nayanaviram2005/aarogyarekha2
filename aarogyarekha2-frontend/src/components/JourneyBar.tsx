@@ -1,9 +1,5 @@
 import type { Journey, StepKey } from '../lib/journey';
 
-/**
- * The steps of a triage-desk visit. Each one is a button: choosing it shows that step right here, so something already done can be
- * looked at or changed. The step the system recommends next is marked; the one on screen is highlighted.
- */
 export function JourneyBar({ j, selected, onSelect }: { j: Journey; selected: StepKey; onSelect: (k: StepKey) => void }) {
   return (
     <nav aria-label="Steps for this patient">

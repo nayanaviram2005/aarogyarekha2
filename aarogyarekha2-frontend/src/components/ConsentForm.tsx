@@ -4,7 +4,6 @@ import type { Api, ConsentInput } from '../lib/types';
 import { Banner } from './Provenance';
 import { useMe } from '../screens/meContext';
 
-// DRAFT wording. It must be reviewed (legal and clinical) before use with real patients.
 export const NOTICE_VERSION = 'notice-v1-draft';
 export const NOTICE_TEXT =
   'We are recording your symptoms and health readings so the health team can decide who needs to be seen first. ' +
@@ -34,7 +33,6 @@ export const STATUS_NOTICE_TEXT =
   'With your permission we will send a text message to your phone to tell you your place in the queue, in your language. ' +
   'It uses only your first name and your queue status. It does not say why you are being seen. You can say no, and you can reply STOP at any time to stop the messages.';
 
-/** `dialog` shows it as a pop-up over the page (for a prompt that interrupts work); `onCancel` lets the person close it without recording anything. */
 export function ConsentForm({ api, patientId, onRecorded, purpose = 'care_triage', facilityName = null, dialog = false, onCancel, intro }: { api: Api; patientId: string; onRecorded: () => void; purpose?: 'care_triage' | 'referral_sharing' | 'external_ai_processing' | 'reminders' | 'status_messages'; facilityName?: string | null; dialog?: boolean; onCancel?: () => void; intro?: ReactNode }) {
   const sharing = purpose === 'referral_sharing';
   const ai = purpose === 'external_ai_processing';
@@ -48,7 +46,6 @@ export function ConsentForm({ api, patientId, onRecorded, purpose = 'care_triage
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const needsWitness = method === 'verbal_witnessed';
-  // The common case in one tap: the patient agrees out loud and the person recording it is the witness. Other ways stay one click away.
   const staff = useMe()?.displayName?.trim() || null;
   const [full, setFull] = useState(false);
   async function quickAgree() {

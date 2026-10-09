@@ -1,7 +1,3 @@
-// Register a new patient. Row-level security decides who may (a clinician or health worker at that facility).
-//  * the facility is the caller's own unless they belong to several and name one,
-//  * a probable duplicate stops the registration until the staff member confirms it is a different person,
-//  * the audit entry holds ids only, never the name, number or address.
 import { z } from 'zod';
 import type { RouteCtx, RouteHelpers } from './intake.js';
 import { possibleDuplicates } from '../intake/duplicates.js';
@@ -30,7 +26,6 @@ export function registerPatientRoutes(c: RouteCtx, h: RouteHelpers): void {
 
     const me = await req.reader!.getMe().catch(() => undefined);
     if (me === undefined) return fail(reply, 502, 'transient', 'Your profile could not be loaded. Try again.');
-    // Only clinical staff register patients. A facility administrator manages people and audit, not patient records.
     const facilities = [...new Set(me.memberships.filter(m => ['health_worker', 'nurse', 'doctor', 'medical_officer'].includes(m.role)).map(m => m.facilityId))];
     const facilityId = b.facilityId ?? (facilities.length === 1 ? facilities[0] : undefined);
     if (!facilityId) return fail(reply, 400, 'invalid', facilities.length === 0 ? 'Only clinical staff at a facility can register patients.' : 'Choose which facility the patient is registered at.');

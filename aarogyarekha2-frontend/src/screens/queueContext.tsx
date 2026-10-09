@@ -24,7 +24,7 @@ export function QueueProvider({ children }: { children: ReactNode }) {
       if (!alive.current) return;
       setEntries(r.entries); setGeneratedAt(r.generatedAt); setError(null);
     } catch (e) {
-      if (alive.current) setError((e as Error).message);   // keep showing the last good list, but say it may be out of date
+      if (alive.current) setError((e as Error).message);
     } finally { if (alive.current) setLoading(false); }
   }, [api]);
 

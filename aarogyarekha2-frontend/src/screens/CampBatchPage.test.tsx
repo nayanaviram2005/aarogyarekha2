@@ -40,7 +40,7 @@ describe('CampBatchPage', () => {
     await waitFor(() => expect(screen.getAllByText(/In the queue and assessed/)).toHaveLength(2));
     expect(a.registerPatient).toHaveBeenCalledTimes(2); expect(a.recordConsent).toHaveBeenCalledWith('p1', expect.objectContaining({ witnessName: 'A. Witness', purpose: 'care_triage' }));
     expect(screen.getAllByRole('link', { name: 'Open' })[0]).toHaveAttribute('href', '/encounters/e1'); expect(h.refresh).toHaveBeenCalled();
-    expect(screen.getByLabelText('Name, row 1')).toBeDisabled();            // saved rows are locked
+    expect(screen.getByLabelText('Name, row 1')).toBeDisabled();
   });
   it('a person without recorded consent is NOT saved, and the row says why', async () => {
     const a = mkApi(); h.api = a; view();
@@ -63,7 +63,7 @@ describe('CampBatchPage', () => {
     expect(screen.getAllByText(/In the queue and assessed/)).toHaveLength(1);
     await userEvent.click(screen.getByRole('button', { name: 'Save 1 person' }));
     await waitFor(() => expect(screen.getAllByText(/In the queue and assessed/)).toHaveLength(2));
-    expect(a.registerPatient).toHaveBeenCalledTimes(2);                    // nobody registered twice
+    expect(a.registerPatient).toHaveBeenCalledTimes(2);
   });
   it('adds more rows', async () => {
     h.api = mkApi(); view(); await userEvent.click(screen.getByRole('button', { name: 'Add 5 rows' }));

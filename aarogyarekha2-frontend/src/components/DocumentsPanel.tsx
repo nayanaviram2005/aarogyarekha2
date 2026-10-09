@@ -11,14 +11,13 @@ export const KIND_LABEL: Record<DocumentKind, string> = {
 };
 export const MAX_MB = 10;
 const ACCEPT = '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png';
-/** Tests that are also measurements taken at intake. A VERIFIED row can be copied across with one click. */
 export const VITAL_FOR_TEST: Record<string, string> = { temperature: 'temperature_c', pulse: 'pulse_bpm', spo2: 'spo2_pct' };
 const LANGS: OcrLanguage[] = ['en', 'hi', 'or'];
 
 const size = (n: number) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 const labelOf = (name: string) => name.replace(/_/g, ' ');
 
-interface Props { api: Api; encounterId: string; editable: boolean; onMeasurementAdded?: () => void; /** Called after a report was read or a row was verified, so other sections can refresh. */ onReadingChanged?: () => void }
+interface Props { api: Api; encounterId: string; editable: boolean; onMeasurementAdded?: () => void; onReadingChanged?: () => void }
 
 export function DocumentsPanel({ api, encounterId, editable, onMeasurementAdded, onReadingChanged }: Props) {
   const [docs, setDocs] = useState<DocumentMeta[] | null>(null);
@@ -165,7 +164,6 @@ const AGREEMENT_TEXT: Record<NonNullable<ExtractedField['agreement']>, { chip: s
   ai_only: { chip: 'AI only', text: v => `Only the AI model found this row (value read: ${v ?? 'unclear'}). Check it against the report.`, warn: true },
   ocr_only: { chip: 'Local reader only', text: () => 'The AI model did not read this row.', warn: false },
 };
-/** Two readers are extra evidence for the person verifying. They are never a verdict: every row still needs a person's confirmation. */
 function SecondRead({ f }: { f: ExtractedField }) {
   if (!f.agreement) return null;
   const a = AGREEMENT_TEXT[f.agreement];

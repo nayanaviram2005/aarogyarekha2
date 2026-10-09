@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { flagSuspicious, RULES, type AuditRow } from '../src/admin/suspicious.js';
 
-const NOW = new Date('2026-10-07T12:00:00Z');                    // 17:30 IST
+const NOW = new Date('2026-10-07T12:00:00Z');
 let id = 0;
 const ev = (over: Partial<AuditRow> & { minsAgo?: number } = {}): AuditRow => {
   const { minsAgo = 5, ...rest } = over;
@@ -45,11 +45,11 @@ describe('refusals and failed sign-ins', () => {
 describe('night reads (India time)', () => {
   const at = (hourIst: number, i: number): AuditRow => { const d = new Date('2026-10-06T00:00:00Z'); d.setUTCHours(hourIst - 5, 30 - 60 + i); return ev({ occurred_at: d.toISOString(), patient_id: `n${i}` }); };
   it('flags 10 reads between 22:00 and 06:00 IST', () => {
-    const rows = Array.from({ length: 10 }, (_, i) => ev({ occurred_at: new Date(Date.UTC(2026, 9, 6, 18, 40 + i * 5)).toISOString(), patient_id: `n${i}` }));   // ~00:10 IST+
+    const rows = Array.from({ length: 10 }, (_, i) => ev({ occurred_at: new Date(Date.UTC(2026, 9, 6, 18, 40 + i * 5)).toISOString(), patient_id: `n${i}` }));
     expect(kinds(rows)).toContain('off_hours_reads');
   });
   it('the same number during the day is not flagged', () => {
-    const rows = Array.from({ length: 12 }, (_, i) => ev({ occurred_at: new Date(Date.UTC(2026, 9, 6, 6, i * 20)).toISOString(), patient_id: `d${i}` }));   // 11:30 IST onward
+    const rows = Array.from({ length: 12 }, (_, i) => ev({ occurred_at: new Date(Date.UTC(2026, 9, 6, 6, i * 20)).toISOString(), patient_id: `d${i}` }));
     expect(kinds(rows)).not.toContain('off_hours_reads'); void at;
   });
   it('9 night reads are not enough', () => {

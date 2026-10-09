@@ -1,9 +1,5 @@
 import type { EncounterSummary } from './types';
 
-/**
- * Extra questions that belong to a type of visit. Answers are saved as ordinary notes ("Label: answer") on the encounter, so they are
- * on the record and in the referral note. They do NOT change the triage tier: the tier comes only from the rule set.
- */
 export interface TemplateField { key: string; label: string; hint?: string; options?: string[] }
 export interface ChecklistItem { key: string; label: string; source: 'note' | 'vital' }
 
@@ -47,7 +43,6 @@ export const noteFor = (f: TemplateField, answer: string) => `${f.label}: ${answ
 
 export interface ChecklistRow { key: string; label: string; source: 'note' | 'vital'; done: boolean; field?: TemplateField }
 
-/** What this type of visit usually needs, and what is already recorded. Informational: it never changes the tier. */
 export function scenarioChecklist(scenario: string, s: EncounterSummary): ChecklistRow[] {
   const t = TEMPLATES[scenario]; if (!t) return [];
   const notes = noteText(s); const kinds = new Set(s.vitals.map(v => v.kind));

@@ -1,4 +1,3 @@
-// Microphone recording in the browser. Audio stays in memory; it is never written to disk or local storage.
 export interface Recording { stop(): Promise<Blob>; cancel(): void }
 
 export const canRecord = (): boolean =>
@@ -6,7 +5,6 @@ export const canRecord = (): boolean =>
 
 const PREFERRED = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
 
-/** Starts recording. Rejects with a plain-language Error if the microphone is blocked or missing. */
 export async function startRecording(): Promise<Recording> {
   let stream: MediaStream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
@@ -19,6 +17,6 @@ export async function startRecording(): Promise<Recording> {
   rec.start();
   return {
     stop: () => new Promise<Blob>(resolve => { rec.onstop = () => { release(); resolve(new Blob(chunks, { type: rec.mimeType || mimeType || 'audio/webm' })); }; rec.stop(); }),
-    cancel: () => { rec.onstop = null; try { rec.stop(); } catch { /* already stopped */ } release(); },
+    cancel: () => { rec.onstop = null; try { rec.stop(); } catch { } release(); },
   };
 }

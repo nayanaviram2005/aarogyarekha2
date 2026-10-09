@@ -1,5 +1,3 @@
-// Reads a generated lab-style PDF with the real local reader and shows what the registration form would be filled with.
-// Run: npx tsx scripts/ocr-identity-check.ts [path-to-your-own-pdf-or-image]   (invented data only unless you pass a file)
 import { readFileSync } from 'node:fs';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { chooseReader } from '../src/ocr/engines.js';
@@ -17,7 +15,7 @@ else {
   lines.forEach((t, i) => p.drawText(t, { x: 40, y: 780 - i * 22, size: 11, font: f }));
   bytes = Buffer.from(await d.save());
 }
-if (mime === 'application/pdf') bytes = (await stripLinks(bytes)).bytes;      // the upload does the same
+if (mime === 'application/pdf') bytes = (await stripLinks(bytes)).bytes;
 const read = await chooseReader('local')({ bytes, mime });
 console.log('engine:', read.engine, 'confidence:', read.confidence);
 console.log('identity:', parseIdentity(read.text));

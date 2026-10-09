@@ -3,7 +3,6 @@ import { formatTime } from '../lib/format';
 import { buildTimeline, KIND_LABEL } from '../lib/timeline';
 import type { EncounterSummary } from '../lib/types';
 
-/** What happened, in order, from recorded facts only. Original wording is kept in the language it was given. */
 export function Timeline({ summary }: { summary: EncounterSummary }) {
   const { t } = useI18n();
   const events = buildTimeline(summary);

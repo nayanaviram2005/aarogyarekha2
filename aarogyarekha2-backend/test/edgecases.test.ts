@@ -1,5 +1,3 @@
-// Systematic edge cases: the odd, hostile and broken inputs every part of the pipeline must survive without crashing,
-// without leaking personal details, and without ever making a patient look LESS urgent.
 import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
 import { assertClean, PiiLeak, redact, restore } from '../src/ai/redact.js';
@@ -102,7 +100,7 @@ describe('lab text parsing: garbage in, nothing invented', () => {
 describe('files and pictures: broken and hostile', () => {
   it('empty, tiny and wrong-type bytes are refused with a reason', () => { for (const b of [Buffer.alloc(0), Buffer.from([0xff]), Buffer.from('MZ\x90\x00'), Buffer.from('<?php echo 1; ?>')]) expect(makeSafe(b, 'image/jpeg').ok).toBe(false); });
   it('a PNG whose header claims a gigantic size is refused before it is decoded (decompression bomb)', () => {
-    const p = new PNG({ width: 2, height: 2 }); const bytes = Buffer.from(PNG.sync.write(p)); bytes.writeUInt32BE(60000, 16); bytes.writeUInt32BE(60000, 20);       // IHDR width and height
+    const p = new PNG({ width: 2, height: 2 }); const bytes = Buffer.from(PNG.sync.write(p)); bytes.writeUInt32BE(60000, 16); bytes.writeUInt32BE(60000, 20);
     expect(makeSafe(bytes, 'image/png').ok).toBe(false);
   });
   it('a truncated JPEG or PNG makes the quality check throw cleanly and enhance return the original', () => {

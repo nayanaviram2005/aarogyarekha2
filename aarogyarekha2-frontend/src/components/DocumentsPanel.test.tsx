@@ -136,7 +136,7 @@ describe('reading results and verifying rows', () => {
     render(<DocumentsPanel api={api} encounterId="e1" editable onMeasurementAdded={onM} />);
     await userEvent.click(await screen.findByRole('button', { name: 'Read results' }));
     const btns = await screen.findAllByRole('button', { name: 'Use as measurement' });
-    expect(btns).toHaveLength(1);                                                         // not pulse (unverified), not haemoglobin (not a measurement)
+    expect(btns).toHaveLength(1);
     await userEvent.click(btns[0]!);
     await waitFor(() => expect(api.addVital).toHaveBeenCalledWith('e1', { kind: 'temperature_c', value: 38.4 }));
     expect(onM).toHaveBeenCalled();

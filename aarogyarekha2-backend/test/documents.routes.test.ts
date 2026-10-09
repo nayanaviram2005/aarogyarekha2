@@ -18,7 +18,6 @@ const jpegWithGps = () => Buffer.concat([Buffer.from([0xff, 0xd8]), seg(0xe0, Bu
 const goodPdf = async () => { const d = await PDFDocument.create(); const f = await d.embedFont(StandardFonts.Helvetica); d.addPage().drawText('Haemoglobin 9.1 g/dL', { font: f, size: 12 }); return Buffer.from(await d.save()); };
 const jsPdf = async () => { const d = await PDFDocument.create(); d.addPage(); d.catalog.set(PDFName.of('OpenAction'), d.context.obj({ S: 'JavaScript', JS: PDFString.of('app.alert(1)') })); return Buffer.from(await d.save({ useObjectStreams: true })); };
 
-/** A real multipart/form-data body. */
 function form(fields: Record<string, string>, file?: { name: string; type: string; data: Buffer }) {
   const B = '----testboundary7MA4YWxkTrZu0gW';
   const parts: Buffer[] = [];
@@ -73,11 +72,11 @@ describe('a good upload', () => {
     expect(r.json()).toMatchObject({ kind: 'photo', mimeType: 'image/jpeg', status: 'clean' });
     expect(r.json().metadataBytesRemoved).toBeGreaterThan(0);
     const up = w.uploaded[0]!;
-    expect(up.bytes.toString('latin1')).not.toContain('GPS-SECRET');                                // metadata never reached storage
+    expect(up.bytes.toString('latin1')).not.toContain('GPS-SECRET');
     expect(up.mime).toBe('image/jpeg');
     expect(up.path).toMatch(new RegExp(`^${F}/${P}/[0-9a-f-]{36}\\.jpg$`));
     expect(w.created[0]).toMatchObject({ patientId: P, encounterId: E, facilityId: F, kind: 'photo', mimeType: 'image/jpeg', sizeBytes: up.bytes.length, originalFilename: 'IMG_0001.jpg' });
-    expect(w.finished[0]).toMatchObject({ sizeBytes: up.bytes.length, sha256: createHash('sha256').update(up.bytes).digest('hex') });   // checksum of the CLEAN bytes
+    expect(w.finished[0]).toMatchObject({ sizeBytes: up.bytes.length, sha256: createHash('sha256').update(up.bytes).digest('hex') });
     expect(w.created[0]!.id).toBe(w.finished[0]!.documentId);
   });
   it('accepts a clean PDF', async () => {

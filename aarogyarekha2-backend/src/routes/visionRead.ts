@@ -1,6 +1,3 @@
-// The AI second read of a report image. Never throws: any problem becomes a status, and the local OCR result stands alone.
-// Needs the patient's separate consent to outside AI processing (an image cannot be redacted), and every call is logged before the
-// rows are used. The image itself is never stored by us.
 import type { FastifyRequest } from 'fastify';
 import type { Deps, DocumentRow } from '../deps.js';
 import { AiError } from '../ai/provider.js';

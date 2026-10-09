@@ -94,7 +94,6 @@ describe('non-diagnostic by construction', () => {
     const comp = find<{ section: { title: string; text: { div: string } }[] }>(b, 'Composition')[0]!;
     for (const s of comp.section.filter(x => x.title !== 'Reason for referral')) {
       const text = s.text.div.replace(/<[^>]+>/g, ' ');
-      // The fixed notice legitimately contains "diagnose"; it is a constant we write.
       if (s.title === 'Notice') continue;
       expect(checkNonDiagnostic(text).allowed, `${s.title}: ${text}`).toBe(true);
     }

@@ -1,7 +1,3 @@
-// Sends ONE recording through the real speech-to-text path to check that the chosen provider, key and model work for Hindi or Odia.
-// Use a recording of invented words only (no real patient). Prints the outcome, never the key.
-//   node --env-file=../.env --import tsx scripts/stt-check.ts <audio-file> [en|hi|or]
-// Accepted files: .webm .ogg .wav .m4a/.mp4 (the same containers the app accepts), up to 2 MB.
 import { readFileSync } from 'node:fs';
 import { AiEnv, AiError, envForTask } from '../src/ai/provider.js';
 import { MAX_AUDIO_BYTES, makeTranscriber, sniffAudio, type SttLanguage } from '../src/ai/stt.js';

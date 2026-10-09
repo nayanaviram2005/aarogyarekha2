@@ -35,7 +35,7 @@ describe('selectRelevantSigns', () => {
   it('the AI can only add; it cannot remove a core sign, and unknown codes are ignored', () => {
     const r = selectRelevantSigns(adult(), rs, 'stomach pain', ['persistent_vomiting', 'not_a_real_sign']);
     expect(r.source).toBe('ai'); expect(r.signs).toContain('persistent_vomiting'); expect(r.signs).not.toContain('not_a_real_sign'); for (const s of CORE_SIGNS.slice(0, 5)) expect(r.signs).toContain(s);
-    expect(r.signs).not.toContain('mental_health_crisis');                      // topics are NOT added on top of the AI's choice
+    expect(r.signs).not.toContain('mental_health_crisis');
   });
   it('without the AI it falls back to topic matching on the words', () => {
     const r = selectRelevantSigns(adult(), rs, 'severe stomach pain and vomiting', null);

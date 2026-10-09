@@ -153,7 +153,6 @@ describe('Twilio sender', () => {
 });
 
 describe('Twilio request signature', () => {
-  // The worked example in Twilio's own documentation.
   const url = 'https://mycompany.com/myapp.php?foo=1&bar=2';
   const params = { CallSid: 'CA1234567890ABCDE', Caller: '+12349013030', Digits: '1234', From: '+12349013030', To: '+18005551212' };
   it('accepts the signature Twilio documents for that example', () => { expect(twilioSignatureValid('12345', url, params, '0/KCTR6DLpKmkAf8muzZqo1nDgQ=')).toBe(true); });

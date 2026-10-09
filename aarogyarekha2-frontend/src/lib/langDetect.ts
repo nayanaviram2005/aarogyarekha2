@@ -1,9 +1,3 @@
-/**
- * Guesses the language of a short piece of text, from the writing system first.
- * Devanagari letters mean Hindi here, Odia letters mean Odia. Plain Latin letters are English unless they contain common Hindi
- * words written in English letters ("bukhar", "dard"), which is how many people type on a phone.
- * It is a SUGGESTION shown to the person typing. It never changes a saved language by itself.
- */
 export type Detected = 'en' | 'hi' | 'or' | 'unknown';
 export interface Detection { lang: Detected; romanizedHindi: boolean; mixed: boolean }
 
@@ -11,7 +5,6 @@ const DEVANAGARI = /[ऀ-ॿ]/g;
 const ODIA = /[଀-୿]/g;
 const LATIN = /[A-Za-z]/g;
 
-/** Common Hindi words typed in English letters. Not exhaustive; a hit needs at least one and the text must have no English-only symptom words alone. */
 const ROMAN_HI = new Set(['bukhar', 'bukhaar', 'khansi', 'khasi', 'dard', 'sir', 'pet', 'ulti', 'dast', 'kamzori', 'saans', 'sans', 'chakkar', 'jukam', 'zukam', 'gala', 'seene', 'sine', 'peeth', 'kamar', 'pasina', 'bhookh', 'pyaas', 'neend', 'ghabrahat', 'thand', 'sujan', 'khoon', 'peshab', 'hai', 'hain', 'se', 'ko', 'mein', 'nahi', 'nahin', 'bahut', 'teen', 'din', 'raat']);
 const STRONG_ROMAN_HI = new Set(['bukhar', 'bukhaar', 'khansi', 'ulti', 'dast', 'kamzori', 'chakkar', 'jukam', 'zukam', 'pasina', 'peshab', 'ghabrahat', 'dard']);
 
@@ -35,7 +28,6 @@ export function detectLanguage(text: string): Detection {
   return { lang: 'en', romanizedHindi: false, mixed };
 }
 
-/** The suggestion to show when the typed text and the chosen language disagree, or null. */
 export function languageSuggestion(text: string, chosen: string): { lang: 'en' | 'hi' | 'or'; message: string } | null {
   const d = detectLanguage(text);
   if (d.lang === 'unknown' || d.lang === chosen) return null;

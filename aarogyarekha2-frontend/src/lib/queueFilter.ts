@@ -1,12 +1,11 @@
 import type { QueueEntry } from './types';
 
-/** Filters for the queue list. A filter only HIDES rows on this screen; it never changes the order or the priority. */
 export interface QueueFilter {
-  tiers: ReadonlySet<number | 'none'>;         // empty = all
-  scenario: string;                            // '' = all
-  language: string;                            // '' = all
-  facilityId: string;                          // '' = all
-  minWaitMinutes: number;                      // 0 = all
+  tiers: ReadonlySet<number | 'none'>;
+  scenario: string;
+  language: string;
+  facilityId: string;
+  minWaitMinutes: number;
 }
 export const NO_FILTER: QueueFilter = { tiers: new Set(), scenario: '', language: '', facilityId: '', minWaitMinutes: 0 };
 
@@ -25,7 +24,6 @@ export function applyQueueFilter(entries: QueueEntry[], f: QueueFilter, now: Dat
   });
 }
 
-/** Distinct values present in the queue, for the dropdowns. */
 export const queueFacets = (entries: QueueEntry[]) => ({
   scenarios: [...new Set(entries.map(e => e.scenario))].sort(),
   languages: [...new Set(entries.map(e => e.patient.preferred_language))].sort(),

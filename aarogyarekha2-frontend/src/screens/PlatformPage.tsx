@@ -7,7 +7,6 @@ import { useAuth } from '../auth/AuthProvider';
 const TYPES = Object.keys(FACILITY_TYPE_LABEL);
 const blank = { name: '', type: 'phc', state: '', district: '', pincode: '', code: '' };
 
-/** For platform administrators: add a facility, switch one on or off, and say who administers it. No patient data is shown here. */
 export function PlatformPage() {
   const { api } = useAuth();
   const [rows, setRows] = useState<PlatformFacilityView[] | null>(null);

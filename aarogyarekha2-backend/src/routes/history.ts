@@ -1,7 +1,3 @@
-// Reported medical history: conditions, allergies, medicines, family history, exposures, immunisations.
-// Recorded exactly as told. The system never comments on a medicine, a dose or an interaction.
-//  * reading and adding need the patient's triage consent and access to the patient (row-level security),
-//  * a reviewer (nurse, doctor, medical officer) can mark an entry "confirmed by staff". Unconfirmed entries are shown as such.
 import { z } from 'zod';
 import type { RouteCtx, RouteHelpers } from './intake.js';
 import type { HistoryStore } from '../deps.js';

@@ -1,9 +1,5 @@
 import type { Api, InputsPatch } from './types';
 
-/**
- * Answers to follow-up questions are collected on screen first and saved together when the reviewer presses Submit. Nothing is sent
- * while answering, so the reviewer can change their mind and the questions do not jump around under their hands.
- */
 export type Draft =
   | { kind: 'bool'; value: boolean }
   | { kind: 'level'; value: string }
@@ -20,7 +16,6 @@ export const VITAL_FIELDS: Record<string, { kinds: { kind: string; label: string
 
 const isNumber = (s: string | undefined) => (s ?? '').trim() !== '' && Number.isFinite(Number(s));
 
-/** A draft counts only when it is complete: a yes/no or a level was chosen, or every number of a measurement was typed. */
 export function draftReady(fieldCode: string, d: Draft | undefined): boolean {
   if (!d) return false;
   if (d.kind === 'bool' || d.kind === 'level') return true;
@@ -44,7 +39,6 @@ export function buildSubmission(drafts: Record<string, Draft>): Submission {
   return { inputs, vitals, count };
 }
 
-/** Saves everything at once: one call for the yes/no and level answers, then each measurement. Throws on the first failure. */
 export async function submitDrafts(api: Api, encounterId: string, drafts: Record<string, Draft>): Promise<number> {
   const s = buildSubmission(drafts);
   if (Object.keys(s.inputs).length > 0) await api.saveInputs(encounterId, s.inputs);

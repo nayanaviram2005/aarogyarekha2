@@ -1,6 +1,3 @@
-// Automated accessibility checks (axe-core) on the screens and panels. This catches missing labels, bad roles, duplicate ids,
-// empty buttons, wrong heading use, and similar. It CANNOT judge colour contrast (jsdom has no layout) or whether a screen reader
-// reads things in a sensible order: those still need a person. See docs/05-frontend.md.
 import { render, waitFor } from '@testing-library/react';
 import axe from 'axe-core';
 import { MemoryRouter } from 'react-router-dom';

@@ -1,4 +1,3 @@
-// Runs the evaluation cases through the real engine and summarises how it behaves. Pure: no I/O.
 import { triage } from '../triage/engine.js';
 import type { RuleSet, Tier, TriageDecision, TriageInput } from '../triage/types.js';
 import { CASES, type CaseGroup, type EvalCase } from './cases.js';
@@ -8,12 +7,11 @@ export interface Summary {
   total: number; scored: number; gaps: number;
   match: number; under: number; over: number; withinOne: number;
   exactRate: number; underRate: number; overRate: number;
-  confusion: Record<string, number>;                       // "expected->actual": n
+  confusion: Record<string, number>;
   byGroup: Record<string, { n: number; match: number; under: number; over: number }>;
   results: CaseResult[];
 }
 
-/** Tiers are 1 (most urgent) to 4. "Under-triage" = the engine is LESS urgent than the label, which is the dangerous direction. */
 export function evaluate(rs: RuleSet, cases: EvalCase[] = CASES): Summary {
   const results: CaseResult[] = cases.map(c => {
     const d = triage(c.input, rs);
@@ -35,7 +33,6 @@ export function evaluate(rs: RuleSet, cases: EvalCase[] = CASES): Summary {
   };
 }
 
-// ------------------------------------------------------------------ invariants (properties the engine must keep for ANY input)
 const SIGNS = ['airway_obstructed_or_not_breathing', 'severe_respiratory_distress', 'central_cyanosis', 'shock_signs', 'unconscious_or_convulsing_now', 'lethargic', 'convulsions_this_illness', 'vomits_everything', 'severe_pallor', 'severe_pain', 'convulsions_in_pregnancy', 'any_vaginal_bleeding', 'fever_in_pregnancy'];
 function rng(seed: number) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 2 ** 32; }; }
 const pick = <T,>(r: () => number, xs: T[]): T => xs[Math.floor(r() * xs.length)]!;
@@ -53,9 +50,8 @@ export function randomInput(r: () => number): TriageInput {
 
 export interface InvariantReport { runs: number; failures: { invariant: string; example: TriageInput }[] }
 
-/** Properties that must hold for every input: adding a danger sign or an outside hint never makes the result LESS urgent; the same input always gives the same answer; tier and urgency colour always agree. */
 export function checkInvariants(rs: RuleSet, runs = 2000, seed = 20261007, engine: (i: TriageInput, rs: RuleSet) => TriageDecision = triage): InvariantReport {
-  const triage = engine;                                   // lets a test hand in a deliberately broken engine to prove the checks can fail
+  const triage = engine;
   const r = rng(seed); const failures: InvariantReport['failures'] = [];
   const fail = (invariant: string, example: TriageInput) => { if (failures.length < 20) failures.push({ invariant, example }); };
   const COLOR = { 1: 'red', 2: 'orange', 3: 'yellow', 4: 'green' } as const;

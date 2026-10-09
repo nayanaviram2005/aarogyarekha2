@@ -1,12 +1,7 @@
-/**
- * Plain summary of one measurement over time. It says what the numbers did, never what they mean:
- * no "controlled", "worsening" or "normal". Direction compares the latest reading with the average of the earlier ones.
- */
 export interface TrendPoint { kind: string; value: number; unit: string; at: string }
 export type Direction = 'higher' | 'lower' | 'steady' | 'single';
 export interface TrendSummary { kind: string; unit: string; n: number; latest: TrendPoint; previous: TrendPoint | null; min: number; max: number; direction: Direction; points: TrendPoint[] }
 
-/** A change smaller than this share of the earlier average is called "steady". A display choice, not a clinical limit. */
 export const STEADY_BELOW = 0.05;
 
 export function summarizeTrend(points: TrendPoint[], kind: string): TrendSummary | null {

@@ -1,6 +1,3 @@
-// Sends ONE synthetic sentence through the real translation path to check that the chosen provider, key and model work.
-// Uses invented text only (no patient data). Prints the outcome, never the key.
-//   AI_PROVIDER=gemini npm --prefix aarogyarekha2-backend run ai:smoke      (also: claude, openai, openrouter)
 import { AiEnv, makeProvider, AiError } from '../src/ai/provider.js';
 import { translateToEnglish } from '../src/ai/translate.js';
 

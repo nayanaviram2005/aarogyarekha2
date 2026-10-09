@@ -1,10 +1,3 @@
-// A live check of every AI path with INVENTED data, using the keys in .env. Prints what came back, never a key.
-//   node --env-file=../.env --import tsx scripts/ai-live.ts          (from aarogyarekha2-backend)
-//
-// It runs, against the real service:
-//   1. translation (Hindi),  2. the priority opinion + chosen and reworded follow-up questions on four invented cases,
-//   3. the report reader (vision) on a synthetic lab PDF, compared with the local parser.
-// Nothing here touches the database.
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { AiEnv, AiError, envForTask, makeProvider } from '../src/ai/provider.js';
 import { translateToEnglish } from '../src/ai/translate.js';
@@ -22,7 +15,6 @@ const err = (e: unknown) => (e instanceof AiError ? `${e.kind}: ${e.message}` : 
 const timed = async <T,>(label: string, f: () => Promise<T>): Promise<T | null> => { const t = Date.now(); try { const r = await f(); console.log(`  (${((Date.now() - t) / 1000).toFixed(1)} s)`); return r; } catch (e) { console.log(`  FAILED ${label}: ${err(e)}`); process.exitCode = 1; return null; } };
 const show = (task: 'TRANSLATE' | 'TRIAGE' | 'VISION') => { const e = envForTask(env, task); const p = makeProvider(e); console.log(`[${task}] provider: ${p.name}  model: ${p.model || '(not set)'}`); return { e, p }; };
 
-// ---------------------------------------------------------------- 1. translation
 console.log('\n1. Translation (Hindi to English)');
 {
   const { p } = show('TRANSLATE');
@@ -30,7 +22,6 @@ console.log('\n1. Translation (Hindi to English)');
   if (o) console.log('  translated:', JSON.stringify([...o.translated.values()]), ' rejected:', o.rejected.length);
 }
 
-// ---------------------------------------------------------------- 2. priority opinion, chosen questions, wording
 console.log('\n2. Priority opinion, question choice and wording');
 const rs = { ...RULESET_PROPOSED, status: 'approved' as const };
 const cases: { name: string; input: TriageInput; complaint: string; symptoms: string[]; expect: string }[] = [
@@ -60,7 +51,6 @@ for (const c of cases) {
   if (odd.length && c.name.startsWith('plain')) { console.log(`  CHECK: unrelated-looking questions in the list: ${odd.join(', ')}`); process.exitCode = 1; }
 }
 
-// ---------------------------------------------------------------- 3. report reader
 console.log('\n3. Report reader (vision) on a synthetic lab PDF');
 {
   const { e } = show('VISION');

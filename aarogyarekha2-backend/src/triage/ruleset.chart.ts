@@ -1,20 +1,3 @@
-// Danger-sign flags taken from a published six-level GP triage chart ("Triage chart", General Practice Triage System,
-// gptriage.info, Medics for Life 2016). We use the CHART'S LIST OF FLAGS AND ITS URGENCY LEVELS, re-worded in our own plain
-// language and re-labelled with review-priority words. Nothing here is a diagnosis or a treatment.
-//
-// How its six priorities map onto our four tiers (a build-team choice, for a clinician to confirm or change):
-//   chart priority 1 (ambulance)                    -> tier 1 (red)
-//   chart priority 2 (emergency department)         -> tier 2 (orange)
-//   chart priorities 3, 4 and 5 (discuss now,
-//     within 30 minutes, come in now)               -> tier 3 (yellow)
-//   chart priority 6 (appointment today)            -> tier 4 (green, the default, so no flag is needed)
-//
-// Honest limits: it is an Australian telephone-triage chart for a GP practice, written for a call-taker, not for Indian primary
-// care. A flag is only as good as the answer to its question, and the answer comes from whoever is asking. No clinician has
-// reviewed this list or the tier mapping. It is part of PROPOSED v0.2.0 and is not in use until that is registered and approved.
-//
-// Two chart entries are not copied as written: "severe pain for any reason" appears at priority 1 and again at priority 3; we keep
-// the existing adult/child severe-pain flags at tier 3. "Death of a patient" is not a triage flag.
 import type { FloorRule, Population, Tier } from './types.js';
 
 const SRC = (p: number) => `GP triage chart (Medics for Life 2016), priority ${p}, re-worded. Australian GP chart, not validated for Indian facilities; needs clinical review`;

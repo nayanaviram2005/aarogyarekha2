@@ -5,7 +5,6 @@ import type { Api, DoneEntry, QueueEntry } from '../lib/types';
 
 const TIERS = [1, 2, 3, 4] as const;
 
-/** How full the queue is, at a glance: who waits at each priority, who is in review, and how many were finished today. */
 export function QueueCounts({ entries, doneCount, onShowDone, showingDone }: { entries: QueueEntry[]; doneCount: number | null; onShowDone: () => void; showingDone: boolean }) {
   const waiting = entries.filter(e => e.queueStatus !== 'in_review');
   const seeing = entries.length - waiting.length;
@@ -19,7 +18,6 @@ export function QueueCounts({ entries, doneCount, onShowDone, showingDone }: { e
   );
 }
 
-/** Patients who were seen or sent on in the last day. They have left the queue; the list is kept for the day so nothing is lost track of. */
 export function DoneToday({ api, onLoaded }: { api: Api; onLoaded?: (n: number) => void }) {
   const [rows, setRows] = useState<DoneEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);

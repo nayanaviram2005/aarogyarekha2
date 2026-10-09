@@ -1,9 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 
-/**
- * A pop-up over the page, for something that must be answered before work can continue (for example consent). Escape or the Close button
- * dismisses it; focus moves into it and returns to where it was; the page behind does not scroll.
- */
 export function Modal({ label, onClose, children }: { label: string; onClose?: () => void; children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {

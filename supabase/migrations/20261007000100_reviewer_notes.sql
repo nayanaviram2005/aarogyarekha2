@@ -1,10 +1,3 @@
--- 0015 reviewer notes: comments, escalations and "was this helpful" feedback from a nurse or doctor.
--- Append-only (like review_actions). Never changes a priority: a priority change is a review (app.record_review).
---   comment      a free-text note for the next person to read
---   escalation   "please look at this now / ask a senior": needs a reason
---   feedback_up / feedback_down   whether the draft assessment was helpful; an optional note says what was wrong
--- Apply with: npm run db:migrate   (then npm run db:verify)
-
 create table public.reviewer_notes (
   id            uuid primary key default gen_random_uuid(),
   encounter_id  uuid not null references public.encounters(id) on delete restrict,

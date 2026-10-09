@@ -1,16 +1,3 @@
--- 0013 Reviewer sign-off, atomically.
---
--- A review does three things that must succeed or fail TOGETHER: append the human decision to review_actions, apply an
--- urgency override to the queue entry, and move the encounter into review. Users cannot write queue urgency (column grant),
--- so this runs as a SECURITY DEFINER function called by the API tier (service_role) with the reviewer's id passed explicitly.
--- The function re-checks everything itself, so it is safe even if the API is bypassed or buggy:
---   * the reviewer must be a nurse / doctor / medical officer at the encounter's facility (health workers cannot sign off),
---   * the reviewer must name the assessment they looked at; if a newer one exists the review is refused (stale),
---   * an assessment can be approved once; it cannot be approved again by someone else without a new assessment,
---   * an override needs a reason; making the case LESS urgent than the rules said needs an explicit confirmation,
---   * rows are locked per encounter so two reviewers cannot interleave.
--- Errors use distinct SQLSTATEs so the API can answer in plain words:
---   P0002 not found · 42501 not a reviewer · 55000 wrong state · 40001 stale assessment · 23505 already reviewed · 22023 bad input
 create or replace function app.record_review(
   p_reviewer          uuid,
   p_encounter         uuid,
@@ -76,7 +63,6 @@ begin
     end if;
     select rank into v_rank_from  from public.urgency_levels where code = v_from;
     select rank into v_rank_rules from public.urgency_levels where code = latest.urgency_code;
-    -- "Downgrade" means LESS urgent than the rules concluded (a larger rank number), not just less urgent than the current queue.
     v_downgrade := v_rank_to > v_rank_rules;
     if v_downgrade and not coalesce(p_confirm_downgrade, false) then
       raise exception 'making the case less urgent than the rules set needs confirmation' using errcode = '22023', hint = 'confirm_downgrade';
@@ -98,6 +84,5 @@ begin
     'facilityId', enc.facility_id, 'patientId', enc.patient_id);
 end $$;
 
--- Same lesson as 0012: functions are PUBLIC-executable by default. Only the service role may call this one.
 revoke all on function app.record_review(uuid, uuid, uuid, public.review_action_type, text, text, boolean) from public, anon, authenticated;
 grant execute on function app.record_review(uuid, uuid, uuid, public.review_action_type, text, text, boolean) to service_role;

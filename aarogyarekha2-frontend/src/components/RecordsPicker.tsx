@@ -6,10 +6,6 @@ import type { Api, DocumentKind, OcrLanguage, RecordIdentity } from '../lib/type
 let counter = 0;
 const STATE: Record<RecordFile['state'], string> = { reading: 'Reading…', read: 'Read', unreadable: 'Could not be read', failed: 'Failed', needs_consent: 'Photo: needs the patient’s agreement' };
 
-/**
- * Add a patient's records (lab reports, discharge summaries, prescriptions) during intake. Each one is read here and what it says about the
- * person is passed up to fill the form. Nothing is stored until the visit is created; then the files are attached to it.
- */
 export function RecordsPicker({ api, files, setFiles, language, onIdentity, disabled = false }: {
   api: Api; files: RecordFile[]; setFiles: (f: (cur: RecordFile[]) => RecordFile[]) => void; language: string; onIdentity?: (i: RecordIdentity) => void; disabled?: boolean;
 }) {

@@ -2,10 +2,6 @@ import { loadEnv, type Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
-// The shared ../.env holds secrets (service-role key, database passwords). Vite is told EXACTLY which values to expose to
-// the browser, by name. The Supabase URL and anon key are public by design (the anon key can only do what RLS allows).
-// Do not add anything else here without thinking about who can read the built bundle.
-/** Built pages only (the dev server needs inline scripts for hot reload). Scripts may come only from this site; the page may talk only to this site, the API and Supabase; it cannot be framed. */
 function securityPolicy(env: Record<string, string>): Plugin {
   const origin = (u: string) => { try { return new URL(u).origin; } catch { return ''; } };
   const api = origin(env.VITE_API_URL || 'http://127.0.0.1:8787'), sb = origin(env.SUPABASE_URL || '');

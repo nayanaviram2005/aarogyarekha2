@@ -1,14 +1,3 @@
-// Marks the registered triage rule set as approved FOR THE HACKATHON DEMO, with a citation that says exactly what is and is
-// not true. It does NOT claim a clinician reviewed anything.
-//
-//   npm run ruleset:approve-demo               # shows what it would do, changes nothing
-//   npm run ruleset:approve-demo -- --confirm  # records the approval
-//   npm run ruleset:approve-demo -- --retire   # takes the approval back (status 'retired'); assessments stop being stored
-//
-// Why this exists: the database refuses to store an assessment against a rule set that is not 'approved'. For a demo on
-// SYNTHETIC patients that gate has to be opened by a person, on the record, with an honest citation. That is this script.
-// Never replace the citation with wording that implies clinical validation. When a clinician has really verified the rules,
-// approve with a real citation instead (docs/03-triage-algorithm.md) and set RULES_CLINICALLY_VALIDATED in the frontend.
 import pg from 'pg';
 import { RULESET_DRAFT } from '../src/triage/ruleset.draft.js';
 import { RULESET_PROPOSED } from '../src/triage/ruleset.proposed.js';
@@ -19,7 +8,6 @@ export const DEMO_CITATION =
   'danger signs and RCP NEWS2 (2017). NOT verified against the primary documents. NOT clinically validated. ' +
   'Synthetic data only. Not for use with real patients.';
 
-// Default approves v0.1.1. Pass --proposed to approve the PROPOSED v0.2.0 for the demo instead (register it first with --proposed).
 const RS = process.argv.includes('--proposed') ? RULESET_PROPOSED : RULESET_DRAFT;
 const confirm = process.argv.includes('--confirm');
 const retire = process.argv.includes('--retire');

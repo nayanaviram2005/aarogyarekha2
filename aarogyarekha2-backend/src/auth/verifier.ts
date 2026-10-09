@@ -1,11 +1,3 @@
-// Checking a sign-in token against the auth service, without hammering it.
-//
-//  * A token just proven genuine is remembered for `cacheMs` (a screen makes a dozen calls at once with the same token).
-//  * Identical checks that are already in flight share one answer.
-//  * "Could not check" (the service is slow, rate-limited or unreachable) is tried once more, then, ONLY for a token that was proven
-//    genuine within the last `staleMs`, the earlier proof is used. A token never seen before, or last proven longer ago, is refused
-//    with an error the caller turns into "service busy" (503): it is never read as "invalid".
-//  * "Invalid" (the service answered that the token is not good) is final: nothing is remembered and nothing is reused.
 import { createHash } from 'node:crypto';
 
 export type Lookup<W> = (token: string) => Promise<{ ok: W } | { invalid: true } | { unavailable: string }>;

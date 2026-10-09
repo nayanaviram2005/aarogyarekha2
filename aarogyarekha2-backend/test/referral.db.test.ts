@@ -1,4 +1,3 @@
-// Exercises app.send_referral (migration 0014) against the REAL schema in an in-process Postgres.
 import type { PGlite } from '@electric-sql/pglite';
 import { createHash, randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -16,7 +15,6 @@ const send = (u: string, ref: string, asm: string, bundle: unknown = BUNDLE, sha
 const fails = async (p: Promise<unknown>) => { try { await p; return null; } catch (e) { const x = e as { code?: string; message: string; hint?: string }; return { code: x.code, message: x.message, hint: x.hint }; } };
 
 interface Opts { reviewed?: boolean; consent?: boolean; to?: string | null; reason?: string | null; status?: string; reviewer?: string }
-/** A submitted encounter with an assessment, optionally reviewed, a draft referral, and optionally a sharing consent. */
 async function make(o: Opts = {}) {
   const { reviewed = true, consent = true, to = F2, reason = 'Needs assessment at a higher facility.', status = 'submitted' } = o;
   const e = randomUUID(), a = randomUUID(), r = randomUUID(), pt = randomUUID();

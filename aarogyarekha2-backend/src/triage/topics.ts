@@ -1,7 +1,3 @@
-// Coarse fallback for "which questions fit these symptoms" when no AI is available. Plain keyword matching on the symptom words,
-// English only (text in Hindi or Odia is translated first when the patient consented; otherwise only the core questions show).
-// This is deliberately blunt: it errs toward asking a few extra questions of a group, never toward hiding the core ones.
-// Every sign in the rule set must belong to at least one topic (a test checks), so no question can become unreachable.
 export interface Topic { id: string; label: string; test: RegExp; signs: string[] }
 
 export const TOPICS: Topic[] = [
@@ -31,7 +27,6 @@ export const TOPICS: Topic[] = [
     signs: ['restless_or_irritable', 'severe_pallor', 'severe_visible_wasting', 'swelling_both_feet', 'breathing_difficulty_not_severe', 'poisoning_reported', 'severe_pain', 'urgent_referral_in', 'carer_very_worried', 'child_not_passing_urine'] },
 ];
 
-/** Shown when the patient is pregnant, whatever the symptoms say. */
 export const PREGNANCY_SIGNS = ['severe_abdominal_pain', 'reduced_fetal_movement', 'leaking_fluid_or_labour_pains', 'fever_in_pregnancy', 'breathing_difficulty_pregnancy', 'any_vaginal_bleeding', 'pain_in_pregnancy'];
 
 export function topicSigns(words: string, pregnant: boolean): string[] {

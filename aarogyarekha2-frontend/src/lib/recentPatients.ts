@@ -1,7 +1,3 @@
-/**
- * The last few records opened in THIS tab, so a nurse on a shared computer can jump back quickly.
- * Kept in sessionStorage (gone when the tab closes). It holds only the visit id and the record number, never a name or any detail.
- */
 const KEY = 'aarogyarekha.recent';
 export interface Recent { encounterId: string; ref: string }
 const MAX = 6;
@@ -15,8 +11,8 @@ export function readRecent(storage: Pick<Storage, 'getItem'> | null): Recent[] {
 
 export function pushRecent(storage: Pick<Storage, 'getItem' | 'setItem'> | null, r: Recent): Recent[] {
   const next = [r, ...readRecent(storage).filter(x => x.encounterId !== r.encounterId)].slice(0, MAX);
-  try { storage?.setItem(KEY, JSON.stringify(next)); } catch { /* storage blocked */ }
+  try { storage?.setItem(KEY, JSON.stringify(next)); } catch { }
   return next;
 }
 
-export function clearRecent(storage: Pick<Storage, 'removeItem'> | null) { try { storage?.removeItem(KEY); } catch { /* ignore */ } }
+export function clearRecent(storage: Pick<Storage, 'removeItem'> | null) { try { storage?.removeItem(KEY); } catch { } }

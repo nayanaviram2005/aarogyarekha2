@@ -19,7 +19,6 @@ const encounter: EncounterRow = {
   closed_at: null, created_at: '2026-10-06T09:00:00Z', updated_at: '2026-10-06T10:00:00Z',
 };
 
-/** A reader that behaves like RLS: only returns rows the "token" is entitled to. */
 const readerFor = (visible: { patient?: boolean; encounter?: boolean }): UserReader => ({
   getPatient: async id => (visible.patient && id === PID ? patient : null),
   getIdentifiers: async () => [],

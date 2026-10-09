@@ -1,6 +1,5 @@
 import { TEMPLATES } from '../lib/scenarioTemplates';
 
-/** The extra questions for a visit type. Answers are kept by the caller and saved as ordinary notes. */
 export function TemplateFields({ scenario, values, onChange, lang, disabled }: { scenario: string; values: Record<string, string>; onChange: (v: Record<string, string>) => void; lang: string; disabled?: boolean }) {
   const t = TEMPLATES[scenario]; if (!t || t.fields.length === 0) return null;
   const set = (k: string, v: string) => onChange({ ...values, [k]: v });

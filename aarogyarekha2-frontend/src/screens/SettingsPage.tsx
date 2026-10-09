@@ -6,7 +6,6 @@ import { rolesByFacility, rolesOf } from '../lib/account';
 import { useLowData } from '../lib/lowBandwidth';
 import { useMe } from './meContext';
 
-/** Personal settings. Things that change how this person works with the app: nothing here changes any patient record or any rule. */
 export function SettingsPage() {
   const me = useMe();
   const { mfa, demo } = useAuth();

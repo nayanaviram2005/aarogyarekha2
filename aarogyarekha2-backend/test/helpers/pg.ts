@@ -1,4 +1,3 @@
-// An in-process Postgres (PGlite) with the real migrations applied and Supabase's auth/storage/role plumbing stubbed.
 import { PGlite } from '@electric-sql/pglite';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';

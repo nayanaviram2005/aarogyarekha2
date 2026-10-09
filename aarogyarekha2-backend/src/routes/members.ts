@@ -1,8 +1,3 @@
-// People and roles for a facility administrator: see who works here, add an existing account, change a role, remove someone.
-//  * a facility administrator can give clinical roles only. Making or changing a facility administrator is for a platform
-//    administrator, and nobody can change their own role (the database functions enforce all of it again),
-//  * every change needs a verified second factor when the deployment requires it, and is audited with ids and the role name,
-//  * adding is by email of an EXISTING account. This service cannot create sign-in accounts; the person signs up first.
 import { z } from 'zod';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { RouteCtx, RouteHelpers } from './intake.js';
@@ -24,7 +19,6 @@ export function registerMemberRoutes(c: RouteCtx, h: RouteHelpers): void {
     if (ids.length === 0) { fail(reply, 403, 'forbidden', 'Administrator access is needed for this screen.'); return null; }
     return ids;
   }
-  /** The facility this change is for: the one named, or the only one the caller administers. Null after sending the refusal. */
   function pick(reply: FastifyReply, fac: string[], named?: string): string | null {
     const id = named ?? (fac.length === 1 ? fac[0] : undefined);
     if (!id) { fail(reply, 400, 'invalid', 'Choose which facility this is for.'); return null; }

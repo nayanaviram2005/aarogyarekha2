@@ -1,25 +1,18 @@
-// Shapes returned by the AarogyaRekha backend (see aarogyarekha2-backend/src/deps.ts and routes/).
 export type UrgencyCode = 'red' | 'orange' | 'yellow' | 'green';
 export type Tier = 1 | 2 | 3 | 4;
 export type Sex = 'female' | 'male' | 'other' | 'unknown';
 
-/** Second factor (authenticator app) helpers. Backed by Supabase Auth; the app never sees the secret after enrolment. */
 export interface MfaApi {
-  /** Does this user already have a verified authenticator? */
   hasFactor(): Promise<boolean>;
-  /** Starts enrolment: a QR picture (data URI) and the same secret as text for typing by hand. */
   enroll(): Promise<{ factorId: string; qr: string; secret: string }>;
-  /** Checks the 6-digit code. Returns an error message, or null when the session is now verified. */
   verify(code: string, factorId?: string): Promise<string | null>;
 }
 
 export interface Me {
-  /** 'aal2' = a second factor was verified in this session. */
   aal?: 'aal1' | 'aal2';
   mfaRequired?: boolean;
   userId: string;
   displayName: string | null;
-  /** Platform administrators manage facilities and have no facility role of their own. */
   isPlatformAdmin?: boolean;
   memberships: { facilityId: string; facilityName: string | null; facilityType: string | null; role: string }[];
 }
@@ -35,9 +28,7 @@ export interface QueueEntry {
   assessed: boolean; urgencyCode: UrgencyCode | null; tier: number | null; potentialTier: number | null;
   missingCount: number; winningLabel: string | null; vulnerable: boolean;
   queueStatus: string | null; waitingSince: string | null; assessmentVersion: number | null;
-  /** What the rules produced. `tier` is the effective tier, which a reviewer may have changed. */
   engineTier: number | null;
-  /** A reviewer has signed off the current assessment. */
   reviewed: boolean;
 }
 export interface QueueResponse { generatedAt: string; entries: QueueEntry[] }
@@ -94,7 +85,6 @@ export interface AssessResponse {
   queue: { urgency: UrgencyCode; downgradeSuggested: boolean };
   followUps: FollowUp[]; followUpsSaved: boolean;
   ruleSet: { name: string; version: string; status: string; hash: string };
-  /** Whether an AI model could help with this assessment (priority opinion and choosing the questions). */
   aiOpinion?: { status: 'ok' | 'not_set_up' | 'no_consent' | 'unavailable' | 'unusable' };
   questionsFrom?: 'ai' | 'topics' | 'core_only' | 'all';
 }
@@ -144,7 +134,6 @@ export interface ReferralMeta {
   id: string; encounterId: string; patientId: string; status: ReferralStatus; priority: ReferralPriority; reasonText: string | null;
   toFacility: { id: string; name: string | null } | null; sentAt: string | null; createdAt: string; bundleSha256: string | null;
 }
-/** A FHIR R4 document Bundle. Only the parts the screen reads are typed. */
 export interface FhirBundle { resourceType: 'Bundle'; type: string; timestamp?: string; entry?: { fullUrl?: string; resource: { resourceType: string; id?: string; [k: string]: unknown } }[] }
 export interface ReferralView {
   referral: ReferralMeta; preview: boolean; bundle: FhirBundle;
@@ -170,7 +159,6 @@ export interface DocumentMeta { id: string; encounterId: string | null; kind: Do
 export interface ExtractedField {
   id: string; name: string; printedLine: string | null; valueText: string | null; valueNum: number | null; unit: string | null; referenceRange: string | null;
   printedFlag: 'low' | 'high' | 'abnormal' | 'normal' | null; confidence: number | null; verified: boolean; verifiedAt: string | null;
-  /** What an AI model read for this row, and how it compares with the local reader. Null when no second read was made. */
   secondRead?: string | null; agreement?: 'agree' | 'differ' | 'ocr_only' | 'ai_only' | null;
 }
 export interface Extraction { id: string; documentId: string; engine: string; status: 'pending' | 'completed' | 'failed'; language: string | null; averageConfidence: number | null; error: string | null; createdAt: string; fields: ExtractedField[] }
@@ -236,7 +224,6 @@ export interface Api {
   addNote(encounterId: string, body: { kind: NoteKind; body?: string; assessmentId?: string }): Promise<{ id: string }>;
   analytics(days: 7 | 30 | 90): Promise<AnalyticsView>;
   documents(encounterId: string): Promise<DocumentMeta[]>;
-  /** Reads one record (nothing is stored) and says who it seems to be about. */
   readRecord(file: File, language?: OcrLanguage, aiConsent?: boolean): Promise<RecordPreview>;
   recordContext(encounterId: string): Promise<RecordContext>;
   uploadDocument(encounterId: string, file: File, kind: DocumentKind): Promise<{ id: string; metadataBytesRemoved: number; quality?: { warnings: { code: string; text: string }[] } }>;

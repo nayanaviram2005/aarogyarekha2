@@ -105,7 +105,7 @@ describe('PDF: active content is refused (heuristic, not antivirus)', () => {
   it('does not mistake harmless words for active content', () => {
     expect(makeSafe(pdfWith('/Title (JavaScript for beginners, the JS guide)'))).toMatchObject({ ok: true });
     expect(makeSafe(pdfWith('/Author (AAron)'))).toMatchObject({ ok: true });
-    expect(makeSafe(pdfWith('/OpenAction [3 0 R /Fit]'))).toMatchObject({ ok: true });   // a normal 'open at page 1' setting
+    expect(makeSafe(pdfWith('/OpenAction [3 0 R /Fit]'))).toMatchObject({ ok: true });
   });
 });
 

@@ -21,7 +21,7 @@ describe('confirming the priority', () => {
     const review = vi.fn().mockResolvedValue({ reviewId: 'r' }); const onDone = vi.fn();
     render(<ReviewPanel {...base} api={api(review)} onDone={onDone} />);
     await userEvent.click(screen.getByRole('button', { name: 'Confirm priority' }));
-    expect(review).not.toHaveBeenCalled();                                         // one click is not enough
+    expect(review).not.toHaveBeenCalled();
     expect(screen.getByText(/Nurse Rao/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Sign off' }));
     expect(review).toHaveBeenCalledWith('e1', { action: 'approve', assessmentId: 'a1' });
@@ -110,11 +110,11 @@ describe('changing the priority', () => {
     expect(screen.queryByText(/danger-sign rule set this priority/i)).not.toBeInTheDocument();
   });
   it('a change relative to a reviewer-lowered case still compares against what the RULES said', async () => {
-    render(<ReviewPanel {...base} effectiveUrgency="green" api={api()} />);   // already lowered to routine
+    render(<ReviewPanel {...base} effectiveUrgency="green" api={api()} />);
     await open();
-    await userEvent.selectOptions(screen.getByLabelText('New priority'), '3');   // yellow is still lower than orange
+    await userEvent.selectOptions(screen.getByLabelText('New priority'), '3');
     expect(screen.getByText(/Lower than the rules set/)).toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByLabelText('New priority'), '2');   // equal to the rules: no warning
+    await userEvent.selectOptions(screen.getByLabelText('New priority'), '2');
     expect(screen.queryByText(/Lower than the rules set/)).not.toBeInTheDocument();
   });
 });

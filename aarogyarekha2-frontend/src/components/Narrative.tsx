@@ -1,10 +1,5 @@
 import { Fragment, type ReactNode } from 'react';
 
-/**
- * Shows a FHIR narrative (an XHTML <div>) WITHOUT putting its markup into the page.
- * The string is parsed into a detached document and rebuilt as React elements from an allow-list: paragraphs, lists,
- * bold and italic. Anything else (scripts, images, links, event handlers, unknown tags) is dropped and only its text is kept.
- */
 const ALLOWED: Record<string, string> = { P: 'p', UL: 'ul', OL: 'ol', LI: 'li', STRONG: 'strong', B: 'strong', EM: 'em', I: 'em', BR: 'br' };
 
 function render(node: Node, key: string): ReactNode {

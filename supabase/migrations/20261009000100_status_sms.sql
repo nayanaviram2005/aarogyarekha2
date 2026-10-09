@@ -1,11 +1,3 @@
--- 0019 Text-message (SMS) status updates to the patient.
---
---  * a new consent purpose, 'status_messages': the patient agrees to a text with their queue status. It is separate from the other consents.
---  * sms_log: one row per message the system tried to send. It holds ids, the status that was announced, the language, the template
---    and the provider's message id. It NEVER holds the phone number or the text. Staff at the facility may read it; only the service
---    role writes it.
---  * app.revoke_sms_consents(phone): called when a recipient replies STOP. It ends the 'status_messages' and 'reminders' consents of every
---    patient registered with that number (a number can be shared by a family), and writes an audit entry holding counts only.
 alter type public.consent_purpose add value if not exists 'status_messages';
 
 create table if not exists public.sms_log (
@@ -14,7 +6,7 @@ create table if not exists public.sms_log (
   patient_id     uuid not null references public.patients(id) on delete restrict,
   facility_id    uuid not null references public.facilities(id) on delete restrict,
   kind           text not null check (kind in ('status', 'moved_down')),
-  tier           smallint not null check (tier between 1 and 4),          -- 1 immediate, 2 very urgent, 3 urgent, 4 routine
+  tier           smallint not null check (tier between 1 and 4),
   language       text not null check (language in ('en', 'hi', 'or')),
   result         text not null check (result in ('sent', 'failed', 'skipped')),
   reason         text check (reason is null or reason in ('no_consent', 'no_phone', 'bad_phone', 'opted_out', 'not_configured', 'provider_error', 'duplicate')),

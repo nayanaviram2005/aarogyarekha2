@@ -17,7 +17,6 @@ describe('reading accuracy on the synthetic corpus (text path)', () => {
   it('finds nearly every result and gets the number, unit and printed flag right', async () => {
     const s = await scoreCorpus(makeCorpus(40, 1));
     const recall = rate(s.found, s.expected), value = rate(s.valueCorrect, s.expected), unit = rate(s.unitCorrect, s.found), flag = rate(s.flagCorrect, s.found);
-    // These floors are what the parser reaches today on invented, clean reports. They are NOT a promise for photos of real reports.
     expect(recall, `recall ${recall}`).toBeGreaterThanOrEqual(0.97); expect(value, `values ${value}`).toBeGreaterThanOrEqual(0.97); expect(unit, `units ${unit}`).toBeGreaterThanOrEqual(0.97); expect(flag, `flags ${flag}`).toBeGreaterThanOrEqual(0.95);
   }, 120_000);
   it('does not turn headers, dates or page numbers into results', async () => {

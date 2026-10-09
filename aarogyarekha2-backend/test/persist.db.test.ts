@@ -1,6 +1,3 @@
-// Runs the REAL migrations (all 12) in an in-process Postgres (PGlite) and exercises assessEncounter against them.
-// Supabase's auth/storage/role plumbing is stubbed, as in supabase/tests/validate.mjs. This proves the SQL and the
-// database-side guarantees; it does not replace a run against the hosted project.
 import { PGlite } from '@electric-sql/pglite';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -110,7 +107,7 @@ describe('persisting an assessment', () => {
 
   it('stores no diagnosis anywhere in the note', async () => {
     const a = (await rows(`select note from public.triage_assessments where encounter_id = $1`, [E]))[0];
-    const { disclaimer, ...derived } = a.note;                                   // the disclaimer legitimately says "does not diagnose"
+    const { disclaimer, ...derived } = a.note;
     expect(disclaimer).toBe(DISCLAIMER);
     expect(JSON.stringify(derived).toLowerCase()).not.toContain('diagnos');
   });
@@ -121,7 +118,7 @@ describe('persisting an assessment', () => {
   });
 
   it('the queue is escalate-only: a better re-run is suggested as a downgrade but does not lower the queue', async () => {
-    const r = await assessEncounter(pool, args('t-approved', adult()));              // all normal -> green
+    const r = await assessEncounter(pool, args('t-approved', adult()));
     expect(r.decision.urgencyCode).toBe('green');
     expect(r.queueUrgency).toBe('red');
     expect(r.downgradeSuggested).toBe(true);
@@ -131,7 +128,7 @@ describe('persisting an assessment', () => {
   it('a fresh encounter starts at its own urgency and a worse re-run raises it', async () => {
     const first = await assessEncounter(pool, args('t-approved', adult(), E2));
     expect(first.queueUrgency).toBe('green');
-    const worse = await assessEncounter(pool, args('t-approved', adult({ consciousness: 'voice' }), E2));   // NEWS2 single 3 -> T2
+    const worse = await assessEncounter(pool, args('t-approved', adult({ consciousness: 'voice' }), E2));
     expect(worse.queueUrgency).toBe('orange');
     expect(worse.downgradeSuggested).toBe(false);
   });

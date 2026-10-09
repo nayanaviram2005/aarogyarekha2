@@ -1,9 +1,3 @@
-// LIVE end-to-end run of the intake path through the HTTP API, as the seeded health worker at facility A.
-//   1) in one terminal:  npm --prefix aarogyarekha2-backend run dev
-//   2) in another:       npm --prefix aarogyarekha2-backend run test:intake
-// Creates ONE new synthetic encounter for "Seed Patient 02" (a child) and walks it through intake. Rows are permanent
-// (audit is append-only by design); everything is synthetic. Assessment succeeds only once the rule set is APPROVED;
-// until then the expected result is a plain 503 saying so, and that is reported as a pass.
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'node:fs';
 

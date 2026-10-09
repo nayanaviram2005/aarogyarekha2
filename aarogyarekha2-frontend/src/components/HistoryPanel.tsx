@@ -6,10 +6,6 @@ import { Banner } from './Provenance';
 const KIND: Record<HistoryKind, string> = { allergy: 'Allergies', medication: 'Medicines being taken', reported_condition: 'Conditions reported', family_history: 'Family history', occupational_exposure: 'Work exposures', immunisation: 'Immunisations', other: 'Other' };
 const ORDER: HistoryKind[] = ['allergy', 'medication', 'reported_condition', 'family_history', 'occupational_exposure', 'immunisation', 'other'];
 
-/**
- * What the patient or staff REPORTED, written down as told. The system does not comment on a medicine, a dose or an allergy.
- * An entry is shown as "Reported" until a nurse or doctor confirms it.
- */
 export function HistoryPanel({ api, patientId, editable, canConfirm, defaultLanguage }: { api: Api; patientId: string; editable: boolean; canConfirm: boolean; defaultLanguage: string }) {
   const [rows, setRows] = useState<HistoryEntry[] | null>(null);
   const [error, setError] = useState<Error | null>(null);

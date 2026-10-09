@@ -1,4 +1,3 @@
-// The reminder claim/mark SQL against the REAL schema in an in-process Postgres.
 import type { PGlite } from '@electric-sql/pglite';
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -36,7 +35,7 @@ describe('claimDue', () => {
     expect(got).toMatchObject({ channel: 'sms', facilityName: 'Seed PHC Khordha', language: 'hi', phone: '+919876543210', consentActive: true });
     expect(got.dueAt).toBe('2026-10-20T04:00:00.000Z');
     expect((await status(a.rm)).status).toBe('sent');
-    expect((await store().claimDue(NOW, 100)).some(x => x.id === a.rm)).toBe(false);          // second runner gets nothing
+    expect((await store().claimDue(NOW, 100)).some(x => x.id === a.rm)).toBe(false);
   });
   it('leaves alone: future ones, already-sent ones, and ones whose follow-up was stopped', async () => {
     const future = await setup({ due: '2026-10-25T00:00:00Z' }), sent = await setup({ status: 'sent' }), stopped = await setup({ active: false });
@@ -73,7 +72,7 @@ describe('marking', () => {
   it('markSent moves a repeating schedule on by its cadence from the last due date, once', async () => {
     const a = await setup({ cadence: 28 }); await store().markSent(a.rm, NOW);
     expect((await rows(`select next_due_at from public.followup_schedules where id = $1`, [a.sc]))[0].next_due_at.toISOString()).toBe('2026-11-17T04:00:00.000Z');
-    await store().markSent(a.rm, NOW);                                                         // the new date is in the future now: no second jump
+    await store().markSent(a.rm, NOW);
     expect((await rows(`select next_due_at from public.followup_schedules where id = $1`, [a.sc]))[0].next_due_at.toISOString()).toBe('2026-11-17T04:00:00.000Z');
   });
   it('a one-off schedule keeps its date', async () => {

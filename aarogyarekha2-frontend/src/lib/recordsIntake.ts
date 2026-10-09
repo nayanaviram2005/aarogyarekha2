@@ -1,15 +1,10 @@
 import type { DocumentKind, RecordIdentity } from './types';
 
-/**
- * Records added during a new-patient intake. They are read first (nothing is stored), the details found are offered to the person
- * registering, and the files are attached to the visit when it is created. The usual consent, duplicate and audit steps all apply.
- */
 export interface RecordFile { key: string; file: File; kind: DocumentKind; state: 'reading' | 'read' | 'unreadable' | 'failed' | 'needs_consent'; note?: string; rows?: number; aiConsent?: boolean }
 export const MAX_FILES = 5;
 
 export interface Identityish { fullName: string; sex: 'female' | 'male' | 'other' | 'unknown'; age: string; birthDate: string; phone: string }
 
-/** Fills only what is still empty, so what staff typed is never overwritten. A birth date wins over an age, and never both. */
 export function applyIdentity<T extends Identityish>(d: T, found: RecordIdentity): T {
   const out = { ...d };
   if (!out.fullName.trim() && found.fullName) out.fullName = found.fullName;

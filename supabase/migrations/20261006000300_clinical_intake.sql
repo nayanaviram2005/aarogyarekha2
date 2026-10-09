@@ -1,6 +1,3 @@
--- 0003 encounters (triage episodes), symptoms, vitals, documents, extraction.
--- Nothing here records a diagnosis. Free-text is patient/worker-reported input.
-
 create table public.encounters (
   id                          uuid primary key default gen_random_uuid(),
   patient_id                  uuid not null references public.patients(id) on delete restrict,
@@ -12,11 +9,11 @@ create table public.encounters (
   chief_complaint_original    text,
   chief_complaint_translated  text,
   translation_confidence      numeric(3,2) check (translation_confidence between 0 and 1),
-  group_ref                   text,                 -- hostel block / shift / camp id (cluster & batch views)
+  group_ref                   text,
   context                     jsonb not null default '{}'::jsonb check (jsonb_typeof(context) = 'object'),
   submitted_at                timestamptz,
   closed_at                   timestamptz,
-  retention_until             date,                 -- [OPEN: retention periods undefined; no default]
+  retention_until             date,
   created_by                  uuid references auth.users(id) on delete set null,
   created_at                  timestamptz not null default now(),
   updated_at                  timestamptz not null default now(),
@@ -35,8 +32,8 @@ create table public.symptom_entries (
   lang              text,
   text_translated   text,
   source            public.input_source not null default 'patient',
-  asr_confidence    numeric(3,2) check (asr_confidence between 0 and 1),  -- voice transcripts
-  code_system       text,                           -- optional normalisation (e.g. SNOMED CT)  [OPEN: licence]
+  asr_confidence    numeric(3,2) check (asr_confidence between 0 and 1),
+  code_system       text,
   code              text,
   onset_at          timestamptz,
   duration_value    numeric check (duration_value >= 0),
@@ -58,7 +55,6 @@ create table public.vitals (
   measured_at  timestamptz not null default now(),
   measured_by  uuid references auth.users(id) on delete set null,
   created_at   timestamptz not null default now(),
-  -- coarse plausibility bounds only (catch unit/keying errors). NOT clinical thresholds.
   check (case kind
     when 'temperature_c'       then value between 25 and 46
     when 'spo2_pct'            then value between 0 and 100
@@ -74,21 +70,19 @@ create table public.vitals (
 );
 create index vitals_encounter_idx on public.vitals (encounter_id);
 
--- Uploaded reports/photos. File bytes live in Storage; this row is the authority for access.
 create table public.documents (
   id                uuid primary key default gen_random_uuid(),
   patient_id        uuid not null references public.patients(id) on delete restrict,
   encounter_id      uuid references public.encounters(id) on delete restrict,
   facility_id       uuid not null references public.facilities(id) on delete restrict,
   kind              public.document_kind not null default 'other',
-  -- convention {facility_id}/{patient_id}/{document_id}.{ext}; enforced so keys can never contain '..' or '/'-tricks
   storage_path      text not null unique check (storage_path ~
                     '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(pdf|jpg|png)$'),
   mime_type         text not null check (mime_type in ('application/pdf', 'image/jpeg', 'image/png')),
   size_bytes        bigint not null check (size_bytes > 0 and size_bytes <= 20971520),
   sha256            bytea check (sha256 is null or octet_length(sha256) = 32),
-  original_filename text,                           -- display only; never used to build a path
-  scan_status       public.scan_status not null default 'pending',   -- only 'clean' is downloadable
+  original_filename text,
+  scan_status       public.scan_status not null default 'pending',
   uploaded_by       uuid references auth.users(id) on delete set null,
   retention_until   date,
   created_at        timestamptz not null default now(),
@@ -107,7 +101,7 @@ create table public.extractions (
   engine_version  text,
   status          public.job_status not null default 'pending',
   language        text,
-  raw_text        text,                             -- sensitive; scrubbed on erasure
+  raw_text        text,
   avg_confidence  numeric(4,3) check (avg_confidence between 0 and 1),
   error           text,
   created_at      timestamptz not null default now(),
@@ -115,16 +109,15 @@ create table public.extractions (
 );
 create index extractions_document_idx on public.extractions (document_id);
 
--- Report values transcribed as printed. `printed_flag` is what the REPORT says; the system never interprets it.
 create table public.extracted_fields (
   id                    uuid primary key default gen_random_uuid(),
   extraction_id         uuid not null references public.extractions(id) on delete restrict,
   field_name            text not null,
-  extracted_value_text  text,                       -- immutable OCR output
-  value_text            text,                       -- human-verified/corrected value
+  extracted_value_text  text,
+  value_text            text,
   value_num             numeric,
   unit                  text,
-  reference_range_text  text,                       -- as printed on the report
+  reference_range_text  text,
   printed_flag          text check (printed_flag in ('low', 'high', 'abnormal', 'normal')),
   confidence            numeric(4,3) check (confidence between 0 and 1),
   verified_by           uuid references auth.users(id) on delete set null,
@@ -134,7 +127,6 @@ create table public.extracted_fields (
 );
 create index extracted_fields_extraction_idx on public.extracted_fields (extraction_id);
 
--- Missing-information prompts and follow-up questions (for the worker or the patient).
 create table public.info_requests (
   id            uuid primary key default gen_random_uuid(),
   encounter_id  uuid not null references public.encounters(id) on delete restrict,

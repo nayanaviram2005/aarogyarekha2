@@ -1,9 +1,3 @@
-// LIVE end-to-end run of the newer features through the HTTP API, as the seeded accounts.
-//   1) terminal A:  npm --prefix aarogyarekha2-backend run dev        (set MFA_REQUIRED=false in .env if you have not enrolled an authenticator)
-//   2) terminal B:  npm --prefix aarogyarekha2-backend run test:features
-// Registers ONE new synthetic patient ("Live Check <time>") and walks it through registration, consent, history, notes, follow-up,
-// upload, background reading, outside-AI refusals, admin screens and the referral inbox. Rows are permanent (the audit log is
-// append-only by design); everything is synthetic. Checks that need migration 0015 or an AI/OCR set-up say so instead of failing.
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'node:fs';
 import { PNG } from 'pngjs';

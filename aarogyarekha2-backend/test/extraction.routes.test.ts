@@ -66,7 +66,7 @@ describe('running the reader', () => {
     expect(s.avgConfidence).toBeGreaterThan(0.8);
     const b = r.json().extraction;
     expect(b.fields[0]).toMatchObject({ name: 'haemoglobin', valueNum: 9.1, unit: 'g/dL', printedFlag: 'low', verified: false });
-    expect(JSON.stringify(b)).not.toContain('CITY DIAGNOSTIC');                       // raw OCR text is never sent to the browser
+    expect(JSON.stringify(b)).not.toContain('CITY DIAGNOSTIC');
   });
   it('audits the run with counts only', async () => {
     await call(await make(), 'POST', `/documents/${D}/extract`);
@@ -267,7 +267,7 @@ describe('photos read by the outside AI reader first (OCR_PHOTOS=ai)', () => {
     const r = await call(await app('ai'), 'POST', `/documents/${D}/extract`);
     expect(r.statusCode).toBe(201); expect(localCalls).toBe(0); expect(sent).toBe(1);
     const sv = w.saved[0]!; expect(sv.engine).toBe('gemini'); expect(sv.fields.map(x => x.fieldName)).toEqual(['haemoglobin', 'esr']);
-    expect(sv.fields.every(x => x.agreement === 'ai_only')).toBe(true);        // every row is marked as read by the AI only, and a person verifies each
+    expect(sv.fields.every(x => x.agreement === 'ai_only')).toBe(true);
   });
   it('without the patient\'s consent nothing is sent and the person is told what to do', async () => {
     consents = [];

@@ -1,9 +1,3 @@
-/**
- * A registered number as Twilio needs it: E.164 (+ country code and digits).
- *  - a 10-digit Indian mobile (starts 6 to 9), optionally with 0, 91 or +91 in front, becomes +91XXXXXXXXXX
- *  - a number already written with + and a country code is kept as digits
- *  - anything else is refused: a wrong number must never be guessed at, because the text names a person and their status
- */
 export function toE164(raw: string | null | undefined, defaultCountry = '+91'): string | null {
   const t = (raw ?? '').trim(); if (!t) return null;
   const digits = t.replace(/[^0-9]/g, '');

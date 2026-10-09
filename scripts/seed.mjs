@@ -1,12 +1,3 @@
-// Seeds SYNTHETIC demo data: 2 facilities, 7 users (one per persona), 5 patients, encounters, symptoms, vitals, consents.
-// Every name, phone and identifier is fake. Nothing here is real patient data.
-//
-//   node --env-file=.env scripts/seed.mjs            # dry run: prints the plan, changes nothing
-//   node --env-file=.env scripts/seed.mjs --apply    # creates the data
-//
-// Auth users are created through the Supabase Admin API (needs SUPABASE_SERVICE_ROLE_KEY). Passwords are generated
-// randomly and written ONLY to .seed-credentials.local.json (git-ignored). They are never printed.
-// Safe to re-run: existing facilities/users/patients are reused; users get a fresh password each run.
 import pg from 'pg';
 import { randomBytes } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
@@ -30,7 +21,6 @@ const USERS = [
   { key: 'platform', name: 'Seed Platform Admin',  platform: true },
   { key: 'outsider', name: 'Seed Outsider (no membership)' },
 ];
-// scenario values must match the encounter_scenario enum.
 const PATIENTS = [
   { mrn: 'SEED-MRN-A-001', name: 'Seed Patient 01', facility: 'A', sex: 'female', age: 34, lang: 'or', scenario: 'opd_queue',
     complaint: 'ଜ୍ୱର ତିନି ଦିନ ଧରି, କାଶ ମଧ୍ୟ ଅଛି', translated: 'Fever for three days, also has cough',
@@ -68,7 +58,6 @@ const c = new pg.Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: fa
 await c.connect();
 const creds = {};
 try {
-  // ---- auth users (Admin API; outside the DB transaction)
   const ids = {};
   const existing = (await adminFetch('/users?page=1&per_page=1000')).body.users ?? [];
   for (const u of USERS) {
@@ -86,7 +75,6 @@ try {
     creds[email] = { password, role: u.role ?? (u.platform ? 'platform_admin' : 'none'), facility: u.facility ?? null };
   }
 
-  // ---- database rows, one transaction
   await c.query('begin');
   const fac = {};
   for (const f of FACILITIES) {

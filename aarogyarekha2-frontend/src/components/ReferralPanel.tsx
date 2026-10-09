@@ -12,11 +12,9 @@ export const SUGGESTED: Record<UrgencyCode, ReferralPriority> = { red: 'stat', o
 interface Props {
   api: Api; encounterId: string; patientId: string;
   effectiveUrgency: UrgencyCode; signedOff: boolean; canReview: boolean; disabled?: boolean;
-  /** Called after anything that changes the encounter or queue (a sent referral takes the patient out of the queue). */
   onChanged: () => void;
 }
 
-/** Prepare, preview, send and download a referral. The clinician decides; the system packages recorded facts. */
 export function ReferralPanel({ api, encounterId, patientId, effectiveUrgency, signedOff, canReview, disabled, onChanged }: Props) {
   const [list, setList] = useState<ReferralMeta[] | null>(null);
   const [view, setView] = useState<ReferralView | null>(null);
@@ -68,7 +66,6 @@ export function ReferralPanel({ api, encounterId, patientId, effectiveUrgency, s
 
   if (list === null) return <section className="block" aria-label="Referral">{head}<div className="block__body"><p className="muted small">Loading…</p></div></section>;
 
-  // ---------------------------------------------------------------- nothing open yet
   if (!active) {
     return (
       <section className="block" aria-label="Referral">
@@ -85,7 +82,6 @@ export function ReferralPanel({ api, encounterId, patientId, effectiveUrgency, s
     );
   }
 
-  // ---------------------------------------------------------------- a referral is open
   const r = view?.readiness;
   const sent = active.status !== 'draft';
   const ready = !!r && r.signedOff && r.hasReceiver && r.hasReason && r.sharingConsent;

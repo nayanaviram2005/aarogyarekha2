@@ -26,7 +26,7 @@ describe('fairness guard', () => {
   });
   it('unassessed patients are unaffected by the guard and still sort as tier 3', () => {
     const un = e(null, 1), t4 = e(4, 1000);
-    expect(ids(sortQueue([t4, un], 3, NOW))).toEqual([un.id, t4.id]);   // unassessed before the aged routine one (same effective tier, unassessed first)
+    expect(ids(sortQueue([t4, un], 3, NOW))).toEqual([un.id, t4.id]);
   });
   it('broken or missing wait times do not promote or crash', () => {
     const a = { ...e(4, 0), waitingSince: 'junk' }, b = { ...e(4, 0), waitingSince: null };

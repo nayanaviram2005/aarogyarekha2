@@ -1,12 +1,3 @@
-// Machine translation of patient words (Hindi, Odia) into English for the reviewer. The ORIGINAL is always kept beside it.
-//
-// Safety steps, in order:
-//   1. every text is redacted (names we hold, phone numbers, dates, ids...) and assertClean() must pass, or nothing is sent
-//   2. the service gets fixed instructions and the texts as DATA; the reply must be JSON in a fixed shape
-//   3. each translated item is checked: known id, sensible length, every name placeholder preserved, and the non-diagnostic
-//      guard. An item that fails is dropped (the original stays), never "fixed".
-//   4. names are put back only after all checks pass
-// Translations are unverified machine output. They are labelled that way wherever they are shown.
 import { z } from 'zod';
 import { checkNonDiagnostic } from '../guard/nonDiagnostic.js';
 import { AiError, type Generate } from './provider.js';
@@ -35,7 +26,7 @@ export async function translateToEnglish(
 
   const prepared = items.map(it => { const r = redact(it.text, known); assertClean(r.text, known); return { id: it.id, original: it.text, redacted: r.text, names: r.names }; });
   const payload = JSON.stringify({ statements: prepared.map(p => ({ id: p.id, text: p.redacted })) });
-  assertClean(payload.replace(/\[\[NAME_\d+\]\]/g, 'X'), known);                                 // belt and braces on the exact bytes that leave
+  assertClean(payload.replace(/\[\[NAME_\d+\]\]/g, 'X'), known);
 
   const res = await gen({ system: SYSTEM(LANG_NAME[lang]), user: payload, json: true, maxTokens: 2048 });
   let parsed: z.infer<typeof Reply>;

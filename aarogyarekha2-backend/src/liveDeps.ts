@@ -1,7 +1,3 @@
-// Production implementations of the Deps seams.
-//  * Reads use the CALLER'S JWT against PostgREST, so RLS (facility / relationship / consent) is the gate.
-//  * verifyToken asks Supabase Auth, so revoked or expired sessions fail immediately (no local JWT trust).
-//  * audit() writes through app.write_audit() on the database connection and THROWS on failure (fail closed).
 import { createClient } from '@supabase/supabase-js';
 import pg from 'pg';
 import { isIP } from 'node:net';
@@ -39,19 +35,16 @@ const TIER_OF: Record<string, number> = { red: 1, orange: 2, yellow: 3, green: 4
 const REFERRAL_COLS = 'id, encounter_id, patient_id, from_facility_id, to_facility_id, requested_by, priority, reason_text, status, status_reason, sent_at, created_at, updated_at';
 const FACILITY_COLS = 'id, name, type, state, district, capabilities:facility_capabilities(capability)';
 const toFacility = (r: any): FacilityRow => ({ id: r.id, name: r.name, type: r.type ?? null, state: r.state ?? null, district: r.district ?? null, capabilities: ((r.capabilities ?? []) as { capability: string }[]).map(c => c.capability) });
-const hex = (v: unknown): string | null => (typeof v === 'string' ? (v.startsWith('\\x') ? v.slice(2) : v) : null);   // PostgREST returns bytea as "\x<hex>"
+const hex = (v: unknown): string | null => (typeof v === 'string' ? (v.startsWith('\\x') ? v.slice(2) : v) : null);
 const DOC_COLS = 'id, patient_id, encounter_id, facility_id, kind, storage_path, mime_type, size_bytes, original_filename, scan_status, uploaded_by, created_at';
 const FIELD_COLS_BASE = 'id, extraction_id, field_name, extracted_value_text, value_text, value_num, unit, reference_range_text, printed_flag, confidence, verified_by, verified_at';
 const FIELD_COLS = FIELD_COLS_BASE + ', second_read, agreement';
 const VITAL_COLS = 'id, encounter_id, kind, value, unit, measured_at';
 
 export function makePool(config: Config): pg.Pool {
-  // Supabase's pooler presents a certificate chain Node does not trust by default. Acceptable for the hackathon
-  // demo; for anything real, pin Supabase's CA via the `ssl.ca` option instead of disabling verification.
   return new pg.Pool({ connectionString: config.databaseUrl, max: 5, ssl: { rejectUnauthorized: false }, idleTimeoutMillis: 30_000 });
 }
 
-/** Text messages: the mock sender unless Twilio is chosen AND fully set up (a half-finished setup falls back to sending nothing). */
 function smsDeps(config: Config, pool: pg.Pool): Pick<Deps, 'statusSms' | 'smsInbound'> {
   const store = makeSmsStore({ query: (sql, p) => pool.query(sql, p as unknown[]) });
   const twilio = config.sms.provider === 'twilio' ? makeTwilioSender({ accountSid: config.sms.accountSid, authToken: config.sms.authToken, from: config.sms.from, messagingServiceSid: config.sms.messagingServiceSid }) : null;
@@ -65,9 +58,8 @@ function smsDeps(config: Config, pool: pg.Pool): Pick<Deps, 'statusSms' | 'smsIn
 export function makeLiveDeps(config: Config, pool: pg.Pool): Deps {
   const verifyToken = makeTokenVerifier<{ userId: string; aal: 'aal1' | 'aal2' }>(async token => {
     const { data, error } = await client().auth.getUser(token);
-    if (!error && data.user) return { ok: { userId: data.user.id, aal: aalOf(token) } };    // getUser has just proven the token genuine, so reading its assurance level is safe
+    if (!error && data.user) return { ok: { userId: data.user.id, aal: aalOf(token) } };
     const status = (error as { status?: number } | null)?.status;
-    // 5xx, 429, no status and network failures mean "could not check", not "invalid"
     const unavailable = !error || status === undefined || status === 0 || status === 429 || status >= 500 || /fetch|network|timeout|retryable/i.test(`${(error as Error).name} ${error.message}`);
     return unavailable ? { unavailable: `${(error as Error | null)?.name ?? 'no user'} ${status ?? 'no status'}` } : { invalid: true };
   });
@@ -110,7 +102,6 @@ export function makeLiveDeps(config: Config, pool: pg.Pool): Deps {
         },
 
         async getMe() {
-          // Exactly the caller's own rows: row-level security also shows colleagues' profiles, and an administrator every membership at their facility.
           const [prof, mem] = await Promise.all([
             sb.from('profiles').select('user_id, display_name').eq('user_id', userId),
             sb.from('memberships').select('user_id, facility_id, role, is_active, facility:facilities(name, type)').eq('user_id', userId).eq('is_active', true),
@@ -136,7 +127,7 @@ export function makeLiveDeps(config: Config, pool: pg.Pool): Deps {
           const row = ((e.data ?? []) as any[])[0];
           if (!row) return null;
           let f: { data: unknown; error: { message: string } | null } = await sb.from('extracted_fields').select(FIELD_COLS).eq('extraction_id', row.id).order('created_at');
-          if (f.error) f = await sb.from('extracted_fields').select(FIELD_COLS_BASE).eq('extraction_id', row.id).order('created_at');      // migration 0017 not applied yet: no second read to show
+          if (f.error) f = await sb.from('extracted_fields').select(FIELD_COLS_BASE).eq('extraction_id', row.id).order('created_at');
           if (f.error) throw new Error(f.error.message);
           return { ...row, fields: (f.data ?? []) as unknown as FieldRow[] } as ExtractionView;
         },
@@ -179,7 +170,6 @@ export function makeLiveDeps(config: Config, pool: pg.Pool): Deps {
 
         async listPatients(q, limit) {
           let query = sb.from('patients').select(BRIEF_COLS).is('deleted_at', null).order('full_name').limit(limit);
-          // `q` has been validated to letters, digits, spaces, dots and hyphens only, so it cannot alter the filter syntax.
           if (q) query = query.or(`full_name.ilike.%${q}%,public_ref.ilike.%${q}%`);
           const { data, error } = await query;
           if (error) throw new Error(error.message);
@@ -205,14 +195,13 @@ export function makeLiveDeps(config: Config, pool: pg.Pool): Deps {
           const reviewedAssessments = new Set(((rv.data ?? []) as { assessment_id: string }[]).map(x => x.assessment_id));
           const queueBy = new Map<string, any>((qi.data ?? []).map((x: any) => [x.encounter_id, x]));
           const latest = new Map<string, any>();
-          for (const a of (as.data ?? []) as any[]) if (!latest.has(a.encounter_id)) latest.set(a.encounter_id, a);   // newest first
+          for (const a of (as.data ?? []) as any[]) if (!latest.has(a.encounter_id)) latest.set(a.encounter_id, a);
           return rows.map((r): QueueEntry => {
             const a = latest.get(r.id); const q = queueBy.get(r.id); const note = (a?.note ?? {}) as Record<string, any>;
             return {
               encounterId: r.id, patient: r.patient as PatientBrief, scenario: r.scenario, facilityId: r.facility_id,
               chiefComplaint: r.chief_complaint_original, chiefComplaintTranslated: r.chief_complaint_translated,
               assessed: !!a, urgencyCode: (q?.urgency_code ?? a?.urgency_code ?? null) as QueueEntry['urgencyCode'],
-              // `tier` is the EFFECTIVE tier (a reviewer may have changed it); `engineTier` is what the rules produced.
               tier: (q?.urgency_code ?? a?.urgency_code) ? TIER_OF[(q?.urgency_code ?? a?.urgency_code) as string] ?? null : null,
               engineTier: typeof note.tier === 'number' ? note.tier : null,
               reviewed: !!a && reviewedAssessments.has(a.id),
@@ -271,7 +260,6 @@ export function makeLiveDeps(config: Config, pool: pg.Pool): Deps {
 
     userWriter(token, userId): UserWriter {
       const sb = client(token);
-      // Convert a Supabase/PostgREST error into a DbError carrying the Postgres SQLSTATE.
       const ok = <T,>(r: { data: T | null; error: { code?: string; message: string } | null }): T => {
         if (r.error) throw new DbError(r.error.code ?? 'XX000', r.error.message);
         return r.data as T;
@@ -324,8 +312,6 @@ export function makeLiveDeps(config: Config, pool: pg.Pool): Deps {
           return r?.context?.triage ?? {};
         },
         async setTriageContext(encounterId, ctx) {
-          // Read-modify-write on the jsonb column. Two simultaneous edits to the SAME encounter can lose one; acceptable for a
-          // single health worker at a bench, and worth a version column if multiple devices edit one encounter.
           const cur = ok(await sb.from('encounters').select('context').eq('id', encounterId).maybeSingle()) as { context?: Record<string, unknown> } | null;
           if (!cur) throw new DbError('42501', 'encounter not visible');
           const upd = ok(await sb.from('encounters').update({ context: { ...(cur.context ?? {}), triage: ctx } }).eq('id', encounterId).select('id'));
@@ -473,7 +459,7 @@ export function makeLiveDeps(config: Config, pool: pg.Pool): Deps {
           [a.documentId, a.engine, a.engineVersion, a.status, a.language, a.rawText, a.avgConfidence, a.error]);
         const id: string = e.rows[0].id;
         for (const f of a.fields) {
-          if (f.agreement || f.secondRead)        // only touches the new columns when a second read exists, so OCR-only reads work before migration 0017 is applied
+          if (f.agreement || f.secondRead)
             await c.query('insert into public.extracted_fields (extraction_id, field_name, extracted_value_text, value_text, value_num, unit, reference_range_text, printed_flag, confidence, second_read, agreement) values ($1,$2,$3,$3,$4,$5,$6,$7,$8,$9,$10)',
               [id, f.fieldName, f.extractedValueText, f.valueNum, f.unit, f.referenceRangeText, f.printedFlag, f.confidence, f.secondRead ?? null, f.agreement ?? null]);
           else

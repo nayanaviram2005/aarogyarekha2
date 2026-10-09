@@ -1,13 +1,3 @@
-/**
- * Offline outbox: notes taken while the connection is down, kept on this device until they can be sent.
- *
- * What it protects, honestly:
- *   * every note is encrypted (AES-GCM) before it touches the disk, with a key the browser will not let a script read out,
- *   * notes older than 24 hours are deleted, and "Discard" deletes at once,
- *   * nothing is sent anywhere from here: sending is a separate, signed-in step.
- * What it does NOT protect against: someone using the same browser profile on the same computer, or malware in it. The key
- * lives in the same browser. On a shared computer, give each person their own computer login.
- */
 export const MAX_AGE_MS = 24 * 3_600_000;
 
 export interface KeyValueStore {
@@ -23,13 +13,11 @@ interface Sealed { iv: ArrayBuffer; ct: ArrayBuffer; savedAt: number }
 const KEY_NAME = 'key';
 const NOTE_PREFIX = 'note:';
 
-/** In-memory store for tests and for browsers without IndexedDB. Nothing survives a reload. */
 export function memoryStore(): KeyValueStore {
   const m = new Map<string, unknown>();
   return { get: async k => m.get(k), set: async (k, v) => { m.set(k, v); }, del: async k => { m.delete(k); }, keys: async () => [...m.keys()] };
 }
 
-/** IndexedDB-backed store. Values may be CryptoKeys, which IndexedDB can hold without exposing their bytes. */
 export function idbStore(dbName = 'aarogyarekha-offline'): KeyValueStore {
   const open = () => new Promise<IDBDatabase>((res, rej) => {
     const r = indexedDB.open(dbName, 1);
@@ -55,14 +43,14 @@ export function createOutbox(store: KeyValueStore, now: () => number = Date.now)
     const have = (await store.get(KEY_NAME)) as CryptoKey | undefined;
     if (have) return have;
     if (!create) return null;
-    const k = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);   // false = cannot be exported
+    const k = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
     await store.set(KEY_NAME, k);
     return k;
   }
 
   async function open(s: Sealed, k: CryptoKey): Promise<Record<string, unknown> | null> {
     try { return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: s.iv }, k, s.ct))) as Record<string, unknown>; }
-    catch { return null; }                                     // wrong key or tampered: treat as unreadable, never as data
+    catch { return null; }
   }
 
   return {
@@ -71,7 +59,6 @@ export function createOutbox(store: KeyValueStore, now: () => number = Date.now)
       const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k, new TextEncoder().encode(JSON.stringify(data)));
       await store.set(NOTE_PREFIX + id, { iv: iv.buffer, ct, savedAt: now() } satisfies Sealed);
     },
-    /** Readable notes, oldest first. Notes past 24 hours or that cannot be decrypted are deleted on the way. */
     async list(): Promise<Note[]> {
       const k = await key(false); const out: Note[] = [];
       for (const full of (await store.keys()).filter(x => x.startsWith(NOTE_PREFIX))) {
@@ -84,7 +71,6 @@ export function createOutbox(store: KeyValueStore, now: () => number = Date.now)
       return out.sort((a, b) => a.savedAt - b.savedAt);
     },
     async remove(id: string): Promise<void> { await store.del(NOTE_PREFIX + id); },
-    /** Deletes every note and the key. */
     async wipe(): Promise<void> { for (const k of await store.keys()) await store.del(k); },
   };
 }

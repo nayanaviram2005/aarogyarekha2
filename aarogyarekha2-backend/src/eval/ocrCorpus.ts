@@ -1,7 +1,3 @@
-// A synthetic lab-report corpus with KNOWN answers, so reading accuracy can be measured instead of guessed.
-// Every report is invented. Layouts vary the way real printed reports do (column spacing, colons, flag words, thousands commas, units).
-// It tests the TEXT path (PDF text layer, then the line parser). Reading a photo with Tesseract needs the language files and is run
-// separately with `npm run ocr:accuracy -- --images` when they are available.
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { parseLabText } from '../ocr/labParser.js';
 import { pdfTextEngine } from '../ocr/engines.js';
@@ -39,7 +35,6 @@ const LAYOUTS: { id: string; make: (p: { name: string; v: string; unit: string; 
 ];
 const FLAG_WORDS: Record<'low' | 'high', string[]> = { low: ['L', 'Low'], high: ['H', 'High'] };
 
-/** `n` reports of 6 to 10 results each, with some values below or above the printed range. */
 export function makeCorpus(n: number, s = 1): SynthReport[] {
   seed = s; const out: SynthReport[] = [];
   for (let r = 0; r < n; r++) {
@@ -68,7 +63,6 @@ export async function toPdf(lines: string[]): Promise<Buffer> {
 
 export interface Score { reports: number; expected: number; found: number; valueCorrect: number; unitCorrect: number; flagCorrect: number; extra: number; byLayout: Record<string, { expected: number; valueCorrect: number }> }
 
-/** Reads each report through the real text engine and parser, and compares with the truth. Matching is by canonical test name. */
 export async function scoreCorpus(corpus: SynthReport[]): Promise<Score> {
   const engine = pdfTextEngine(); const sc: Score = { reports: corpus.length, expected: 0, found: 0, valueCorrect: 0, unitCorrect: 0, flagCorrect: 0, extra: 0, byLayout: {} };
   for (const rep of corpus) {

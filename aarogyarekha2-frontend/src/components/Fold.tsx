@@ -1,9 +1,5 @@
 import { useState, type ReactNode } from 'react';
 
-/**
- * A closed-by-default section. Its content is not even built until it is opened, so a screen with several of these loads fewer things
- * and keeps the main steps in view. The title says what is inside; `hint` says when you would want it.
- */
 export function Fold({ title, hint, defaultOpen = false, id, children }: { title: string; hint?: string; defaultOpen?: boolean; id?: string; children: ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
   return (

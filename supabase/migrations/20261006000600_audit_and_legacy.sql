@@ -1,10 +1,3 @@
--- 0006 audit log (append-only, hash-chained) + legacy id map.
---
--- IMPORTANT LIMITATION: Postgres cannot audit SELECTs. DB triggers below capture writes and
--- security-relevant events (grants, break-glass, referral transitions, reviews). PHI *reads* must be
--- recorded by the API tier through app.write_audit(), which only service_role may call.
--- `details` must never contain PHI: store field NAMES and ids, not values.
-
 create table public.audit_events (
   id            bigint generated always as identity primary key,
   occurred_at   timestamptz not null default now(),
@@ -14,7 +7,7 @@ create table public.audit_events (
   action        public.audit_action not null,
   entity_type   text not null,
   entity_id     uuid,
-  patient_id    uuid,              -- no FK on purpose: must survive erasure
+  patient_id    uuid,
   outcome       public.audit_outcome not null default 'success',
   request_id    text,
   ip            inet,
@@ -28,8 +21,6 @@ create index audit_events_patient_idx on public.audit_events (patient_id, occurr
 create index audit_events_facility_idx on public.audit_events (facility_id, occurred_at desc);
 create index audit_events_actor_idx on public.audit_events (actor_user_id, occurred_at desc);
 
--- Chain: row_hash = sha256(prev_hash || canonical(row)). One global chain, serialised by an advisory
--- lock. [Trade-off: single writer. If audit volume demands it, chain per day/facility instead.]
 create or replace function app.audit_chain()
 returns trigger language plpgsql security definer set search_path = '' as $$
 declare prev bytea;
@@ -48,14 +39,13 @@ create trigger trg_audit_chain before insert on public.audit_events
 create trigger trg_audit_immutable before update or delete on public.audit_events
   for each row execute function app.forbid_mutation_strict();
 
--- Returns the ids of rows whose hash or linkage does not verify (empty set = chain intact).
 create or replace function app.verify_audit_chain(p_from bigint default 0)
 returns table (broken_id bigint) language plpgsql stable security definer set search_path = '' as $$
 declare r record; prev bytea := null; first_row boolean := true; expect bytea;
 begin
   for r in select * from public.audit_events where id >= p_from order by id loop
     if first_row and p_from > 0 then
-      prev := r.prev_hash;            -- trust the anchor row's link when starting mid-chain
+      prev := r.prev_hash;
     end if;
     first_row := false;
     expect := sha256(coalesce(prev, '\x'::bytea) || convert_to(concat_ws('|',
@@ -69,7 +59,6 @@ begin
   end loop;
 end $$;
 
--- API-tier entry point (e.g. PHI reads, login events). service_role only.
 create or replace function app.write_audit(
   p_action public.audit_action, p_entity_type text, p_entity_id uuid default null,
   p_patient_id uuid default null, p_facility_id uuid default null, p_actor uuid default null,
@@ -89,7 +78,6 @@ end $$;
 revoke all on function app.write_audit(public.audit_action, text, uuid, uuid, uuid, uuid, public.audit_outcome, text, inet, text, text, jsonb) from public, authenticated, anon;
 grant execute on function app.write_audit(public.audit_action, text, uuid, uuid, uuid, uuid, public.audit_outcome, text, inet, text, text, jsonb) to service_role;
 
--- Generic DB-side change audit: records WHICH columns changed, never their values.
 create or replace function app.audit_row_change()
 returns trigger language plpgsql security definer set search_path = '' as $$
 declare
@@ -134,12 +122,9 @@ begin
   end loop;
 end $$;
 
--- ---------------------------------------------------------------- legacy MongoDB -> Supabase id map
--- Temporary migration aid: lets the loader be idempotent and lets us verify patient<->record
--- associations. Drop (or archive) after cutover verification.
 create table public.legacy_id_map (
-  legacy_collection text not null,                   -- 'users' | 'records' | 'healthrecords' | 'gridfs'
-  legacy_id         text not null,                   -- Mongo ObjectId hex
+  legacy_collection text not null,
+  legacy_id         text not null,
   new_table         text not null,
   new_id            uuid not null,
   migrated_at       timestamptz not null default now(),

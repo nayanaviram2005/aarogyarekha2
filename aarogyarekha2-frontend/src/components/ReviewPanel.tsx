@@ -13,13 +13,9 @@ interface Props {
   encounterId: string;
   patientId?: string;
   assessmentId: string;
-  /** What the rules produced for this assessment. */
   rulesUrgency: UrgencyCode;
-  /** What is in force now (may already have been changed by a reviewer). */
   effectiveUrgency: UrgencyCode;
-  /** True when a danger-sign rule (not just a score) set the priority. */
   ruleFloor: boolean;
-  /** Review of THIS assessment, if any. */
   current: ReviewRecord | null;
   reviewerName: string | null;
   canReview: boolean;
@@ -29,7 +25,6 @@ interface Props {
 
 const LEVELS: Tier[] = [1, 2, 3, 4];
 
-/** Reviewer sign-off: confirm the priority the rules set, or change it with a recorded reason. Both are recorded under the reviewer's name. */
 export function ReviewPanel(p: Props) {
   const [mode, setMode] = useState<'idle' | 'confirm' | 'change'>('idle');
   const [busy, setBusy] = useState(false);
@@ -157,7 +152,6 @@ const SMS_WHY: Record<string, string> = {
 };
 const LANG_NAME = { en: 'English', hi: 'Hindi', or: 'Odia' } as const;
 
-/** What happened to the patient's text message after the sign-off. The sign-off itself is never affected. */
 function SmsNote({ sms, patientId, api }: { sms: NonNullable<ReviewResult['sms']>; patientId?: string; api: Api }) {
   const [asked, setAsked] = useState(false);
   if (sms.status === 'sent') return <Banner kind="info" title="Text message sent">The patient was told their queue status in {LANG_NAME[sms.language]}.</Banner>;

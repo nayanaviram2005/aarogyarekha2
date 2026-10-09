@@ -1,8 +1,3 @@
-// Translate what the patient said (Hindi, Odia) into English for the reviewer. The original is always kept beside it.
-//  * Needs triage consent, whose notice tells the patient that redacted text goes to an outside service. Without it, nothing is sent.
-//  * Text is redacted before it leaves; the patient's name and identifiers never reach the service (src/ai/translate.ts).
-//  * Every call to the outside service is logged (provider, model, how many items, how many characters; never the text).
-//  * Output is stored only if it passes the checks. A translation that fails stays untranslated.
 import type { RouteCtx, RouteHelpers } from './intake.js';
 import { AiError } from '../ai/provider.js';
 import { PiiLeak } from '../ai/redact.js';
@@ -26,7 +21,6 @@ export function registerTranslateRoutes(c: RouteCtx, h: RouteHelpers): void {
     const [patient, summary] = await Promise.all([req.reader!.getPatient(enc.patient_id), req.reader!.getEncounterSummary(enc.id)]).catch(() => [undefined, undefined] as const);
     if (!patient || !summary) return fail(reply, 502, 'transient', 'The record could not be loaded. Try again.');
 
-    // What still needs translating, grouped by language.
     const byLang: Record<SourceLanguage, TranslateItem[]> = { hi: [], or: [] };
     const complaintLang = isSource(enc.language) ? enc.language : null;
     if (complaintLang && enc.chief_complaint_original && !enc.chief_complaint_translated) byLang[complaintLang].push({ id: 'complaint', text: enc.chief_complaint_original });
@@ -34,7 +28,6 @@ export function registerTranslateRoutes(c: RouteCtx, h: RouteHelpers): void {
     const todo = byLang.hi.length + byLang.or.length;
     if (todo === 0) return reply.send({ translated: 0, rejected: 0, nothingToDo: true, provider: deps.translator.name, model: deps.translator.model, machineTranslation: true });
 
-    // What actually answered (it may be a fallback model or provider) is what gets logged.
     let served: { provider: string; model: string } = { provider: deps.translator.name, model: deps.translator.model };
     const generate: typeof deps.translator.generate = async q => { const x = await deps.translator.generate(q); served = { provider: x.provider, model: x.model }; return x; };
     const known = { names: [patient.full_name], identifiers: [patient.public_ref, patient.phone] };
@@ -56,7 +49,6 @@ export function registerTranslateRoutes(c: RouteCtx, h: RouteHelpers): void {
       return fail(reply, 502, 'transient', 'The translation service could not be used. The original text is shown. Try again later.');
     }
 
-    // Log the outside call BEFORE storing anything, so a disclosure is never unrecorded.
     try { await deps.logExternalRun({ encounterId: enc.id, consentId: ai.id, provider: served.provider, model: served.model, items: sentItems, chars: sentChars, status: 'ok' }); }
     catch (err) { req.log.error({ reqId: req.id, err: (err as Error).message }, 'external run could not be logged'); return fail(reply, 503, 'transient', 'The outside service call could not be recorded, so the translation was not saved. Try again.'); }
 

@@ -10,10 +10,6 @@ const CHANNEL: Record<ReminderChannel, string> = { sms: 'SMS', whatsapp: 'WhatsA
 const STATUS: Record<string, string> = { scheduled: 'Waiting to be sent', sent: 'Sent', delivered: 'Delivered', failed: 'Not sent', acknowledged: 'Seen by patient', missed: 'Missed' };
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'no date');
 
-/**
- * Plan a follow-up visit and schedule reminders for it. A reminder to the patient needs their separate consent. The reminder text is
- * fixed (facility and date only). In this build reminders go through a MOCK sender: nothing is really sent to any phone.
- */
 export function FollowupsPanel({ api, encounterId, patientId, editable }: { api: Api; encounterId: string; patientId: string; editable: boolean }) {
   const [list, setList] = useState<Followup[] | null>(null);
   const [error, setError] = useState<Error | null>(null);

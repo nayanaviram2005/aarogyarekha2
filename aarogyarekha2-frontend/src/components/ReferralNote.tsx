@@ -9,7 +9,6 @@ type Res = { resourceType: string; id?: string; [k: string]: any };
 const all = (b: FhirBundle, type: string): Res[] => (b.entry ?? []).map(e => e.resource as Res).filter(r => r.resourceType === type);
 const first = (b: FhirBundle, type: string): Res | undefined => all(b, type)[0];
 
-/** Pulls the few facts the page header needs out of the document. Nothing is invented: missing parts show as "not recorded". */
 export function readNote(bundle: FhirBundle) {
   const comp = first(bundle, 'Composition');
   const patient = first(bundle, 'Patient');

@@ -15,7 +15,6 @@ export const MEASUREMENTS: { kind: string; label: string; unit: string; min: num
   { kind: 'muac_cm', label: 'Mid-upper arm size (MUAC)', unit: 'cm', min: 3, max: 60 },
 ];
 
-/** Type a measurement in by hand. This is also the way to carry on when a report could not be read. Re-assess afterwards. */
 export function MeasurementForm({ api, encounterId, onSaved }: { api: Api; encounterId: string; onSaved: () => void }) {
   const [kind, setKind] = useState(MEASUREMENTS[0]!.kind);
   const [value, setValue] = useState('');

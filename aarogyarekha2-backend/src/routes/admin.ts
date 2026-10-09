@@ -1,8 +1,3 @@
-// Facility administrator screens and emergency ("break-glass") access.
-//  * administrators see activity AT THEIR OWN facilities only, and never patient names (record numbers and counts only),
-//  * emergency access needs a typed reason of at least 10 characters, a verified second factor, lasts one hour, and every grant
-//    (and every refused attempt) is audited and appears in the administrator's review list,
-//  * administrators can mark an emergency access as reviewed. They cannot edit or delete it.
 import { z } from 'zod';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { RouteCtx, RouteHelpers } from './intake.js';
@@ -21,7 +16,6 @@ export function registerAdminRoutes(c: RouteCtx, h: RouteHelpers): void {
   const { app, deps, authenticate, fail } = c;
   const storeFor = (req: FastifyRequest) => (deps.adminStore ? deps.adminStore(req.headers.authorization!.slice(7).trim(), req.user!.userId) : null);
 
-  /** The facilities this caller administers, or null after sending the refusal. */
   async function adminFacilities(req: FastifyRequest, reply: FastifyReply): Promise<string[] | null> {
     const me = await req.reader!.getMe().catch(() => undefined);
     if (me === undefined) { fail(reply, 502, 'transient', 'Your profile could not be loaded. Try again.'); return null; }
@@ -86,7 +80,6 @@ export function registerAdminRoutes(c: RouteCtx, h: RouteHelpers): void {
     return reply.send({ id: id.data, reviewed: true });
   });
 
-  // ------------------------------------------------------------------ emergency access (any clinician)
   app.post('/break-glass', { preHandler: authenticate, config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
     if (!deps.systemAdmin) return notSetUp(reply);
     const body = grantBody.safeParse(req.body); if (!body.success) return h.invalid(reply, body.error);

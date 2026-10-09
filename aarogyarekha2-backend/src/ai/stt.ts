@@ -1,8 +1,3 @@
-// Speech to text. A voice recording is identifiable and CANNOT be redacted, so this path is stricter than text:
-//   * the patient must have consented to an outside AI service (checked by the route),
-//   * the recording is never stored: it is sent, the transcript comes back, and the bytes are dropped,
-//   * recordings are capped in size, and only real audio containers are accepted,
-//   * the transcript is only a draft that a person reads and edits before anything is saved.
 import { z } from 'zod';
 import { AiError, type AiEnvValues, type ProviderName } from './provider.js';
 
@@ -12,7 +7,6 @@ export type SttLanguage = 'en' | 'hi' | 'or';
 export interface Transcript { text: string; language: string | null; provider: ProviderName; model: string }
 export type Transcribe = (a: { bytes: Buffer; mime: AudioMime; language?: SttLanguage }) => Promise<Transcript>;
 
-/** The real container from the first bytes, never from the file name or the browser's claim. */
 export function sniffAudio(b: Buffer): AudioMime | null {
   if (b.length >= 4 && b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return 'audio/webm';
   if (b.length >= 4 && b.subarray(0, 4).toString('latin1') === 'OggS') return 'audio/ogg';
@@ -72,5 +66,5 @@ export function makeTranscriber(env: Partial<AiEnvValues> & { OPENAI_STT_MODEL?:
     } };
   }
 
-  return { name, model: '', supported: false, transcribe: unsupported };           // claude and openrouter chat models here do not take audio
+  return { name, model: '', supported: false, transcribe: unsupported };
 }

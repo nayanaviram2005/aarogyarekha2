@@ -1,12 +1,10 @@
-// Database side of the visit flow (migration 0018): call a patient in, complete the visit, list who was seen today.
-// System path: the route has checked who is calling; the database functions check again.
 import { VisitError, type DoneRow, type VisitFlow, type VisitOutcome } from '../deps.js';
 
 interface Queryable { query(sql: string, params?: unknown[]): Promise<{ rows: any[] }> }
 
 const map = (e: unknown): never => {
   const x = e as { code?: string; message?: string; hint?: string };
-  if (x.code === '42883' || x.code === '42703') throw new VisitError('not_set_up', 'migration 0018 is not applied');      // function or column missing
+  if (x.code === '42883' || x.code === '42703') throw new VisitError('not_set_up', 'migration 0018 is not applied');
   if (x.code === '42501') throw new VisitError('forbidden', x.message ?? 'not allowed');
   if (x.code === 'P0002') throw new VisitError('not_found', x.message ?? 'not found');
   if (x.code === '55000') throw new VisitError(x.hint === 'review_first' ? 'review_first' : x.hint === 'taken' ? 'taken' : 'state', x.message ?? 'wrong state');

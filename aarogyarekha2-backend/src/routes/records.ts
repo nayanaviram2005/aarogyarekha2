@@ -1,9 +1,3 @@
-// Records as the way IN, and as context for triage.
-//
-//  POST /intake/records/read      : read ONE uploaded record (photo or PDF) and say who it seems to be about. Nothing is stored and
-//                                   nothing leaves the server: this is a preview so staff can confirm or correct before registering.
-//  GET  /encounters/:id/record-context : what the encounter's uploaded reports say, summarised from the rows the reader found.
-// Registering the patient, recording consent, starting the visit and storing the files all go through the usual, audited endpoints.
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { RouteCtx, RouteHelpers } from './intake.js';
@@ -19,7 +13,6 @@ import { summariseRecords, type ContextDoc } from '../ocr/recordContext.js';
 const CLINICAL = ['health_worker', 'nurse', 'doctor', 'medical_officer'];
 const lang = z.enum(['en', 'hi', 'or']);
 
-/** The encounter's documents with the rows read from them. Rows only; never the raw text. */
 export async function loadRecordContext(req: FastifyRequest, encounterId: string): Promise<ContextDoc[]> {
   const docs = await req.reader!.listDocuments(encounterId);
   const out: ContextDoc[] = [];
@@ -63,8 +56,6 @@ export function registerRecordRoutes(c: RouteCtx, h: RouteHelpers): void {
       if (!p.ok) return fail(reply, 400, 'invalid', p.reason);
     }
 
-    // A photo can be read by the outside AI image reader instead of this server (OCR_PHOTOS). The patient is not registered yet, so the person
-    // registering must confirm the patient agrees; nothing is sent without that. The disclosure is audited here and recorded as a consent later.
     const v = deps.vision;
     const aiAvailable = !!v && v.supported && v.name !== 'mock' && v.accepts(safe.mime) && safe.mime !== 'application/pdf' && c.ocrPhotos !== 'local';
     if (aiAvailable && !aiConsent && c.ocrPhotos === 'ai') {
@@ -79,7 +70,6 @@ export function registerRecordRoutes(c: RouteCtx, h: RouteHelpers): void {
       } catch (err) {
         await h.note(req, { action: 'read', entityType: 'record_preview_ai', outcome: 'error', details: { kind: err instanceof AiError ? err.kind : 'unknown', bytes: safe.bytes.length } });
         if (c.ocrPhotos === 'ai') return reply.send({ identity: {}, rows: 0, readable: false, note: err instanceof AiError && err.kind === 'busy' ? 'The outside reading service is busy. Try again in a moment.' : 'The outside reading service could not read this photo. Try again, or use a PDF.', averageConfidence: null });
-        // ai_then_local: carry on with the local reader below
       }
     }
 

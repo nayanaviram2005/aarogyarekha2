@@ -1,24 +1,11 @@
-// Reading a report photo (or PDF) with a vision-capable model, as a SECOND reader beside the local OCR.
-//
-// Why a second reader: the local OCR is private and free but struggles with poor photos. A model reads those better. When both
-// read the same value and agree, a person can trust the row more; when they differ, the row is flagged for the person to check.
-//
-// Safety, stricter than text because an image cannot be redacted:
-//   * the patient must have consented to outside AI processing (the route checks), and every call is logged,
-//   * the image is sent and dropped, never stored by us; only the rows come back,
-//   * the model is told to ignore names, addresses and ids, and to transcribe, not interpret,
-//   * the reply is untrusted: JSON only, size-capped, each row checked by the non-diagnostic guard, and a row that fails is dropped,
-//   * the rows are DRAFTS. A person verifies every row before anything uses it.
 import { z } from 'zod';
 import { checkNonDiagnostic } from '../guard/nonDiagnostic.js';
 import { AiError, postJson, withModel, type AiEnvValues, type ProviderName } from './provider.js';
 
 export type VisionMime = 'image/jpeg' | 'image/png' | 'image/webp' | 'application/pdf';
 export interface VisionRow { name: string; value: string; unit: string | null; referenceRange: string | null; flag: 'low' | 'high' | 'abnormal' | 'normal' | null }
-/** Who a record is about, as the model read it. A guess for a person to confirm, checked strictly before use. */
 export interface VisionIdentity { fullName?: string; sex?: 'female' | 'male' | 'other'; ageYears?: number; birthDate?: string; phone?: string }
 export interface VisionRead { rows: VisionRow[]; provider: ProviderName; model: string; dropped: number; identity?: VisionIdentity }
-/** `identity: true` also asks who the record is about (used when registering a patient from a record; the normal reading never asks). */
 export type ReadReport = (a: { bytes: Buffer; mime: VisionMime; identity?: boolean }) => Promise<VisionRead>;
 export interface Vision { name: ProviderName; model: string; supported: boolean; accepts: (mime: string) => boolean; read: ReadReport }
 
@@ -53,7 +40,6 @@ const PROMPT_WITH_IDENTITY =
 const clean = (s: string) => s.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
 const FENCE = /^```(?:json)?\s*([\s\S]*?)\s*```$/;
 
-/** Validate and clean the model's reply. Pure, so it can be tested without a service. */
 export function parseVisionReply(text: string, withIdentity = false): { rows: VisionRow[]; dropped: number; identity?: VisionIdentity } {
   let raw: z.infer<typeof Reply>;
   try { raw = Reply.parse(JSON.parse(text.trim().replace(FENCE, '$1'))); }
@@ -69,7 +55,6 @@ export function parseVisionReply(text: string, withIdentity = false): { rows: Vi
   return withIdentity ? { rows, dropped, identity: cleanIdentity(raw.identity) } : { rows, dropped };
 }
 
-/** The identity the model gave, kept only where it is plausible. Anything odd is dropped, never repaired. */
 export function cleanIdentity(raw: unknown): VisionIdentity {
   const p = Ident.safeParse(raw ?? {});
   if (!p.success) return {};
@@ -94,7 +79,6 @@ export function makeVision(env: Partial<AiEnvValues>, fetchImpl: typeof fetch = 
   const sameProvider = fallback && v.supported ? makeVisionOnce(withModel(env, fallback), fetchImpl) : null;
   const fp = env.AI_FALLBACK_PROVIDER && env.AI_FALLBACK_PROVIDER !== env.AI_PROVIDER ? makeVisionOnce({ ...env, AI_PROVIDER: env.AI_FALLBACK_PROVIDER, AI_FALLBACK_MODEL: undefined, AI_FALLBACK_PROVIDER: undefined }, fetchImpl) : null;
   if (!sameProvider && !fp) return v;
-  // Still busy after the retry: one try on the fallback model, then one on the fallback provider (only if this task named one and it can read this file type).
   return { ...v, read: async a => {
     try { return await v.read(a); }
     catch (e) {
@@ -137,7 +121,6 @@ function makeVisionOnce(env: Partial<AiEnvValues>, fetchImpl: typeof fetch): Vis
     } };
   }
 
-  // openai and openrouter: chat models that accept an image as a data URL
   const key = (name === 'openai' ? env.OPENAI_API_KEY : env.OPENROUTER_API_KEY)?.trim(); const model = (name === 'openai' ? env.OPENAI_MODEL : env.OPENROUTER_MODEL)?.trim();
   if (!key || !model) return off(model);
   const url = name === 'openai' ? 'https://api.openai.com/v1/chat/completions' : 'https://openrouter.ai/api/v1/chat/completions';

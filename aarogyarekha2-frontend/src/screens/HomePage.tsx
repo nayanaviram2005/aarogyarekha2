@@ -6,7 +6,6 @@ import { PaneFrame } from './PaneFrame';
 import { canReviewAt, useMe } from './meContext';
 import { useQueue } from './queueContext';
 
-/** What a person at the triage desk should do first, from what is in the queue right now. Pure so it can be tested. */
 export function startHere(entries: QueueEntry[], canReview: boolean) {
   const waiting = entries.filter(e => e.queueStatus !== 'in_review');
   const needsAssess = entries.filter(e => !e.assessed);

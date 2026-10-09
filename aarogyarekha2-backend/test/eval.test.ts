@@ -93,7 +93,7 @@ describe('proposed v0.2.0', () => {
   it('an unknown age no longer hides abnormal vitals, but a known pregnancy still does not use the adult score', () => {
     const d = triage({ ageYears: null, pregnant: null, vitals: { pulse_bpm: 135 }, signs: {} }, PROP); expect(d.tier).toBe(2); expect(d.news2.applicable).toBe(true);
     expect(triage({ ageYears: null, pregnant: true, vitals: { pulse_bpm: 135 }, signs: {} }, PROP).news2.applicable).toBe(false);
-    expect(triage({ ageYears: null, pregnant: null, vitals: { pulse_bpm: 135 }, signs: {} }, RS).tier).toBe(4);          // v0.1.1 unchanged
+    expect(triage({ ageYears: null, pregnant: null, vitals: { pulse_bpm: 135 }, signs: {} }, RS).tier).toBe(4);
   });
   it('the report lists what the proposal changes', () => {
     const md = renderReport(evaluate(RS), checkInvariants(RS, 50), [], { name: 'n', version: RS.version, status: 'draft' }, new Date('2026-10-07'), { version: PROP.version, summary: ps, invariants: checkInvariants(PROP, 50) });

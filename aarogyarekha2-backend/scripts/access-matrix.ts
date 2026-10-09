@@ -1,9 +1,3 @@
-// LIVE access-matrix test against the hosted project, using the seeded synthetic users.
-// Signs in as each persona (anon key + the passwords in ../.seed-credentials.local.json; nothing is printed) and checks
-// that row-level security gives each one exactly the view the design promises.
-//   npm run test:live
-// If the API is running (API_URL, default http://127.0.0.1:8787) it also checks the same rules through the HTTP API.
-// Side effect: a few audit rows are written by the API checks (append-only by design).
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { readFileSync } from 'node:fs';
 

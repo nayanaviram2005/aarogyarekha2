@@ -1,4 +1,3 @@
-/* ------------------------------------------------------------------ shell */
 .app-shell { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: var(--topbar-h) minmax(0, 1fr) var(--legal-h); height: 100%; }
 
 .topbar {
@@ -27,7 +26,6 @@
   padding: 2px var(--s2); font-size: var(--fs-12); font-weight: 600;
 }
 
-/* ------------------------------------------------------------------ panes */
 .panes { display: grid; grid-template-columns: 360px minmax(0, 1fr) 320px; min-height: 0; background: var(--paper); }
 .pane { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border-right: 1px solid var(--rule); }
 .pane:last-child { border-right: 0; }
@@ -59,7 +57,6 @@
   .topbar__ctx { display: none; }
 }
 
-/* ------------------------------------------------------------------ buttons and fields */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--s2);
   min-height: 40px; padding: 0 var(--s4); border: 1px solid var(--action); border-radius: var(--radius);
@@ -88,33 +85,26 @@
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s3); }
 @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
 
-/* Yes / No segmented control */
 .seg { display: inline-flex; border: 1px solid var(--rule-strong); border-radius: var(--radius); overflow: hidden; }
 .seg button { min-height: 36px; padding: 0 var(--s4); border: 0; border-right: 1px solid var(--rule-strong); background: var(--panel); cursor: pointer; font-weight: 500; }
 .seg button:last-child { border-right: 0; }
 .seg button:hover:not(:disabled):not([aria-pressed='true']) { background: var(--action-tint); }
-/* The chosen answer stays highlighted, also under the pointer, and carries a tick so it does not rely on colour alone. */
-/* The chosen answer stays highlighted, also under the pointer. Yes is green with a tick, No is red with a cross, so it never relies on colour alone. */
 .seg button[aria-pressed='true'], .seg button[aria-pressed='true']:hover:not(:disabled) { color: #fff; font-weight: 600; }
 .seg button[data-answer='yes'][aria-pressed='true'], .seg button[data-answer='yes'][aria-pressed='true']:hover:not(:disabled) { background: var(--urg-green); }
 .seg button[data-answer='no'][aria-pressed='true'], .seg button[data-answer='no'][aria-pressed='true']:hover:not(:disabled) { background: var(--urg-red); }
 .seg button[data-answer='yes'][aria-pressed='true']::before { content: '\2713\00a0'; }
 .seg button[data-answer='no'][aria-pressed='true']::before { content: '\2715\00a0'; }
-/* A seg with no data-answer (other uses) keeps the default action colour. */
 .seg button:not([data-answer])[aria-pressed='true'], .seg button:not([data-answer])[aria-pressed='true']:hover:not(:disabled) { background: var(--action); color: var(--action-ink); }
 .seg button:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; position: relative; }
 
-/* The bar under a list of questions: how many answers are chosen, and the one button that saves them all. */
 .submitbar { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; margin-top: var(--s3); padding: var(--s3) 0; background: var(--panel); border-top: 1px solid var(--rule-strong); }
 
-/* ------------------------------------------------------------------ banners */
 .banner { padding: var(--s3) var(--s4); border: 1px solid var(--rule-strong); border-left-width: 4px; background: var(--panel); }
 .banner__title { margin: 0 0 2px; font-weight: 600; font-size: var(--fs-14); line-height: 1.25; }
 .banner--info { border-color: var(--action); background: var(--action-tint); }
 .banner--warn { border-color: var(--urg-yellow); background: var(--urg-yellow-tint); }
 .banner--error { border-color: var(--urg-red); background: var(--urg-red-tint); }
 
-/* ------------------------------------------------------------------ urgency plate (signature 1) */
 .plate {
   display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px 2px 6px; border: 1px solid currentColor;
   border-radius: var(--radius); font-weight: 700; font-size: var(--fs-13); line-height: 1.3; white-space: nowrap;
@@ -128,11 +118,10 @@
 .plate--large { font-size: var(--fs-20); padding: 6px 14px 6px 10px; gap: 10px; }
 .plate--large svg { width: 20px; height: 20px; }
 
-/* ------------------------------------------------------------------ provenance rule (signature 2) */
 .prov { position: relative; background: var(--panel); border: 1px solid var(--rule); padding: 0; }
 .prov::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; }
 .prov--draft::before {
-  background: repeating-linear-gradient(135deg, var(--draft) 0 3px, #fff 3px 6px);   /* hatched: not yet reviewed */
+  background: repeating-linear-gradient(135deg, var(--draft) 0 3px, #fff 3px 6px);
   border-right: 1px solid var(--draft);
 }
 .prov--reviewed::before { background: var(--ink); }
@@ -143,7 +132,6 @@
 .prov--reviewed .prov__status { color: var(--ink); }
 .prov__body { padding: var(--s4) var(--s4) var(--s4) calc(var(--s4) + 6px); display: flex; flex-direction: column; gap: var(--s4); }
 
-/* ------------------------------------------------------------------ blocks, lists, tables */
 .block { background: var(--panel); border: 1px solid var(--rule); }
 .block__head { display: flex; align-items: center; gap: var(--s3); padding: var(--s2) var(--s4); border-bottom: 1px solid var(--rule); min-height: 40px; }
 .block__head h3 { font-size: var(--fs-14); }
@@ -173,7 +161,6 @@
 .empty { padding: var(--s6) var(--s4); display: flex; flex-direction: column; gap: var(--s3); align-items: flex-start; color: var(--ink-2); }
 .empty h3 { color: var(--ink); }
 
-/* ------------------------------------------------------------------ queue */
 .queue-row {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px var(--s3); width: 100%; text-align: left;
   padding: var(--s3) var(--s4); background: var(--panel); border: 0; border-bottom: 1px solid var(--rule);
@@ -187,7 +174,6 @@
 .queue-row__side { grid-row: 1 / span 2; grid-column: 2; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .queue-row__wait { font-size: var(--fs-12); color: var(--ink-2); }
 
-/* ------------------------------------------------------------------ follow-up questions */
 .q { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: var(--s3); padding: var(--s3) 0; border-bottom: 1px solid var(--rule); }
 .q:last-child { border-bottom: 0; }
 .q__rank { font-weight: 700; color: var(--ink-2); }
@@ -195,7 +181,6 @@
 .q__could { font-size: var(--fs-12); color: var(--ink-2); margin-top: 2px; }
 .q--done .q__text { color: var(--ink-2); font-weight: 400; }
 
-/* ------------------------------------------------------------------ steps (intake) */
 .steps { display: flex; flex-direction: column; gap: 0; }
 .step { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: var(--s3); padding: var(--s2) 0; align-items: start; }
 .step__mark { width: 16px; height: 16px; margin-top: 3px; border: 2px solid var(--rule-strong); border-radius: 50%; background: var(--panel); }
@@ -203,7 +188,6 @@
 .step--fail .step__mark { background: var(--urg-red); border-color: var(--urg-red); border-radius: 0; }
 .step--run .step__mark { border-color: var(--action); border-style: dashed; }
 
-/* ------------------------------------------------------------------ sign-in */
 .signin { min-height: 100%; display: grid; place-items: center; padding: var(--s5); background: var(--paper); }
 .signin__card { width: min(420px, 100%); background: var(--panel); border: 1px solid var(--rule-strong); }
 .signin__head { background: var(--ink); color: #fff; padding: var(--s4) var(--s5); }
@@ -213,7 +197,6 @@
 .signin__foot { padding: var(--s3) var(--s5); border-top: 1px solid var(--rule); color: var(--ink-2); font-size: var(--fs-12); }
 .pane--context { border-right: 0; }
 
-/* ------------------------------------------------------------------ narrow screens */
 .app-shell { grid-template-rows: var(--topbar-h) minmax(0, 1fr) auto; }
 .legal { min-height: var(--legal-h); padding-top: 4px; padding-bottom: 4px; text-align: center; }
 html, body { overflow-x: hidden; }
@@ -222,7 +205,7 @@ html, body { overflow-x: hidden; }
   .topbar { gap: var(--s3); padding: 0 var(--s3); }
   .topbar__brand { font-size: var(--fs-14); }
   .topbar__right { gap: var(--s2); min-width: 0; }
-  .topbar__right > span:not(.status):not(.demo-flag) { display: none; }   /* user name: not needed on a phone */
+  .topbar__right > span:not(.status):not(.demo-flag) { display: none; }
   .status { font-size: var(--fs-12); }
   .demo-flag { font-size: 0.6875rem; padding: 1px 6px; }
   .legal { font-size: 0.6875rem; line-height: 1.3; }
@@ -231,7 +214,6 @@ html, body { overflow-x: hidden; }
   .row > .field { flex-basis: 120px; }
 }
 
-/* ------------------------------------------------------------------ referral note (screen + print) */
 .note-overlay { position: fixed; inset: 0; z-index: 50; background: var(--paper); display: flex; flex-direction: column; }
 .note-toolbar { display: flex; align-items: center; gap: var(--s3); padding: var(--s2) var(--s4); background: var(--panel); border-bottom: 1px solid var(--rule-strong); flex-wrap: wrap; }
 .note-toolbar .grow { flex: 1; }
@@ -252,7 +234,6 @@ html, body { overflow-x: hidden; }
   .prov::before { print-color-adjust: exact; }
 }
 
-/* ------------------------------------------------------------------ hackathon bar: a plain black strip, sliding text */
 .app-root { display: grid; grid-template-rows: auto minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); height: 100%; }
 .app-root > :not(.hbar):not(.bars) { min-height: 0; }
 .hbar { min-width: 0; max-width: 100%; display: flex; align-items: center; background: #000; color: #fff; height: 28px; font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.02em; }
@@ -277,21 +258,17 @@ html, body { overflow-x: hidden; }
   .hbar__text { padding-right: 0; }
 }
 
-/* Second-factor strip above the work area (only shown when a verified second factor is still needed) */
 .app-main { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
 .app-main--plain { display: contents; }
 .app-main__body { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr); }
 .app-main--plain > .app-main__body { display: contents; }
 .mfa-strip { padding: var(--s3) var(--s4); background: var(--action-tint); border-bottom: 1px solid var(--rule-strong); }
 
-/* Top bar navigation */
 .topbar__nav { display: flex; gap: var(--s3); }
 .topbar__nav a { color: #fff; text-decoration: none; padding: 4px 8px; border-bottom: 2px solid transparent; font-size: var(--fs-14); }
 .topbar__nav a.active { border-bottom-color: #fff; font-weight: 700; }
 .topbar__nav a:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
-/* Phones: brand and controls on the first row, the navigation on its own row that scrolls sideways.
-   Without this the top bar is wider than the screen and Sign out falls off the edge. */
 @media (max-width: 820px) {
   .app-shell { grid-template-rows: auto minmax(0, 1fr) auto; }
   .topbar { flex-wrap: wrap; align-items: center; row-gap: 0; padding: 6px var(--s3) 0; }
@@ -303,23 +280,19 @@ html, body { overflow-x: hidden; }
   .lang-switch__label { display: none; }
 }
 
-/* The language switch sits on the dark top bar: keep its text dark on its light field (it inherited white text). */
 .topbar .select { color: var(--ink); background: #fff; height: 32px; min-height: 0; padding: 0 var(--s2); }
 .topbar label { color: #fff; }
 
-/* Queue filter */
 .qfilter { border-bottom: 1px solid var(--rule); padding: 0 var(--s3); }
 .qfilter summary { cursor: pointer; padding: var(--s2) 0; font-size: var(--fs-14); font-weight: 600; }
 .qfilter__body { display: flex; flex-direction: column; gap: var(--s2); padding-bottom: var(--s3); }
 
-/* Quick patient switch */
 .switch { position: fixed; inset: 0; z-index: 50; background: rgba(21, 35, 45, 0.55); display: flex; justify-content: center; align-items: flex-start; padding: 12vh var(--s3) 0; }
 .switch__box { background: var(--panel); border: 1px solid var(--rule-strong); width: min(560px, 100%); max-height: 70vh; overflow: auto; padding: var(--s3); display: flex; flex-direction: column; gap: var(--s2); }
 
 .linklike { background: none; border: 0; padding: 0; color: var(--action); text-decoration: underline; cursor: pointer; font: inherit; }
 .linklike[aria-pressed="true"] { font-weight: 600; }
 
-/* ------------------------------------------------------------------ account menu (top right) */
 .account { position: relative; }
 .account__button { display: inline-flex; align-items: center; gap: 8px; height: 32px; max-width: 320px; padding: 0 var(--s3); border: 1px solid #6c7c88; border-radius: var(--radius); background: transparent; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
 .account__button:hover, .account__button[aria-expanded='true'] { background: #24343f; }
@@ -337,7 +310,6 @@ html, body { overflow-x: hidden; }
 .topbar .account__menu label { color: var(--ink); }
 .account__menu .lang-switch__label { display: inline; }
 
-/* ------------------------------------------------------------------ triage-desk journey (encounter page) */
 .journey { display: flex; gap: 0; list-style: none; margin: 0; padding: 0; border: 1px solid var(--rule-strong); border-radius: var(--radius); overflow-x: auto; background: var(--panel); }
 .journey__step { flex: 1 1 0; min-width: 96px; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-right: 1px solid var(--rule); color: var(--ink-2); }
 .journey__step:last-child { border-right: 0; }
@@ -373,7 +345,6 @@ html, body { overflow-x: hidden; }
 .step-group { display: grid; gap: var(--s3); }
 .step-group__title { margin: var(--s4) 0 0; font-size: var(--fs-13); letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-2); }
 
-/* items of the scrolling pane keep their natural height instead of being squeezed */
 .journey, .nextstep, .fold, .step-group { flex: none; }
 @media (max-width: 700px) {
   .journey { overflow: visible; }
@@ -383,7 +354,6 @@ html, body { overflow-x: hidden; }
   .journey__step--current .journey__note { display: block; max-width: 100%; }
 }
 
-/* ------------------------------------------------------------------ triage desk start page */
 .starthere { display: grid; gap: var(--s4); max-width: 560px; margin: 0 auto; padding: var(--s4); }
 .starthere__new { justify-self: start; min-width: 220px; justify-content: center; }
 .starthere__counts { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; color: var(--ink-2); }
@@ -393,7 +363,6 @@ html, body { overflow-x: hidden; }
 
 .vitals-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--s3); }
 
-/* steps are buttons: the one on screen is highlighted, the recommended one carries "Next" */
 .journey__step { padding: 0; }
 .journey__button { all: unset; box-sizing: border-box; flex: 1; display: flex; align-items: center; gap: 8px; padding: 8px 10px; width: 100%; cursor: pointer; position: relative; }
 .journey__button:hover { background: var(--action-tint); }
@@ -407,28 +376,21 @@ html, body { overflow-x: hidden; }
   .journey__next { margin-left: 0; font-size: 11px; }
 }
 
-/* inside a step panel the step's own heading is above, so the sign-off box does not repeat its title or draw a second frame */
 .nextstep__body > section[aria-label="Reviewer sign-off"], .nextstep__body > div > section[aria-label="Reviewer sign-off"] { border: 0; background: transparent; }
 .nextstep__body section[aria-label="Reviewer sign-off"] > .block__head { display: none; }
 .nextstep__body section[aria-label="Reviewer sign-off"] > .block__body { padding: 0; }
 .nextstep__body { display: grid; gap: var(--s3); }
 
-/* fields of unequal height (one has a hint under it) start at the same line, so labels and boxes line up */
 .row--top { align-items: flex-start; }
 
-/* Pop-up for something that must be answered before work continues (consent) */
 .modal { position: fixed; inset: 0; z-index: 80; background: rgba(15, 27, 36, 0.55); display: flex; align-items: flex-start; justify-content: center; padding: 8vh 16px 16px; overflow-y: auto; }
 .modal__box { background: var(--panel); border: 1px solid var(--rule-strong); width: min(640px, 100%); max-height: 84vh; overflow-y: auto; outline: none; }
 .modal__bar { display: flex; justify-content: flex-end; padding: 8px 8px 0; }
 .modal__box .block { border: 0; margin: 0; }
 @media print { .modal { display: none; } }
 
-/* Landing page (signed-out visitors). Edge-to-edge placement: a two-column opening, a full-width row of settings, a dashed rule with a centred
-   label, a heading left and text right, one wide card of three equal columns split by dashed lines, a grid of cards, a status bar, two-column
-   questions. The page uses the full width of a wide container. No promotion, no gradients, no shadows. */
 .landing { min-height: 100%; background: var(--paper); color: var(--ink); scroll-behavior: smooth; }
 .landing__wrap { max-width: 1840px; margin: 0 auto; padding: var(--s4) clamp(24px, 2.5vw, 48px) var(--s6); }
-/* Three items, one gap: Features, Contact and Sign in are equally spaced, in a short bar at the top right. */
 .landing__nav { display: flex; align-items: center; gap: var(--s5); width: max-content; max-width: 100%; margin: var(--s3) 0 0 auto; padding: var(--s2) var(--s3); background: var(--panel); border: 1px solid var(--rule-strong); }
 .landing__nav a:not(.btn) { color: var(--ink); font-weight: 600; text-decoration: none; padding: var(--s2) 0; }
 .landing__nav a:not(.btn):hover { text-decoration: underline; }
@@ -446,7 +408,6 @@ html, body { overflow-x: hidden; }
 .landing__points p { margin: 3px 0 0; color: var(--ink-2); font-size: var(--fs-14); line-height: 1.45; max-width: 46ch; }
 .landing__icon { color: var(--action); padding-top: 1px; }
 
-/* full-width row of settings, centred heading, equal cells split by dashed lines */
 .landing__settings { padding: 0 0 clamp(48px, 7vw, 96px); text-align: center; }
 .landing__settings h2 { font-size: clamp(1.25rem, 2.2vw, 1.875rem); margin-bottom: var(--s5); }
 .landing__settings ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border-top: 1px dashed var(--rule-strong); border-bottom: 1px dashed var(--rule-strong); }
@@ -455,7 +416,6 @@ html, body { overflow-x: hidden; }
 .landing__settings strong { font-size: var(--fs-16); }
 .landing__settings span { color: var(--ink-2); font-size: var(--fs-14); line-height: 1.4; }
 
-/* dashed rule with a centred label, heading left and text right */
 .landing__features { padding-bottom: clamp(40px, 6vw, 80px); }
 .landing__rule { position: relative; display: flex; justify-content: center; align-items: center; height: 24px; }
 .landing__rule::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--rule-strong); }
@@ -464,7 +424,6 @@ html, body { overflow-x: hidden; }
 .landing__intro h2 { font-size: clamp(1.75rem, 3.6vw, 3rem); max-width: 18ch; }
 .landing__intro p { color: var(--ink-2); font-size: var(--fs-16); line-height: 1.5; max-width: 52ch; }
 
-/* one wide card, three equal columns split by dashed lines */
 .landing__card { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--rule-strong); background: var(--panel); }
 .landing__col { padding: var(--s5); display: grid; gap: var(--s3); align-content: start; border-left: 1px dashed var(--rule-strong); }
 .landing__col:first-child { border-left: 0; }
@@ -494,7 +453,6 @@ html, body { overflow-x: hidden; }
 .landing__steps p { margin: 0; color: var(--ink-2); font-size: var(--fs-14); line-height: 1.45; }
 .landing__stepno { font-weight: 700; font-size: var(--fs-13); color: var(--ink-2); }
 
-/* grid of cards: two over three */
 .landing__bento { display: grid; gap: var(--s4); padding: 0 0 clamp(40px, 6vw, 80px); }
 .landing__bentoTop { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s4); }
 .landing__bentoBottom { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s4); }
@@ -519,7 +477,6 @@ html, body { overflow-x: hidden; }
 .landing__limits p { margin: 0; grid-column: 1; }
 .landing__limits ul { grid-column: 2; grid-row: 1 / span 2; }
 
-/* heading left, list right */
 .landing__faq { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr); gap: clamp(24px, 6vw, 96px); padding: clamp(32px, 5vw, 64px) 0; border-top: 1px dashed var(--rule-strong); }
 .landing__faqHead h2 { font-size: clamp(1.5rem, 3vw, 2.5rem); max-width: 14ch; }
 .landing__faqHead p { color: var(--ink-2); margin: var(--s3) 0 0; max-width: 34ch; line-height: 1.5; }

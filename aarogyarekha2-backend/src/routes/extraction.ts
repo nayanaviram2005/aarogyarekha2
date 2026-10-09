@@ -1,8 +1,3 @@
-// Reading a stored report: run the local reader, parse rows, let a person verify each row.
-//  * The file is downloaded as the CALLER (only clean files are readable), read locally, and the rows are stored by the system
-//    (users cannot write extraction tables). Raw OCR text is stored but never returned to the browser.
-//  * Rows are TRANSCRIPTIONS. printed_flag is what the report printed. Nothing here says a value is abnormal or what it means.
-//  * Verifying a row records who confirmed it and when. An unverified row is never used for anything downstream.
 import { z } from 'zod';
 import type { RouteCtx, RouteHelpers } from './intake.js';
 import { OcrUnavailable } from '../ocr/engines.js';
@@ -12,7 +7,6 @@ import { secondRead } from './visionRead.js';
 import type { ExtractionView } from '../deps.js';
 
 const uuid = z.string().uuid();
-/** What to tell the person when the AI image reader could not read a photo. */
 const PHOTO_PROBLEM: Record<string, string> = {
   no_consent: 'Reading a photo uses an outside AI service and needs the patient’s separate consent. Record that consent, or upload the report as a PDF.',
   not_set_up: 'Reading photos is not set up on this server. Upload the report as a PDF instead.',
@@ -72,10 +66,8 @@ export function registerExtractionRoutes(c: RouteCtx, h: RouteHelpers): void {
           return { result: null, failure: err instanceof OcrUnavailable ? err.message : 'The report could not be read.' };
         }
       };
-      // Photos can be read by the outside AI image reader first (OCR_PHOTOS=ai), so a small server never runs the heavy local reader.
       const aiPrimary = d.mime_type !== 'application/pdf' && c.ocrPhotos !== 'local';
       let { result, failure } = aiPrimary ? { result: null as Read | null, failure: null as string | null } : await local();
-      // The AI reader (needs the patient's separate consent). Both reads are kept when both ran; a person verifies every row either way.
       const sr = await secondRead(deps, req, d, bytes);
       const aiRead = sr.status === 'ok' && sr.rows.length > 0;
       if (aiPrimary && !aiRead && c.ocrPhotos === 'ai_then_local') ({ result, failure } = await local());
@@ -83,7 +75,7 @@ export function registerExtractionRoutes(c: RouteCtx, h: RouteHelpers): void {
       let fields = parsed.fields; let counts: Record<string, number> | null = null; let engine = result?.engine ?? 'none';
       if (aiRead) {
         const m = crossCheck(parsed.fields, sr.rows); fields = m.fields; counts = m.counts; engine = result ? `${engine}+${sr.provider}` : `${sr.provider}`;
-        if (fields.length > 0) failure = null;                                   // the AI read rows the local reader could not
+        if (fields.length > 0) failure = null;
       }
       if (aiPrimary && !result && !aiRead && sr.status !== 'ok') failure = PHOTO_PROBLEM[sr.status] ?? 'The photo could not be read.';
       const avg = fields.length ? Math.round((fields.reduce((s, f) => s + (f.confidence ?? 0), 0) / fields.length) * 1000) / 1000 : null;
@@ -96,7 +88,6 @@ export function registerExtractionRoutes(c: RouteCtx, h: RouteHelpers): void {
       return { failure, secondRead: { status: sr.status, counts } };
     };
 
-    // ?async=1: answer at once and let the screen check back (GET /jobs/:id). The same checks have already run above.
     if ((req.query as { async?: string } | undefined)?.async === '1') {
       const jobId = c.jobs.submit(req.user!.userId, 'extract', async () => { const r = await work(); return { documentId: d.id, failure: r.failure }; });
       if (!jobId) return fail(reply, 429, 'throttled', 'Too many reports are waiting to be read. Wait a minute and try again.');

@@ -4,7 +4,6 @@ import { scenarioLabel } from '../lib/format';
 import type { Api, EncounterSummary } from '../lib/types';
 import { Banner } from './Provenance';
 
-/** What this type of visit usually needs, and what is already recorded. It does not change the priority. */
 export function ScenarioChecklist({ api, summary, editable, onChanged }: { api: Api; summary: EncounterSummary; editable: boolean; onChanged: () => void }) {
   const rows = scenarioChecklist(summary.encounter.scenario, summary);
   const [open, setOpen] = useState<string | null>(null);

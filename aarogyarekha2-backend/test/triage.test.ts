@@ -53,7 +53,6 @@ describe('NEWS2 layer: hand-checked cases (adult)', () => {
     expect(triage(adult({ onSupplementalOxygen: true }), RS).news2.score).toBe(2);
   });
 
-  // band edges: [value, expected points]
   it.each<[string, number, number]>([
     ['temperature_c', 35.0, 3], ['temperature_c', 35.1, 1], ['temperature_c', 36.0, 1], ['temperature_c', 36.1, 0],
     ['temperature_c', 38.0, 0], ['temperature_c', 38.1, 1], ['temperature_c', 39.0, 1], ['temperature_c', 39.1, 2],
@@ -152,7 +151,7 @@ describe('missing data is never read as normal', () => {
     expect(d.tier).toBe(4);
     const codes = d.missing.filter(m => m.potentialTier != null).map(m => m.code);
     expect(codes).toContain('sign.central_cyanosis');
-    expect(d.missing.find(m => m.code === 'sign.vomits_everything')).toBeUndefined();   // answered "no": not missing
+    expect(d.missing.find(m => m.code === 'sign.vomits_everything')).toBeUndefined();
     expect(d.potentialTier).toBe(3);
   });
 
@@ -181,7 +180,6 @@ describe('escalate-only guarantee', () => {
     expect(d.tier).toBe(1);
   });
 
-  // Seeded generator so a failure is reproducible.
   const rng = (seed: number) => () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   const allSigns = [...new Set(RS.floors.map(f => f.sign))];
   const randomInput = (r: () => number): TriageInput => {
@@ -235,7 +233,6 @@ describe('escalate-only guarantee', () => {
     for (let n = 0; n < 400; n++) {
       const i = { ...randomInput(r), ageYears: 40, pregnant: false as const };
       const before = tierOf(i);
-      // Replace a vital with an extreme value that is in the top band for that parameter.
       const worse = { ...i, vitals: { ...i.vitals, spo2_pct: 85 } };
       expect(tierOf(worse), `case ${n}`).toBeLessThanOrEqual(before);
     }

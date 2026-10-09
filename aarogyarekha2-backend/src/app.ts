@@ -43,19 +43,14 @@ const uuid = z.string().uuid();
 
 export async function buildApp(config: Pick<Config, 'allowedOrigins'> & { triageRuleSet?: { name: string; version: string }; uploadMaxMb?: number; requireMfa?: boolean; rateLimitPerMinute?: number; accessBudgetPerHour?: number; ocrPhotos?: 'local' | 'ai' | 'ai_then_local' }, deps: Deps): Promise<FastifyInstance> {
   const app = Fastify({
-    genReqId: () => randomUUID(),            // never trust a client-supplied request id
-    // Deprecated in Fastify 5.x but still supported until v6; the replacement (logController) is not in the
-    // installed typings yet. Revisit on upgrade.
-    disableRequestLogging: true,             // we log our own PHI-free line below
+    genReqId: () => randomUUID(),
+    disableRequestLogging: true,
     logger: {
       level: process.env.LOG_LEVEL ?? 'info',
-      // Defence in depth: even if a header or body sneaks into a log call, it is censored.
       redact: { paths: ['req.headers.authorization', 'req.headers.cookie', 'headers.authorization', '*.password', '*.token'], censor: '[redacted]' },
     },
   });
 
-  // Awaited on purpose: @fastify/rate-limit protects only routes registered AFTER it has loaded.
-  // The API returns data, never pages: nothing may load, run or frame from its answers.
   await app.register(helmet, {
     contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"], baseUri: ["'none'"], formAction: ["'none'"] } },
     referrerPolicy: { policy: 'no-referrer' }, crossOriginResourcePolicy: { policy: 'same-site' },
@@ -64,10 +59,8 @@ export async function buildApp(config: Pick<Config, 'allowedOrigins'> & { triage
   await app.register(cors, { origin: config.allowedOrigins, methods: ['GET', 'POST', 'PUT'], allowedHeaders: ['authorization', 'content-type'] });
   const maxUploadBytes = (config.uploadMaxMb ?? 10) * 1024 * 1024;
   await app.register(multipart, { limits: { fileSize: maxUploadBytes, files: 1, fields: 6, parts: 8, headerPairs: 50 } });
-  await app.register(rateLimit, { max: config.rateLimitPerMinute ?? 600, timeWindow: '1 minute' });         // one screen makes about a dozen calls; costly or sensitive routes set their own, lower limits
+  await app.register(rateLimit, { max: config.rateLimitPerMinute ?? 600, timeWindow: '1 minute' });
 
-  // A POST/PUT may legitimately carry a JSON content-type with NO body (submit, assess). The default parser turns that into
-  // a 500. Parse ourselves: empty body = no body; poisoned or malformed JSON = 400.
   app.addContentTypeParser('application/json', { parseAs: 'string', bodyLimit: 256 * 1024 }, (_req, body, done) => {
     const text = String(body).trim();
     if (!text) return done(null, undefined);
@@ -75,10 +68,8 @@ export async function buildApp(config: Pick<Config, 'allowedOrigins'> & { triage
     catch { const e = Object.assign(new Error('Request body is not valid JSON.'), { statusCode: 400 }); done(e, undefined); }
   });
 
-  // PHI must never be cached by browsers or intermediaries.
   app.addHook('onSend', async (_req, reply) => { reply.header('cache-control', 'no-store'); });
 
-  // PHI-free access log: method, path WITHOUT query string, status, duration, request id. No body, no headers.
   app.addHook('onResponse', async (req, reply) => {
     req.log.info({ method: req.method, path: req.url.split('?')[0], status: reply.statusCode, ms: Math.round(reply.elapsedTime), reqId: req.id }, 'request');
   });
@@ -93,7 +84,6 @@ export async function buildApp(config: Pick<Config, 'allowedOrigins'> & { triage
     let who: Awaited<ReturnType<typeof deps.verifyToken>>;
     try { who = await deps.verifyToken(token); }
     catch (err) {
-      // The sign-in service could not be reached or is rate-limiting us. That is not a bad session: say so, and do not record a failed login.
       req.log.warn({ reqId: req.id, err: (err as Error).message }, 'token check unavailable');
       return fail(reply, 503, 'transient', 'The sign-in service is busy. Wait a moment and try again. You are still signed in.');
     }
@@ -108,10 +98,8 @@ export async function buildApp(config: Pick<Config, 'allowedOrigins'> & { triage
   const base = (req: FastifyRequest): Pick<AuditEvent, 'actor' | 'requestId' | 'ip' | 'userAgent'> =>
     ({ actor: req.user!.userId, requestId: req.id, ip: req.ip, userAgent: req.headers['user-agent'] });
 
-  /** Audit, and refuse to release data if the audit record could not be written (fail closed). */
   const budget = makeAccessBudget(config.accessBudgetPerHour ?? 80);
   const auditOrFail = async (req: FastifyRequest, reply: FastifyReply, ev: Omit<AuditEvent, 'actor' | 'requestId' | 'ip' | 'userAgent'>) => {
-    // Access budget: opening many different patients' records in an hour is stopped and reported, even for a valid login.
     if (ev.action === 'read' && ev.outcome === 'success' && ev.patientId && req.user) {
       const b = budget.record(req.user.userId, ev.patientId);
       if (b.exceeded) {
@@ -128,10 +116,6 @@ export async function buildApp(config: Pick<Config, 'allowedOrigins'> & { triage
     }
   };
 
-  /**
-   * Decisions that change a patient's priority or send a record to another facility need a second factor (aal2) when the
-   * deployment requires it. Refused calls are logged. Returns true when the caller may go on.
-   */
   const requireMfa = async (req: FastifyRequest, reply: FastifyReply, what: string): Promise<boolean> => {
     if (!config.requireMfa || req.user?.aal === 'aal2') return true;
     await deps.audit({ ...base(req), action: 'update', entityType: 'mfa_gate', outcome: 'denied', details: { action: what } }).catch(() => {});
@@ -143,7 +127,7 @@ export async function buildApp(config: Pick<Config, 'allowedOrigins'> & { triage
   const helpers = registerIntakeRoutes(routeCtx);
   registerViewRoutes(routeCtx);
   registerReviewRoutes(routeCtx, helpers);
-  registerReferralBoardRoutes(routeCtx, helpers);   // before the :id routes so /referrals/incoming is not read as an id
+  registerReferralBoardRoutes(routeCtx, helpers);
   registerReferralRoutes(routeCtx, helpers);
   registerDocumentRoutes(routeCtx, helpers, maxUploadBytes);
   registerExtractionRoutes(routeCtx, helpers);
@@ -171,7 +155,7 @@ export async function buildApp(config: Pick<Config, 'allowedOrigins'> & { triage
       await deps.audit({ ...base(req), action: 'read', entityType: 'patient', entityId: id.data, outcome: 'error' }).catch(() => {});
       return fail(reply, 502, 'transient', 'The record could not be loaded. Try again.');
     }
-    if (!row) {   // missing OR hidden by RLS: indistinguishable on purpose
+    if (!row) {
       if (!(await auditOrFail(req, reply, { action: 'read', entityType: 'patient', entityId: id.data, outcome: 'denied' }))) return;
       return fail(reply, 404, 'not-found', 'No such patient, or you do not have access.');
     }
@@ -214,7 +198,7 @@ export async function buildApp(config: Pick<Config, 'allowedOrigins'> & { triage
 
   app.setNotFoundHandler((_req, reply) => fail(reply, 404, 'not-found', 'Unknown route.'));
   app.setErrorHandler((err, req, reply) => {
-    req.log.error({ reqId: req.id, err: (err as Error).message }, 'unhandled error');   // message only; never request data
+    req.log.error({ reqId: req.id, err: (err as Error).message }, 'unhandled error');
     const status = (err as { statusCode?: number }).statusCode;
     if (status === 429) return fail(reply, 429, 'throttled', 'Too many requests. Wait a minute and try again.');
     if (status === 413) return fail(reply, 413, 'too-costly', 'The request is too large.');

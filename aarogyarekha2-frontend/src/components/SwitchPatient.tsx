@@ -4,7 +4,6 @@ import { ageSex } from '../lib/format';
 import { clearRecent, readRecent } from '../lib/recentPatients';
 import type { Api, PatientBrief } from '../lib/types';
 
-/** A quick way to change patient (Ctrl+K): search, or jump back to a record opened earlier in this tab. */
 export function SwitchPatient({ api, open, onClose }: { api: Api | null; open: boolean; onClose: () => void }) {
   const nav = useNavigate();
   const [q, setQ] = useState('');

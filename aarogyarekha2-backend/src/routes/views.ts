@@ -1,12 +1,8 @@
-// Read views for the frontend: patient search, the queue board, and an encounter summary.
-// These go through the API (not straight from the browser to the database) so every read of patient data is audited.
-// RLS still decides what each caller can see; a facility admin or an unaffiliated user simply gets empty results.
 import { z } from 'zod';
 import type { RouteCtx } from './intake.js';
 import { isWaitingLong, sortQueue } from '../queue/sort.js';
 
 const patientQuery = z.object({
-  // Letters (any script), marks, digits, space, dot, hyphen. No commas, brackets or wildcards: the value is used in a filter.
   q: z.string().trim().regex(/^[\p{L}\p{M}\p{N} .-]{1,60}$/u, 'Use letters, numbers, spaces, dots or hyphens (up to 60).').optional(),
   limit: z.coerce.number().int().min(1).max(50).default(25),
 }).strict();
@@ -14,12 +10,10 @@ const patientQuery = z.object({
 export function registerViewRoutes(c: RouteCtx): void {
   const { app, deps, authenticate, fail } = c;
 
-  // Identity of the caller: name, facilities and roles. No patient data, so no read audit.
   app.get('/me', { preHandler: authenticate }, async (req, reply) => {
     let me: Awaited<ReturnType<NonNullable<typeof req.reader>['getMe']>> | undefined;
     try { me = await req.reader!.getMe(); } catch (err) { req.log.warn({ reqId: req.id, err: (err as Error).message }, 'profile could not be loaded'); }
     if (me === undefined) return fail(reply, 502, 'transient', 'Your profile could not be loaded. Try again.');
-    // Platform administrators have no facility role, so this is how the page knows to show their screen. A failed check just means "no".
     const isPlatformAdmin = deps.platformAdmin ? await deps.platformAdmin.isPlatform(req.user!.userId).catch(() => false) : false;
     return reply.send({ userId: req.user!.userId, aal: req.user!.aal ?? 'aal1', mfaRequired: c.mfaRequired, isPlatformAdmin, ...me });
   });

@@ -1,12 +1,3 @@
-// A second opinion on review priority from an outside AI model, shown beside the rules result.
-//
-// What it is: a suggestion of HOW SOON a person should be looked at (tier 1 most urgent to 4), with a short plain reason.
-// What it is not: a diagnosis, a cause, a treatment or a medicine. The reply is checked by the non-diagnostic guard and dropped if it fails.
-// How it is used: it can only RAISE the priority (it enters the engine as an external hint). A reviewer sees both results and
-// decides; only a reviewer can lower anything. If the service is down, slow, unconfigured or sends something unusable, the
-// rules result stands alone.
-//
-// The case text is built from structured facts and the patient's own words, redacted first. assertClean() must pass on the exact bytes.
 import { z } from 'zod';
 import { checkNonDiagnostic } from '../guard/nonDiagnostic.js';
 import type { TriageInput, Tier } from '../triage/types.js';
@@ -14,8 +5,7 @@ import { AiError, type Generate } from './provider.js';
 import { assertClean, redact } from './redact.js';
 
 export interface CaseWords { complaint?: string | null; symptoms: { text: string; duration?: string | null; severity?: number | null }[]; reportNotes?: string[] }
-export interface AiOpinion { tier: Tier; reason: string; ask: string[] | null; /** sign code -> the question worded for this patient */ phrasing: Record<string, string> }
-/** A question the rules could ask. `must` ones are always asked (the quick emergency looks); the model only words them. `question` is the plain, fixed meaning the answer is recorded against. */
+export interface AiOpinion { tier: Tier; reason: string; ask: string[] | null; phrasing: Record<string, string> }
 export interface Candidate { code: string; label: string; question?: string; must?: boolean }
 
 const Reply = z.object({ tier: z.number().int().min(1).max(4), reason: z.string().min(1).max(400), ask: z.array(z.string().max(80)).max(30).optional(), questions: z.array(z.object({ code: z.string().max(80), text: z.string().max(300) })).max(40).optional() });
@@ -38,7 +28,6 @@ const LABEL: Record<string, string> = {
 };
 const yn = (v: boolean | null | undefined) => (v === true ? 'yes' : v === false ? 'no' : 'not asked');
 
-/** The case as text. Sign codes are used as-is (they are rule vocabulary, not personal data). */
 export function buildCaseText(input: TriageInput, words: CaseWords, sex: string | null | undefined): string {
   const lines: string[] = [];
   lines.push(`Age: ${input.ageYears == null ? 'unknown' : input.ageYears < 2 ? `${Math.round(input.ageYears * 12)} months` : `${Math.floor(input.ageYears)} years`}`);
@@ -56,7 +45,7 @@ export function buildCaseText(input: TriageInput, words: CaseWords, sex: string 
   return lines.join('\n');
 }
 
-export interface OpinionRun { opinion: AiOpinion | null; sentChars: number; dropped: 'bad_reply' | 'guard' | null; /** What actually answered (it may be a fallback model or provider). */ served: { provider: string; model: string } }
+export interface OpinionRun { opinion: AiOpinion | null; sentChars: number; dropped: 'bad_reply' | 'guard' | null; served: { provider: string; model: string } }
 
 const candidateText = (c: Candidate[]) => {
   const must = c.filter(x => x.must), pick = c.filter(x => !x.must);
@@ -66,16 +55,14 @@ const candidateText = (c: Candidate[]) => {
 
 const NAMES_A_CONDITION = /\b\w{3,}(itis|osis|emia|aemia|pathy|oma|syndrome|ectomy)\b|\b(dengue|malaria|typhoid|covid|pneumonia|tuberculosis|diabetes|cancer|stroke|infarction|sepsis|meningitis|eclampsia|appendicitis)\b/i;
 
-/** A model-written question is kept only if it is one short plain question: no tokens, numbers that look like ids, links, or diagnostic words. */
 export function cleanQuestion(text: string): string | null {
   const t = text.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
   if (t.length < 8 || t.length > 200 || !t.endsWith('?') || (t.match(/\?/g) ?? []).length > 1) return null;
   if (/\[\[|\]\]|@|https?:|www\.|\d{6,}/i.test(t)) return null;
-  if (NAMES_A_CONDITION.test(t)) return null;                                  // a question checks a sign; it never names a disease
+  if (NAMES_A_CONDITION.test(t)) return null;
   return checkNonDiagnostic(t).allowed ? t : null;
 }
 
-/** Throws AiError (not configured, timeout, network, rejected) or PiiLeak; returns opinion null when the reply is unusable. */
 export async function getAiOpinion(
   gen: Generate, input: TriageInput, words: CaseWords, sex: string | null | undefined,
   known: { names?: (string | null | undefined)[]; identifiers?: (string | null | undefined)[] },
@@ -83,7 +70,7 @@ export async function getAiOpinion(
 ): Promise<OpinionRun> {
   const r = redact(buildCaseText(input, words, sex), known);
   assertClean(r.text.replace(/\[\[NAME_\d+\]\]/g, 'X'), known);
-  const res = await gen({ system: SYSTEM, user: r.text + candidateText(candidates), json: true, maxTokens: 8192 });         // models that think before answering spend part of this on thinking; a small limit cut replies off mid-JSON
+  const res = await gen({ system: SYSTEM, user: r.text + candidateText(candidates), json: true, maxTokens: 8192 });
   const served = { provider: res.provider, model: res.model };
   let parsed: z.infer<typeof Reply>;
   try { parsed = Reply.parse(JSON.parse(res.text.trim().replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/, '$1'))); }

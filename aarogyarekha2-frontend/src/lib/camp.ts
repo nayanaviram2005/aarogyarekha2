@@ -3,16 +3,10 @@ import { NOTICE_VERSION } from '../components/ConsentForm';
 import { ApiError } from './api';
 import type { Api, DuplicateMatch, PatientBrief } from './types';
 
-/**
- * Health camp: register, take consent, open the encounter, record the temperature, submit and assess, one person at a time.
- * Each row remembers what already succeeded, so retrying a failed row never registers the same person twice.
- */
 export interface CampProgress { patientId?: string; consent?: boolean; encounterId?: string; vital?: boolean; submitted?: boolean }
 export interface CampRow {
   key: string; name: string; sex: PatientBrief['sex']; age: string; language: string; complaint: string; temperature: string;
-  /** The notice was read to this person and they agreed. Without it nothing is saved. */
   consented: boolean;
-  /** Staff confirmed this is not the person the system thinks they already know. */
   notDuplicate: boolean;
   progress: CampProgress;
   status: 'todo' | 'run' | 'done' | 'fail' | 'duplicate';
@@ -22,7 +16,6 @@ export interface CampRow {
 export const blankRow = (key: string): CampRow => ({ key, name: '', sex: 'unknown', age: '', language: 'en', complaint: '', temperature: '', consented: false, notDuplicate: false, progress: {}, status: 'todo' });
 export const isBlank = (r: CampRow) => !r.name.trim() && !r.age.trim() && !r.complaint.trim() && !r.temperature.trim();
 
-/** A problem with this row that can be fixed before anything is sent, or null. */
 export function rowProblem(r: CampRow, witness: string): string | null {
   const reg = buildRegistration({ fullName: r.name, sex: r.sex, age: r.age, birthDate: '', language: r.language });
   if (typeof reg === 'string') return reg;

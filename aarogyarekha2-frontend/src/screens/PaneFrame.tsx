@@ -3,7 +3,6 @@ import { QueuePane } from './QueuePane';
 
 type Pane = 'queue' | 'note' | 'context';
 
-/** Three panes on a wide screen; one pane at a time with a tab bar on a narrow one. */
 export function PaneFrame({ center, context, startOn, resetKey }: { center: ReactNode; context: ReactNode; startOn: Pane; resetKey?: string }) {
   const [pane, setPane] = useState<Pane>(startOn);
   useEffect(() => setPane(startOn), [startOn, resetKey]);

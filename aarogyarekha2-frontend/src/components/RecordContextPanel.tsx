@@ -2,11 +2,6 @@ import { useEffect, useState } from 'react';
 import type { Api, RecordContext } from '../lib/types';
 import { Banner } from './Provenance';
 
-/**
- * What the patient's uploaded records say, at the top of the case where the priority is decided. It only repeats what the reports printed:
- * the lab's own flags, never a judgement. Rows no person has checked yet are marked, and the AI second opinion only sees checked rows.
- * Shows nothing when no record has been uploaded.
- */
 export function RecordContextPanel({ api, encounterId, refreshKey = 0 }: { api: Api; encounterId: string; refreshKey?: number }) {
   const [ctx, setCtx] = useState<RecordContext | null>(null);
   const [failed, setFailed] = useState(false);

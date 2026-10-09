@@ -1,4 +1,3 @@
-// Migration 0015 (reviewer_notes) against the REAL schema, with row-level security switched on for the test user.
 import type { PGlite } from '@electric-sql/pglite';
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -8,7 +7,6 @@ let db: PGlite;
 const F1 = randomUUID(), F2 = randomUUID(), P = randomUUID(), E = randomUUID(), E2 = randomUUID(), A = randomUUID(), RS = randomUUID();
 const U = { nurse: randomUUID(), hw: randomUUID(), other: randomUUID(), admin: randomUUID() };
 
-/** Runs `f` as the signed-in user (authenticated role + JWT subject), then switches back. */
 async function as<T>(user: string, f: () => Promise<T>): Promise<T> {
   await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub', '${user}', false), set_config('request.jwt.claim.role', 'authenticated', false);`);
   try { return await f(); } finally { await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false);`); }

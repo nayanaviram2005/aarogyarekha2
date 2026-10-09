@@ -1,12 +1,3 @@
--- 0007 access-control helpers used by RLS.
--- Role model:
---   intake roles   : health_worker, nurse, doctor, medical_officer   -> may handle patient data at their facility
---   reviewer roles : nurse, doctor, medical_officer                  -> may review/override/refer
---   facility_admin : manages memberships & directory; has NO patient-data access
---   platform admin : manages facilities; has NO patient-data access
--- Membership is read from the table on every call (not from JWT claims) so revocation is immediate.
--- All functions are STABLE SECURITY DEFINER with an empty search_path (no RLS recursion, no hijacking).
-
 create or replace function app.is_platform_admin()
 returns boolean language sql stable security definer set search_path = '' as $$
   select exists (select 1 from public.platform_admins p where p.user_id = (select auth.uid()));
@@ -48,8 +39,6 @@ returns boolean language sql stable security definer set search_path = '' as $$
                  where p.id = p_patient and p.user_id = (select auth.uid()) and p.deleted_at is null);
 $$;
 
--- Patient-level access: self | registering facility | facility with an encounter | referral
--- destination | active consent-backed grant | active break-glass.
 create or replace function app.can_access_patient(p_patient uuid)
 returns boolean language sql stable security definer set search_path = '' as $$
   select
@@ -69,8 +58,6 @@ returns boolean language sql stable security definer set search_path = '' as $$
                  and app.is_clinician_at(b.facility_id));
 $$;
 
--- Encounter-level access is narrower: the registering facility does NOT automatically see other
--- facilities' encounters (so a camp's encounter is not visible to the home PHC unless referred/granted).
 create or replace function app.can_access_encounter(p_encounter uuid)
 returns boolean language sql stable security definer set search_path = '' as $$
   select exists (
@@ -99,7 +86,6 @@ returns uuid language sql stable security definer set search_path = '' as $$
   select registered_facility_id from public.patients where id = p_patient;
 $$;
 
--- Documents are downloadable only when the file has passed the malware scan.
 create or replace function app.can_read_document_object(p_path text)
 returns boolean language sql stable security definer set search_path = '' as $$
   select exists (
@@ -118,5 +104,4 @@ $$;
 
 revoke all on all functions in schema app from public, anon;
 grant execute on all functions in schema app to authenticated, service_role;
--- write_audit stays service_role-only (its own grants are re-applied below since the line above reset them)
 revoke execute on function app.write_audit(public.audit_action, text, uuid, uuid, uuid, uuid, public.audit_outcome, text, inet, text, text, jsonb) from authenticated;

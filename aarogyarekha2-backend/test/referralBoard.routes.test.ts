@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { DbError, type AuditEvent, type ConsentBrief, type Deps, type FacilityRow, type ReferralBoardRow, type ReferralRow, type ReferralStatus, type UserReader, type UserWriter } from '../src/deps.js';
 
-const FA = '22222222-2222-4222-8222-222222222222';   // sending
-const FB = '77777777-7777-4777-8777-777777777777';   // receiving
-const FC = '88888888-8888-4888-8888-888888888888';   // unrelated
+const FA = '22222222-2222-4222-8222-222222222222';
+const FB = '77777777-7777-4777-8777-777777777777';
+const FC = '88888888-8888-4888-8888-888888888888';
 const R = '99999999-9999-4999-8999-999999999999';
 const P = '11111111-1111-4111-8111-111111111111';
 const mem = (facilityId: string, role: string) => ({ facilityId, facilityName: 'F', facilityType: 'phc', role });

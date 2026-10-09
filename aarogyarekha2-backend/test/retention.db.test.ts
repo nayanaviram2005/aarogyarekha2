@@ -1,4 +1,3 @@
-// The retention SQL against the REAL schema: selection, legal hold, scrubbing under the append-only rules, and the proof entry.
 import type { PGlite } from '@electric-sql/pglite';
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';

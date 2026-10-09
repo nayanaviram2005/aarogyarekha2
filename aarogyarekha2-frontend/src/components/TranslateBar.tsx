@@ -3,10 +3,6 @@ import { ApiError } from '../lib/api';
 import type { Api } from '../lib/types';
 import { Banner } from './Provenance';
 
-/**
- * "Translate to English" for what the patient said in Hindi or Odia. The patient's triage consent covers it (its notice says
- * redacted text goes to an outside service). The original text stays on screen; the translation is labelled machine output, not verified.
- */
 export function TranslateBar({ api, encounterId, patientId, onDone }: { api: Api; encounterId: string; patientId: string; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | Error | null>(null);

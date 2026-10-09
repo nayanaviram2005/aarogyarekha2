@@ -3,7 +3,6 @@ import type { PatientBrief, Sex, Tier } from './types';
 const MS_YEAR = 365.25 * 24 * 3600 * 1000;
 const MS_DAY = 24 * 3600 * 1000;
 
-/** "3 y", "8 mo", "12 d"; falls back to an age reported at a camp; "age unknown" otherwise. Never invents an age. */
 export function formatAge(p: Pick<PatientBrief, 'birth_date' | 'age_years_reported'>, now: Date = new Date()): string {
   if (p.birth_date) {
     const t = Date.parse(p.birth_date);
@@ -22,7 +21,6 @@ const SEX: Record<Sex, string> = { female: 'Female', male: 'Male', other: 'Other
 export const formatSex = (s: Sex) => SEX[s] ?? SEX.unknown;
 export const ageSex = (p: PatientBrief, now?: Date) => `${formatAge(p, now)}, ${formatSex(p.sex).toLowerCase()}`;
 
-/** "12 min", "1 h 05 min", "2 d". Waiting time is shown, never hidden. Empty when unknown. */
 export function formatWait(since: string | null, now: Date = new Date()): string {
   if (!since) return '';
   const t = Date.parse(since);
@@ -84,7 +82,6 @@ export const CONSCIOUSNESS: { value: 'alert' | 'confusion' | 'voice' | 'pain' | 
   { value: 'pain', label: 'Responds to pain only' }, { value: 'unresponsive', label: 'Unresponsive' },
 ];
 
-/** Latest reading per kind, newest first within kind. */
 export function latestVitals<T extends { kind: string; measured_at: string }>(rows: T[]): T[] {
   const m = new Map<string, T>();
   for (const r of rows) { const p = m.get(r.kind); if (!p || Date.parse(r.measured_at) >= Date.parse(p.measured_at)) m.set(r.kind, r); }

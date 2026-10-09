@@ -7,7 +7,6 @@ const RELATION: Record<AiOpinionView['relation'], string> = {
   lower: 'The AI model suggested a lower priority than the rules. The rules result was kept. Only a reviewer can lower it.',
 };
 
-/** The AI model's second opinion on priority, beside the rules result. Machine output: never shown as a decision. */
 export function AiOpinion({ opinion }: { opinion: AiOpinionView }) {
   return (
     <div aria-label="AI second opinion">

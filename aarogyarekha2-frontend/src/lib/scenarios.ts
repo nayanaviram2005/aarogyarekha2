@@ -1,9 +1,5 @@
 import type { QueueEntry } from './types';
 
-/**
- * Counts for the scenario boards, worked out from the queue already on screen. These are COUNTS of recorded visits, not findings:
- * the app does not say what is causing a cluster, only that several similar visits arrived close together.
- */
 export interface ScenarioSummary { scenario: string; total: number; byTier: Record<1 | 2 | 3 | 4, number>; notAssessed: number; oldestWaitingSince: string | null }
 
 const hours = (iso: string | null, now: Date) => (iso && !Number.isNaN(Date.parse(iso)) ? (now.getTime() - Date.parse(iso)) / 3_600_000 : null);
@@ -19,7 +15,6 @@ export function summarizeScenario(entries: QueueEntry[], scenario: string): Scen
   return { scenario, total: mine.length, byTier, notAssessed, oldestWaitingSince: oldest };
 }
 
-/** The number of similar visits in the window that makes a facility officer look. A DRAFT value: the real one is a public-health decision. */
 export const CLUSTER_RULE = { windowHours: 72, threshold: 5, validated: false } as const;
 
 export interface ClusterSignal { count: number; threshold: number; windowHours: number; flagged: boolean }

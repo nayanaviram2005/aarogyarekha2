@@ -7,7 +7,6 @@ const gemOk = (text = '{"a":1}') => res(200, { candidates: [{ content: { parts: 
 const orOk = (text = '{"b":2}') => res(200, { choices: [{ message: { content: text } }] });
 const base = { GEMINI_API_KEY: 'g-key', GEMINI_MODEL: 'g-main', OPENROUTER_API_KEY: 'o-key', OPENROUTER_MODEL: 'o-model', AI_RETRY_AFTER_MS: 0 };
 const req = { system: 'S', user: 'U', json: true };
-/** A fetch that answers by URL: busy for the Gemini main model, whatever the test says for the rest. */
 const router = (h: { main?: () => Promise<Response>; fallbackModel?: () => Promise<Response>; openrouter?: () => Promise<Response> }) => vi.fn().mockImplementation((url: string) => {
   if (String(url).includes('g-main')) return (h.main ?? (() => res(503)))();
   if (String(url).includes('g-fallback')) return (h.fallbackModel ?? (() => res(503)))();
@@ -19,7 +18,7 @@ describe('fallback model', () => {
   const p = (f: ReturnType<typeof vi.fn>) => makeProvider({ AI_PROVIDER: 'gemini', ...base, AI_FALLBACK_MODEL: 'g-fallback' }, f as never);
   it('is used once when the main model stays busy, and the answer says which model served it', async () => {
     const f = router({ fallbackModel: () => gemOk('{"ok":"fallback"}') }); const r = await p(f).generate(req);
-    expect(r).toEqual({ text: '{"ok":"fallback"}', provider: 'gemini', model: 'g-fallback' }); expect(f).toHaveBeenCalledTimes(3);       // main twice (retry), then the fallback model
+    expect(r).toEqual({ text: '{"ok":"fallback"}', provider: 'gemini', model: 'g-fallback' }); expect(f).toHaveBeenCalledTimes(3);
   });
   it('is not used when the main model works, or when the request itself was wrong (4xx)', async () => {
     const a = router({ main: () => gemOk() }); await p(a).generate(req); expect(a).toHaveBeenCalledTimes(1);
@@ -73,7 +72,7 @@ describe('vision fallback', () => {
   it('uses a fallback PROVIDER only when one was named for this task, and the provider can read the file type', async () => {
     const f = router({ openrouter: () => orOk(rows) });
     expect((await v(f, { AI_FALLBACK_PROVIDER: 'openrouter' }).read(file)).provider).toBe('openrouter');
-    const g = router({ openrouter: () => orOk(rows) }); await expect(v(g, { AI_FALLBACK_PROVIDER: 'openrouter' }).read({ bytes: Buffer.from('x'), mime: 'application/pdf' })).rejects.toMatchObject({ kind: 'busy' });   // a PDF is not sent to a provider that cannot read it
+    const g = router({ openrouter: () => orOk(rows) }); await expect(v(g, { AI_FALLBACK_PROVIDER: 'openrouter' }).read({ bytes: Buffer.from('x'), mime: 'application/pdf' })).rejects.toMatchObject({ kind: 'busy' });
     const h = router({ openrouter: () => orOk(rows) }); await expect(v(h).read(file)).rejects.toMatchObject({ kind: 'busy' }); expect(h.mock.calls.every(c => !String(c[0]).includes('openrouter'))).toBe(true);
   });
 });

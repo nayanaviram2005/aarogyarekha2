@@ -7,7 +7,6 @@ const fmtSec = (s: number | null) => (s === null ? 'no data' : s < 60 ? `${s} se
 const fmtMin = (m: number | null) => (m === null ? 'no data' : m < 60 ? `${m} minutes` : `${Math.round(m / 6) / 10} hours`);
 const spread = (s: Spread, f: (n: number | null) => string) => (s.n === 0 ? 'No data yet' : `Typical ${f(s.median)}; 9 in 10 within ${f(s.p90)} (${s.n} visits)`);
 
-/** Counts and timings for the administrator's facilities. No names. Agreement is how often a reviewer confirmed the rules' priority; it says nothing about clinical accuracy. */
 export function AnalyticsPanel({ api }: { api: Api }) {
   const [days, setDays] = useState<7 | 30 | 90>(30);
   const [a, setA] = useState<AnalyticsView | null>(null);

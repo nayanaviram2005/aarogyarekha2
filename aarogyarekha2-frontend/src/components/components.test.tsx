@@ -45,7 +45,6 @@ describe('Provenance', () => {
 });
 
 describe('FollowUpControl', () => {
-  // A small stand-in for the page: it keeps the chosen answers, as the page does, and never saves anything.
   function Harness({ fieldCode, question = 'q', ...rest }: { fieldCode: string; question?: string; potentialTier?: 1 | 2 | 3 | 4 | null; disabled?: boolean; checks?: string | null; initial?: Draft; spy?: (d: Draft | null) => void }) {
     const [d, setD] = useState<Draft | undefined>(rest.initial);
     return <ul><FollowUpControl fieldCode={fieldCode} question={question} rank={1} potentialTier={rest.potentialTier ?? null} disabled={rest.disabled} checks={rest.checks} draft={d} onDraft={x => { rest.spy?.(x); setD(x ?? undefined); }} /></ul>;

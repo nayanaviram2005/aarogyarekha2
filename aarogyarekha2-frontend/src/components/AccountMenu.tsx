@@ -4,10 +4,6 @@ import { LanguageSwitcher } from '../i18n/I18n';
 import { accountLabel, rolesByFacility, rolesOf } from '../lib/account';
 import type { Me } from '../lib/types';
 
-/**
- * The person's name and role in the top right, as a button that opens a menu: who they are, quick settings, other settings and sign out.
- * It is a disclosure: Escape or a click outside closes it and returns focus to the button.
- */
 export function AccountMenu({ me, loadFailed, onRetry, lowData, setLowData, needMfa, onVerifyMfa, onSignOut }: {
   me: Me | null; loadFailed?: boolean; onRetry?: () => void;
   lowData: boolean; setLowData: (v: boolean) => void; needMfa: boolean; onVerifyMfa: () => void; onSignOut: () => void;

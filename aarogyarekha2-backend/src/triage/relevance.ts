@@ -19,6 +19,7 @@ export function askableFloors(input: TriageInput, rs: RuleSet): FloorRule[] {
     if (input.signs[f.sign] != null) return false;
     switch (f.population) {
       case 'any': return true;
+      case 'child': return input.ageYears == null || input.ageYears < rs.news2.minAgeYears;
       case 'child_under_5': return input.ageYears == null || input.ageYears < 5;
       case 'adult': return input.ageYears == null || (input.ageYears >= rs.news2.minAgeYears && input.pregnant !== true);
       case 'pregnant': return input.pregnant == null || input.pregnant === true;

@@ -51,6 +51,15 @@ describe('processRow', () => {
     const second = await processRow(a, first, 'W');
     expect(second.status).toBe('done'); expect(a.createEncounter).toHaveBeenCalledTimes(1); expect(a.addVital).toHaveBeenCalledTimes(1); expect(a.submit).toHaveBeenCalledTimes(2);
   });
+  it('records a separate training consent only when the person agreed to it, and only once on a retry', async () => {
+    const none = api(); await processRow(none, row(), 'W');
+    expect(none.recordConsent).toHaveBeenCalledTimes(1);
+    const a = api({ submit: vi.fn().mockRejectedValueOnce(new ApiError(502, 'x')).mockResolvedValue({}) });
+    const first = await processRow(a, row({ training: true }), 'A. Witness'); expect(first.status).toBe('fail');
+    const second = await processRow(a, first, 'A. Witness'); expect(second.status).toBe('done');
+    expect(a.recordConsent).toHaveBeenCalledTimes(2);
+    expect(a.recordConsent).toHaveBeenNthCalledWith(2, 'p1', expect.objectContaining({ purpose: 'research_deidentified', witnessName: 'A. Witness', givenBy: 'self' }));
+  });
   it('a probable duplicate stops the row and shows who; ticking "different person" sends the confirmation', async () => {
     const dup = new ApiError(409, 'Someone ... already registered', [{ id: 'old', publicRef: 'AR-0001', fullName: 'Meera Das', sex: 'female', birthDate: null, ageYears: 28 }]);
     const a = api({ registerPatient: vi.fn().mockRejectedValueOnce(dup).mockResolvedValue({ id: 'p2', publicRef: 'AR-2' }) });

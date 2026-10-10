@@ -227,7 +227,7 @@ export function registerIntakeRoutes(c: RouteCtx): RouteHelpers {
 
     let result;
     try {
-      result = await deps.assess({ encounterId: enc.id, facilityId: enc.facility_id, ruleSetName: c.triageRuleSet.name, ruleSetVersion: c.triageRuleSet.version, input, aiOpinion: ai.tier != null && ai.reason ? { tier: ai.tier, reason: ai.reason, provider: ai.provider ?? '', model: ai.model ?? '' } : null });
+      result = await deps.assess({ encounterId: enc.id, facilityId: enc.facility_id, ruleSetName: c.triageRuleSet.name, ruleSetVersion: c.triageRuleSet.version, input, aiOpinion: ai.tier != null && ai.reason ? { tier: ai.tier, reason: ai.reason, provider: ai.provider ?? '', model: ai.model ?? '' } : null, aiStatus: ai.status });
     } catch (err) {
       if (err instanceof RuleSetUnavailable) {
         req.log.warn({ reqId: req.id, reason: err.reason }, 'triage rules unavailable');

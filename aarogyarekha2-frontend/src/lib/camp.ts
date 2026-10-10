@@ -1,12 +1,13 @@
 import { buildRegistration } from '../components/RegisterPatientForm';
-import { NOTICE_VERSION } from '../components/ConsentForm';
+import { NOTICE_VERSION, TRAINING_NOTICE_VERSION } from '../components/ConsentForm';
 import { ApiError } from './api';
 import type { Api, DuplicateMatch, PatientBrief } from './types';
 
-export interface CampProgress { patientId?: string; consent?: boolean; encounterId?: string; vital?: boolean; submitted?: boolean }
+export interface CampProgress { patientId?: string; consent?: boolean; training?: boolean; encounterId?: string; vital?: boolean; submitted?: boolean }
 export interface CampRow {
   key: string; name: string; sex: PatientBrief['sex']; age: string; language: string; complaint: string; temperature: string;
   consented: boolean;
+  training?: boolean;
   notDuplicate: boolean;
   progress: CampProgress;
   status: 'todo' | 'run' | 'done' | 'fail' | 'duplicate';
@@ -35,6 +36,7 @@ export async function processRow(api: Api, row: CampRow, witness: string): Promi
   try {
     if (!p.patientId) { p.patientId = (await api.registerPatient({ ...reg, ...(row.notDuplicate ? { confirmNotDuplicate: true } : {}) })).id; }
     if (!p.consent) { await api.recordConsent(p.patientId, { purpose: 'care_triage', givenBy: 'self', method: 'verbal_witnessed', noticeVersion: NOTICE_VERSION, witnessName: witness.trim() }); p.consent = true; }
+    if (row.training && !p.training) { await api.recordConsent(p.patientId, { purpose: 'research_deidentified', givenBy: 'self', method: 'verbal_witnessed', noticeVersion: TRAINING_NOTICE_VERSION, witnessName: witness.trim() }); p.training = true; }
     if (!p.encounterId) { encounterId = (await api.createEncounter({ patientId: p.patientId, scenario: 'health_camp', language: row.language, chiefComplaint: row.complaint.trim() })).id; p.encounterId = encounterId; }
     if (row.temperature.trim() && !p.vital) { await api.addVital(p.encounterId, { kind: 'temperature_c', value: Number(row.temperature) }); p.vital = true; }
     if (!p.submitted) { await api.submit(p.encounterId); p.submitted = true; }

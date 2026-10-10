@@ -24,7 +24,7 @@ export async function loadRuleSet(db: Queryable, name: string, version: string):
 }
 
 export interface StoredAiOpinion { tier: Tier; reason: string; provider: string; model: string }
-export interface PersistArgs { encounterId: string; facilityId: string; ruleSetName: string; ruleSetVersion: string; input: TriageInput; aiOpinion?: StoredAiOpinion | null }
+export interface PersistArgs { encounterId: string; facilityId: string; ruleSetName: string; ruleSetVersion: string; input: TriageInput; aiOpinion?: StoredAiOpinion | null; aiStatus?: string }
 export interface PersistResult { assessmentId: string; version: number; decision: TriageDecision; queueUrgency: string; downgradeSuggested: boolean; ruleSet: RuleSet }
 
 export async function assessEncounter(pool: PoolLike, a: PersistArgs): Promise<PersistResult> {
@@ -48,7 +48,7 @@ export async function assessEncounter(pool: PoolLike, a: PersistArgs): Promise<P
       aiOpinion = { tier: a.aiOpinion.tier, reason: a.aiOpinion.reason, provider: a.aiOpinion.provider, model: a.aiOpinion.model, machineGenerated: true, rulesTier, relation: a.aiOpinion.tier === rulesTier ? 'agrees' : a.aiOpinion.tier < rulesTier ? 'raised' : 'lower' };
       assertNoteNonDiagnostic(aiOpinion.reason);
     }
-    const note = { disclaimer: DISCLAIMER, ...derived, ...(aiOpinion ? { aiOpinion } : {}) };
+    const note = { disclaimer: DISCLAIMER, ...derived, ...(aiOpinion ? { aiOpinion } : a.aiStatus ? { aiStatus: a.aiStatus } : {}) };
     for (const s of decision.signals) assertNoteNonDiagnostic(s.display_text);
 
     await db.query('select id from public.encounters where id = $1 for update', [a.encounterId]);

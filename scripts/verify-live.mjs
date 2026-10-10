@@ -13,7 +13,7 @@ const q = async (sql, params) => (await c.query(sql, params)).rows;
 try {
   const tables = await q(`select c.relname, c.relrowsecurity rls from pg_class c join pg_namespace n on n.oid=c.relnamespace
                           where n.nspname='public' and c.relkind in ('r','p') order by 1`);
-  check(tables.length === 37, 'public tables created', `${tables.length} tables`);
+  check(tables.length === 38, 'public tables created', `${tables.length} tables`);
   const noRls = tables.filter(t => !t.rls).map(t => t.relname);
   check(noRls.length === 0, 'every public table has RLS enabled', noRls.join(', '));
 
@@ -80,8 +80,24 @@ try {
                                where n.nspname='public' and c.relrowsecurity
                                  and not exists (select 1 from pg_policy p where p.polrelid=c.oid) order by 1`);
   const names = serviceOnly.map(r => r.relname).sort().join(',');
-  check(names === 'health_card_tokens,legacy_id_map,platform_admins',
+  check(names === 'health_card_tokens,legacy_id_map,platform_admins,training_cases',
         'tables with RLS but no policy are exactly the service-only set', names);
+
+  const tc = await q(`select
+      has_table_privilege('anon', 'public.training_cases', 'select,insert,update,delete') anon_any,
+      has_table_privilege('authenticated', 'public.training_cases', 'select') auth_select,
+      has_table_privilege('authenticated', 'public.training_cases', 'insert') auth_insert,
+      has_table_privilege('authenticated', 'public.training_cases', 'update') auth_update,
+      has_table_privilege('authenticated', 'public.training_cases', 'delete') auth_delete,
+      has_table_privilege('service_role', 'public.training_cases', 'select') svc_select,
+      has_table_privilege('service_role', 'public.training_cases', 'insert') svc_insert`).catch(() => []);
+  check(tc.length === 1, 'public.training_cases exists (migration 0022 applied)');
+  check(tc.length === 1 && !tc[0].anon_any && !tc[0].auth_select && !tc[0].auth_insert && !tc[0].auth_update && !tc[0].auth_delete && tc[0].svc_select && tc[0].svc_insert,
+        'only the server role can read or write training_cases');
+  const tcFk = await q(`select count(*)::int n from pg_constraint where conrelid = 'public.training_cases'::regclass and contype = 'f'`).catch(() => [{ n: -1 }]);
+  check(tcFk[0].n === 0, 'training_cases has no link to a patient, encounter, facility or user', `${tcFk[0].n} foreign keys`);
+  const tcCols = await q(`select column_name from information_schema.columns where table_schema = 'public' and table_name = 'training_cases' and column_name ~ '(patient|encounter|facility|user|reviewer|doctor|phone|name)'`);
+  check(tcCols.length === 0, 'training_cases has no column that names a person or place', tcCols.map(r => r.column_name).join(', '));
 
   const appExposed = await q(`select 1 from pg_namespace where nspname='app' and has_schema_privilege('anon','app','usage')`);
   check(appExposed.length === 0, 'app schema not usable by anon');

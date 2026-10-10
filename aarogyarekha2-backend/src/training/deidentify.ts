@@ -9,6 +9,7 @@ import type { ContextDoc } from '../ocr/recordContext.js';
 export const TRAINING_SCHEMA = 'aarogyarekha-training-case/1';
 const EPOCH = Date.UTC(2000, 0, 1);
 const TIER_OF: Record<string, number> = { red: 1, orange: 2, yellow: 3, green: 4 };
+const OTHER_SCRIPT = /[ऀ-ॿ଀-୿]/;
 const VITAL_COLUMNS = ['temperature_c', 'pulse_bpm', 'spo2_pct', 'resp_rate_pm', 'bp_systolic_mmhg', 'bp_diastolic_mmhg', 'weight_kg', 'height_cm', 'blood_glucose_mgdl', 'muac_cm'] as const;
 
 export interface TrainingInput {
@@ -58,6 +59,7 @@ export function buildTrainingCase(i: TrainingInput, now: Date = new Date()): Tra
   let withheld = 0;
   const clean = (t: string | null | undefined): string | null => {
     if (!t || !t.trim()) return null;
+    if (OTHER_SCRIPT.test(t)) { withheld++; return null; }
     const r = redact(t, known);
     const text = r.text.replace(/\[\[NAME_\d+\]\]/g, '[NAME]');
     try { assertClean(text, known); return text; } catch { withheld++; return null; }

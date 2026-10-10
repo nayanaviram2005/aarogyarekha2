@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import type { Api, RecordContext } from '../lib/types';
-import { Banner } from './Provenance';
 
 export function RecordContextPanel({ api, encounterId, refreshKey = 0 }: { api: Api; encounterId: string; refreshKey?: number }) {
   const [ctx, setCtx] = useState<RecordContext | null>(null);
@@ -14,7 +13,6 @@ export function RecordContextPanel({ api, encounterId, refreshKey = 0 }: { api: 
   if (failed) return <p className="tiny muted">The uploaded records could not be loaded.</p>;
   if (!ctx || ctx.summary.documents === 0) return null;
   const s = ctx.summary;
-  const unchecked = s.rows - s.verified;
   return (
     <section className="block" aria-label="Records on file">
       <div className="block__head"><h3>Records on file</h3><span className="chip">{s.documents} uploaded</span></div>
@@ -25,7 +23,6 @@ export function RecordContextPanel({ api, encounterId, refreshKey = 0 }: { api: 
             <>
               <p className="small">{s.rows} test result{s.rows === 1 ? '' : 's'} read from {s.read} record{s.read === 1 ? '' : 's'}. {s.flagged === 0 ? 'None are marked outside the printed range.' : `${s.flagged} marked outside the printed range by the lab:`}</p>
               {s.lines.length > 0 && <ul className="small">{s.lines.map(l => <li key={l}>{l}</li>)}</ul>}
-              {unchecked > 0 && <Banner kind="warn">{unchecked} result{unchecked === 1 ? ' has' : 's have'} not been checked by a person. Check them against the report before relying on them. The triage engine only uses checked results.</Banner>}
             </>
           )}
         {s.notRead > 0 && s.rows > 0 && <p className="tiny muted">{s.notRead} record{s.notRead === 1 ? ' was' : 's were'} not readable (for example a photo that is too dark). Open it to check by eye.</p>}

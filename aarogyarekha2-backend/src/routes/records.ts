@@ -58,6 +58,9 @@ export function registerRecordRoutes(c: RouteCtx, h: RouteHelpers): void {
 
     const v = deps.vision;
     const aiAvailable = !!v && v.supported && v.name !== 'mock' && v.accepts(safe.mime) && safe.mime !== 'application/pdf' && c.ocrPhotos !== 'local';
+    if (safe.mime !== 'application/pdf' && c.ocrPhotos === 'ai' && !aiAvailable) {
+      return reply.send({ identity: {}, rows: 0, readable: false, note: 'Photos are read by the outside AI reader, and it is not set up on this server. Use a PDF, or ask an administrator to set it up.', averageConfidence: null });
+    }
     if (aiAvailable && !aiConsent && c.ocrPhotos === 'ai') {
       return reply.send({ identity: {}, rows: 0, readable: false, needsAiConsent: true, note: 'Reading a photo uses an outside AI service, and names and numbers on a photo cannot be removed first. Confirm the patient agrees, then read it.', averageConfidence: null });
     }

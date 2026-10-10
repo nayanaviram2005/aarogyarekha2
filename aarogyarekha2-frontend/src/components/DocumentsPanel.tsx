@@ -4,6 +4,7 @@ import { formatTime, languageLabel } from '../lib/format';
 import { compressImage } from '../lib/compress';
 import { useLowData } from '../lib/lowBandwidth';
 import { Banner } from './Provenance';
+import { DocLink } from './DocLink';
 
 export const KIND_LABEL: Record<DocumentKind, string> = {
   lab_report: 'Lab report', prescription: 'Prescription', discharge_summary: 'Discharge summary', imaging_report: 'Imaging report',
@@ -31,14 +32,12 @@ export function DocumentsPanel({ api, encounterId, editable, onMeasurementAdded,
   const [results, setResults] = useState<Record<string, Extraction | null>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [lang, setLang] = useState<OcrLanguage>('en');
-  const [image, setImage] = useState<{ url: string; name: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     try { setDocs(await api.documents(encounterId)); setError(null); } catch (e) { setError(e as Error); setDocs(d => d ?? []); }
   }, [api, encounterId]);
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => () => { if (image) URL.revokeObjectURL(image.url); }, [image]);
 
   async function upload(e: FormEvent) {
     e.preventDefault();
@@ -67,15 +66,7 @@ export function DocumentsPanel({ api, encounterId, editable, onMeasurementAdded,
     try { const x = await api.extractDocument(d.id, lang); setResults(r => ({ ...r, [d.id]: x })); onReadingChanged?.(); }
     catch (e) { setError(e as Error); } finally { setBusy(null); }
   }
-  async function openFile(d: DocumentMeta) {
-    setBusy(d.id); setError(null);
-    try {
-      const f = await api.documentFile(d.id);
-      if (d.mimeType === 'application/pdf') {
-        const url = URL.createObjectURL(f.blob); const a = document.createElement('a'); a.href = url; a.download = f.filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-      } else setImage({ url: URL.createObjectURL(f.blob), name: d.filename ?? KIND_LABEL[d.kind] });
-    } catch (e) { setError(e as Error); } finally { setBusy(null); }
-  }
+  const docRef = (d: DocumentMeta) => ({ id: d.id, mimeType: d.mimeType, name: d.filename ?? KIND_LABEL[d.kind], kind: d.kind });
 
   return (
     <section className="block" aria-label="Reports and photos">
@@ -107,13 +98,13 @@ export function DocumentsPanel({ api, encounterId, editable, onMeasurementAdded,
           {(docs ?? []).map(d => (
             <li key={d.id} style={{ borderTop: '1px solid var(--rule)', padding: '12px 0' }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
-                <strong>{d.filename ?? KIND_LABEL[d.kind]}</strong>
+                <strong>{d.status === 'clean' ? <DocLink api={api} doc={docRef(d)} /> : (d.filename ?? KIND_LABEL[d.kind])}</strong>
                 <span className="small muted">{KIND_LABEL[d.kind]} · {size(d.sizeBytes)} · {formatTime(d.createdAt)}</span>
                 <span className={`chip ${d.status === 'clean' ? 'chip--ok' : 'chip--warn'}`}>{d.status === 'clean' ? 'Checked' : 'Not accepted'}</span>
               </div>
               {d.status === 'clean' && (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
-                  <button className="btn btn--small" disabled={busy === d.id} onClick={() => void openFile(d)}>{d.mimeType === 'application/pdf' ? 'Download' : 'Open'}</button>
+                  <DocLink api={api} doc={docRef(d)} variant="button" />
                   <button className="btn btn--small" aria-expanded={open === d.id} onClick={() => void show(d)}>{open === d.id ? 'Hide results' : 'Show results'}</button>
                   {editable && (
                     <>
@@ -132,12 +123,6 @@ export function DocumentsPanel({ api, encounterId, editable, onMeasurementAdded,
           ))}
         </ul>
       </div>
-      {image && (
-        <div className="note-overlay" role="dialog" aria-modal="true" aria-label="Uploaded image">
-          <div className="note-toolbar"><strong>{image.name}</strong><span className="grow" /><button className="btn btn--small btn--primary" onClick={() => setImage(null)} autoFocus>Close</button></div>
-          <div style={{ flex: 1, overflow: 'auto', display: 'grid', placeItems: 'center', padding: 16 }}><img src={image.url} alt="Uploaded report" style={{ maxWidth: '100%', height: 'auto' }} /></div>
-        </div>
-      )}
     </section>
   );
 }

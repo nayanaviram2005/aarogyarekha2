@@ -35,7 +35,7 @@ export function buildCaseSummary(input: EncounterSummary): SummaryLine[] {
   if (s.assessment) {
     const t = tierOfUrgency(s.assessment.urgency_code);
     const ai = s.assessment.note.aiOpinion;
-    out.push({ label: 'Rules result', text: `${t ? `${TIER_WORD[t]} (priority ${t})` : 'no priority'}, ${formatTime(s.assessment.created_at)}. ${s.assessment.note.winning.detail}${ai ? ` AI second opinion: ${TIER_WORD[ai.tier].toLowerCase()}.` : ''}` });
+    out.push({ label: 'Rules result', text: `${t ? `${TIER_WORD[t]} (priority ${t})` : 'no priority'}, ${formatTime(s.assessment.created_at)}. ${s.assessment.note.winning.detail}${ai ? ` Triage engine output: ${TIER_WORD[ai.tier].toLowerCase()}.` : ''}` });
   }
 
   const last = [...s.reviews].reverse().find(r => !s.assessment || r.assessment_id === s.assessment.id);

@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import pg from 'pg';
 import { isIP } from 'node:net';
 import type { Config } from './config.js';
-import { DbError, type Deps, type AuditEvent, type UserReader, type UserWriter, type PatientBrief, type QueueEntry, type FacilityRow, type ReferralRow, type DocumentRow, type ExtractionView, type FieldRow } from './deps.js';
+import { DbError, type Deps, type AuditEvent, type UserReader, type UserWriter, type PatientBrief, type QueueEntry, type QueueDocument, type FacilityRow, type ReferralRow, type DocumentRow, type ExtractionView, type FieldRow } from './deps.js';
 import { assessEncounter, loadRuleSet, type PoolLike } from './triage/persist.js';
 import { recordReview } from './review/record.js';
 import { sendReferral } from './referral/send.js';
@@ -24,6 +24,7 @@ import { envForTask, makeProvider } from './ai/provider.js';
 import { makeVision } from './ai/vision.js';
 import { makeTranscriber } from './ai/stt.js';
 import type { FollowupStore, FollowupView } from './deps.js';
+import { makeFileSink } from './training/sink.js';
 import { isConsentActive } from './intake/consent.js';
 import type { PatientFacts, TriageContext } from './intake/input.js';
 import type { PatientRow, IdentifierRow, EncounterRow, VitalRow } from './fhir/project.js';
@@ -184,11 +185,18 @@ export function makeLiveDeps(config: Config, pool: pg.Pool): Deps {
           const rows = (encs.data ?? []) as any[];
           if (rows.length === 0) return [];
           const ids = rows.map(r => r.id as string);
-          const [qi, rv, as] = await Promise.all([
+          const [qi, rv, as, dc] = await Promise.all([
             sb.from('queue_items').select('encounter_id, urgency_code, status, entered_at').in('encounter_id', ids),
             sb.from('review_actions').select('assessment_id').in('encounter_id', ids).in('action', ['approve', 'override_urgency']),
             sb.from('triage_assessments').select('id, encounter_id, version, urgency_code, note').in('encounter_id', ids).order('version', { ascending: false }),
+            sb.from('documents').select('id, encounter_id, kind, mime_type, original_filename').in('encounter_id', ids).eq('scan_status', 'clean').order('created_at', { ascending: true }),
           ]);
+          const docsBy = new Map<string, QueueDocument[]>();
+          for (const d of (dc.error ? [] : (dc.data ?? [])) as { id: string; encounter_id: string; kind: string; mime_type: string; original_filename: string | null }[]) {
+            const list = docsBy.get(d.encounter_id) ?? [];
+            if (list.length < 3) list.push({ id: d.id, name: d.original_filename, mimeType: d.mime_type, kind: d.kind });
+            docsBy.set(d.encounter_id, list);
+          }
           if (qi.error) throw new Error(qi.error.message);
           if (as.error) throw new Error(as.error.message);
           if (rv.error) throw new Error(rv.error.message);
@@ -211,6 +219,7 @@ export function makeLiveDeps(config: Config, pool: pg.Pool): Deps {
               vulnerable: note.vulnerable === true,
               queueStatus: q?.status ?? null, waitingSince: q?.entered_at ?? r.submitted_at ?? r.created_at ?? null,
               assessmentVersion: a?.version ?? null,
+              documents: docsBy.get(r.id) ?? [],
             };
           });
         },
@@ -393,6 +402,7 @@ export function makeLiveDeps(config: Config, pool: pg.Pool): Deps {
     translator: makeProvider(envForTask(config.ai, 'TRANSLATE')),
     loadRuleSet: async (name, version) => (await loadRuleSet(pool, name, version)).ruleSet,
     triageAi: makeProvider(envForTask(config.ai, 'TRIAGE')),
+    ...(config.TRAINING_EXPORT === 'on' ? { trainingSink: makeFileSink(config.TRAINING_DATA_DIR?.trim() || 'training-data') } : {}),
     transcriber: makeTranscriber(envForTask(config.ai, 'STT')),
     vision: makeVision(envForTask(config.ai, 'VISION')),
     adminStore: token => makeAdminStore(client(token)),

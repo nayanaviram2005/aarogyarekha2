@@ -19,7 +19,7 @@ interface Rec { summary: EncounterSummary; followUps: FollowUp[] }
 
 const note = (tier: Tier, winning: DecisionLogEntry, over: Partial<NonNullable<EncounterSummary['assessment']>['note']> = {}) => ({
   disclaimer: 'Organises information for review. Does not diagnose or advise treatment.', tier, potentialTier: null as Tier | null, winning,
-  log: [winning, { layer: 'default', ruleId: 'DEFAULT', tier: 4 as Tier, detail: 'No urgency signal found in the information recorded so far' }],
+  log: [winning, { layer: 'default', ruleId: 'DEFAULT', tier: 4 as Tier, detail: 'No urgency signal found in the information recorded so far', source: 'Built-in rule', why: 'None of the checks found an urgent sign in what has been recorded so far. More answers or measurements can change this.' }],
   missing: [] as { code: string; label: string; potentialTier: Tier | null }[], news2: { applicable: false, score: null as number | null },
   vulnerable: false, insufficientData: false, ruleSet: { name: 'aarogyarekha-layered', version: '0.1.1', status: 'approved', hash: 'demo' }, ...over,
 });
@@ -39,13 +39,13 @@ function seed(): Rec[] {
   e7.symptoms.push({ id: 's7', text_original: 'Breathlessness', text_translated: null, lang: 'en', duration_value: 1, duration_unit: 'days', severity: 9, created_at: ago(9) });
   vit(e7, 'spo2_pct', 86, '%'); vit(e7, 'resp_rate_pm', 28, '/min'); vit(e7, 'pulse_bpm', 118, '/min');
   e7.triageContext = { signs: { central_cyanosis: true, airway_obstructed_or_not_breathing: false } };
-  assessed(e7, 1, note(1, { layer: 'floor', ruleId: 'ETAT-E3', tier: 1, detail: 'Blue or grey lips or tongue' }, { news2: { applicable: true, score: 9 } }));
+  assessed(e7, 1, note(1, { layer: 'floor', ruleId: 'ETAT-E3', tier: 1, detail: 'Blue or grey lips or tongue', source: 'WHO ETAT emergency signs', why: 'Marked Yes for: "Are the lips or tongue blue or grey?"' },{ news2: { applicable: true, score: 9 } }));
 
   const e3 = base(3, P.p3, 'maternal_followup', 'Headache and swelling of feet, 34 weeks pregnant', null, 22);
   e3.symptoms.push({ id: 's3', text_original: 'Headache', text_translated: null, lang: 'en', duration_value: 2, duration_unit: 'days', severity: 5, created_at: ago(20) });
   vit(e3, 'bp_systolic_mmhg', 165, 'mm[Hg]'); vit(e3, 'bp_diastolic_mmhg', 104, 'mm[Hg]');
   e3.triageContext = { pregnant: true, signs: { convulsions_in_pregnancy: false, heavy_vaginal_bleeding: false } };
-  assessed(e3, 2, note(2, { layer: 'pregnancy_bp', ruleId: 'WHO-PREG-BP', tier: 2, detail: 'Blood pressure in the severe range for pregnancy (as recorded)' }, { vulnerable: true }));
+  assessed(e3, 2, note(2, { layer: 'pregnancy_bp', ruleId: 'WHO-PREG-BP', tier: 2, detail: 'Blood pressure in the severe range for pregnancy (as recorded)', source: 'WHO severe hypertension in pregnancy (>=160 systolic or >=110 diastolic)  [verify]', why: 'Recorded blood pressure 165/104 mmHg. The limit in pregnancy is 160/110.' },{ vulnerable: true }));
 
   const e2 = base(2, P.p2, 'campus_fever', 'तीन दिन से बुखार और सिरदर्द', 'Fever and headache for three days', 38);
   e2.symptoms.push({ id: 's2', text_original: 'Fever', text_translated: null, lang: 'en', duration_value: 3, duration_unit: 'days', severity: 7, created_at: ago(35) });
@@ -57,7 +57,7 @@ function seed(): Rec[] {
     { fieldCode: 'sign.lethargic', audience: 'health_worker', question: 'Is the child unusually sleepy or hard to wake?', lang: 'en', potentialTier: 2, rank: 3 },
     { fieldCode: 'sign.central_cyanosis', audience: 'health_worker', question: 'Are the lips or tongue blue or grey?', lang: 'en', potentialTier: 2, rank: 4 },
   ];
-  assessed(e2, 3, note(3, { layer: 'floor', ruleId: 'ETAT-P2', tier: 3, detail: 'Very high fever (as judged by the health worker)' }, { aiOpinion: { tier: 3, reason: 'A young child with a high fever who is still drinking can usually be seen within the hour, but should be checked again if drinking stops.', provider: 'demo', model: 'demo', machineGenerated: true, rulesTier: 3, relation: 'agrees' }, potentialTier: 2, vulnerable: true, missing: fu2.map(f => ({ code: f.fieldCode, label: f.question, potentialTier: f.potentialTier })) }));
+  assessed(e2, 3, note(3, { layer: 'floor', ruleId: 'ETAT-P2', tier: 3, detail: 'Very high fever (as judged by the health worker)', source: 'WHO ETAT priority signs', why: 'Marked Yes for: "Is the fever very high, in the health worker\'s judgement?"' },{ aiOpinion: { tier: 3, reason: 'A young child with a high fever who is still drinking can usually be seen within the hour, but should be checked again if drinking stops.', provider: 'demo', model: 'demo', machineGenerated: true, rulesTier: 3, relation: 'agrees' }, potentialTier: 2, vulnerable: true, missing: fu2.map(f => ({ code: f.fieldCode, label: f.question, potentialTier: f.potentialTier })) }));
   e2.followUps = fu2.map(f => ({ field_code: f.fieldCode, question_text: f.question, status: 'open', answer_text: null }));
 
   const e1 = base(1, P.p1, 'opd_queue', 'ଜ୍ୱର ତିନି ଦିନ ଧରି, କାଶ ମଧ୍ୟ ଅଛି', 'Fever for three days, also has cough', 45);
@@ -103,7 +103,10 @@ export function createDemoApi(opts: { rulesApproved: boolean }): Api {
   const recs = seed();
   const patients: PatientBrief[] = Object.values(P);
   const referrals = new Map<string, ReferralMeta>();
-  const docsByEnc = new Map<string, DocumentMeta[]>();
+  const docsByEnc = new Map<string, DocumentMeta[]>([
+    ['10000000-0000-4000-8000-000000000001', [{ id: 'demo-doc-cbc', encounterId: '10000000-0000-4000-8000-000000000001', kind: 'lab_report', mimeType: 'image/png', sizeBytes: 184000, filename: 'cbc-report.png', status: 'clean', createdAt: ago(40) }]],
+    ['10000000-0000-4000-8000-000000000007', [{ id: 'demo-doc-discharge', encounterId: '10000000-0000-4000-8000-000000000007', kind: 'discharge_summary', mimeType: 'application/pdf', sizeBytes: 92000, filename: 'discharge-summary.pdf', status: 'clean', createdAt: ago(5) }]],
+  ]);
   const extractions = new Map<string, Extraction>();
   const SAMPLE_ROWS: [string, number, string, string, 'low' | 'high' | null][] = [
     ['haemoglobin', 9.1, 'g/dL', '12.0 - 15.5', 'low'], ['wbc_count', 11200, '/cumm', '4000 - 11000', 'high'], ['platelet_count', 2.4, 'lakh/cumm', '1.5 - 4.5', null], ['esr', 38, 'mm/hr', '0 - 20', 'high'],
@@ -135,6 +138,7 @@ export function createDemoApi(opts: { rulesApproved: boolean }): Api {
       encounterId: s.encounter.id, patient: s.patient, scenario: s.encounter.scenario, chiefComplaint: s.encounter.chief_complaint_original, chiefComplaintTranslated: s.encounter.chief_complaint_translated,
       assessed: !!s.assessment, urgencyCode: s.queue?.urgency_code ?? null, tier: s.queue ? TIER[s.queue.urgency_code] : n?.tier ?? null, engineTier: n?.tier ?? null, reviewed: !!s.assessment && s.reviews.some(r => r.assessment_id === s.assessment!.id), potentialTier: n?.potentialTier ?? null, missingCount: n?.missing.length ?? 0,
       winningLabel: n?.winning.detail ?? null, vulnerable: n?.vulnerable ?? false, queueStatus: s.queue?.status ?? null, waitingSince: s.encounter.submitted_at, assessmentVersion: s.assessment?.version ?? null,
+      documents: (docsByEnc.get(s.encounter.id) ?? []).filter(d => d.status === 'clean').slice(0, 3).map(d => ({ id: d.id, name: d.filename, mimeType: d.mimeType, kind: d.kind })),
     };
   };
   const sortKey = (e: QueueEntry) => (e.assessed && e.tier ? e.tier : 3);
@@ -247,7 +251,7 @@ export function createDemoApi(opts: { rulesApproved: boolean }): Api {
       return wait({ summary: { documents: docs.length, read: docs.filter(d => d.rows.length > 0).length, notRead: docs.filter(d => d.rows.length === 0).length, rows: all.length, verified: all.filter(r => r.verified).length, flagged: flagged.length,
         lines: flagged.slice(0, 12).map(r => `${r.name.replace(/_/g, ' ')} ${r.valueText ?? r.valueNum ?? '?'}${r.unit ? ' ' + r.unit : ''} (printed ${String(r.printedFlag).toUpperCase()}${r.verified ? '' : ', not yet checked by a person'})`) }, documents: docs });
     },
-    documentFile: async () => wait({ blob: new Blob([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='), c => c.charCodeAt(0))], { type: 'image/png' }), filename: 'document.png' }),
+    documentFile: async id => id === 'demo-doc-discharge' ? wait({ blob: new Blob(['%PDF-1.1\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 150]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF'], { type: 'application/pdf' }), filename: 'document.pdf' }) : wait({ blob: new Blob([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='), c => c.charCodeAt(0))], { type: 'image/png' }), filename: 'document.png' }),
     extractDocument: async id => {
       const fields: ExtractedField[] = SAMPLE_ROWS.map(([name, v, unit, range, flag], i) => ({ id: id + '-f' + i, name, printedLine: `${name.replace(/_/g, ' ')} ${v} ${unit} ${range}${flag ? ' ' + flag.charAt(0).toUpperCase() : ''}`, valueText: String(v), valueNum: v, unit, referenceRange: range, printedFlag: flag, confidence: i === 3 ? 0.55 : 0.91, verified: false, verifiedAt: null }));
       fields.forEach((f, i) => { if (i === 3) { f.agreement = 'differ'; f.secondRead = String((f.valueNum ?? 0) + 8); } else { f.agreement = 'agree'; f.secondRead = String(f.valueNum); } });

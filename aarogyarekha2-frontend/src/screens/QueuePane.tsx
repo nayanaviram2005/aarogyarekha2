@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { UrgencyPlate } from '../components/Plate';
 import { useI18n } from '../i18n/I18n';
 import { ageSex, formatWait, isTier } from '../lib/format';
-import { whyText } from '../lib/queueWhy';
+import { whyLines } from '../lib/queueWhy';
 import { QueueFilterBar } from '../components/QueueFilterBar';
 import { DocLink } from '../components/DocLink';
 import { applyQueueFilter, NO_FILTER, type QueueFilter } from '../lib/queueFilter';
@@ -62,7 +62,7 @@ export function QueuePane({ onOpen }: { onOpen?: () => void }) {
                   <span className="queue-row__wait">{formatWait(e.waitingSince, now)}</span>
                 </span>
                 <span className="queue-row__sub" lang={e.patient.preferred_language}>{e.chiefComplaint ?? t('queue.noComplaint')}</span>
-                {showWhy && e.order && <span className="queue-row__why">{whyText(e, n => t(`tier.${n}` as never))}</span>}
+                {showWhy && e.order && <span className="queue-row__why">{(whyLines(e, entries[entries.indexOf(e) - 1] ?? null, entries[entries.indexOf(e) + 1] ?? null, n => t(`tier.${n}` as never)) ?? []).map((l, i) => <span key={i}>{l}</span>)}</span>}
                 {e.assessed && isTier(e.potentialTier) && isTier(e.tier) && e.potentialTier < e.tier && (
                   <span className="queue-row__sub tiny strong" style={{ gridColumn: '1 / -1' }}>{t('queue.couldBe', { tier: t(`tier.${e.potentialTier}`).toLowerCase(), n: e.missingCount })}</span>
                 )}

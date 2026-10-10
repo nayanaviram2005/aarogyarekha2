@@ -113,6 +113,7 @@ export type VisitOutcome = 'treated_here' | 'sent_home' | 'did_not_wait' | 'refe
 export interface DoneEntry { encounterId: string; facilityId: string; patientRef: string; patientName: string | null; sex: string | null; urgencyCode: string | null; outcome: VisitOutcome | null; finishedAt: string; by: string | null; waitedMinutes: number | null }
 export type MemberRole = 'health_worker' | 'nurse' | 'doctor' | 'medical_officer';
 export interface MemberView { userId: string; facilityId: string; role: string; active: boolean; since: string; name: string | null; email: string | null; lastSignIn: string | null; mfa: boolean; isSelf: boolean; canChange: boolean }
+export interface TrainingSummary { enabled: boolean; count: number; latestAt: string | null }
 export interface PlatformFacilityView { id: string; name: string; type: string; state: string | null; district: string | null; code: string | null; active: boolean; staff: number; lastActivity: string | null; visits30: number; referrals30: number; admins: { userId: string; name: string | null; email: string | null }[] }
 export interface MemberChangeView { at: string; facilityId: string; op: string; role: string | null; previous: string | null; actor: string | null; target: string | null }
 export interface BreakGlassGrantView { id: string; who: string | null; userId: string; patientRef: string; facilityId: string; reason: string; createdAt: string; expiresAt: string; reviewedAt: string | null; reviewed: boolean }
@@ -224,6 +225,8 @@ export interface Api {
   setMemberRole(userId: string, role: MemberRole, facilityId?: string): Promise<{ userId: string; role: string; previous: string }>;
   removeMember(userId: string, facilityId?: string): Promise<{ userId: string; removed: true }>;
   platformFacilities(): Promise<PlatformFacilityView[]>;
+  trainingSummary(): Promise<TrainingSummary>;
+  downloadTrainingData(format: 'csv' | 'jsonl'): Promise<{ filename: string; blob: Blob; rows: number }>;
   createFacility(body: { name: string; type: string; state?: string; district?: string; pincode?: string; code?: string }): Promise<{ id: string }>;
   setFacilityActive(facilityId: string, active: boolean): Promise<{ id: string; active: boolean }>;
   appointFacilityAdmin(facilityId: string, email: string): Promise<{ userId: string }>;

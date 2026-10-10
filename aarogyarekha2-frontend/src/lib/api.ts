@@ -94,6 +94,17 @@ export function createApi(baseUrl: string, getToken: TokenSource, fetchImpl: typ
     setFacilityActive: (id, active) => call('POST', `/platform/facilities/${enc(id)}/active`, { active }),
     appointFacilityAdmin: (id, email) => call('POST', `/platform/facilities/${enc(id)}/admins`, { email }),
     removeFacilityAdmin: (id, userId) => call('POST', `/platform/facilities/${enc(id)}/admins/${enc(userId)}/remove`, {}),
+    trainingSummary: () => call('GET', '/platform/training-cases'),
+    downloadTrainingData: async format => {
+      const token = await getToken();
+      if (!token) throw new ApiError(401, FALLBACK[401]!);
+      let res: Response;
+      try { res = await fetchImpl(`${baseUrl}/platform/training-cases/export?format=${format}`, { headers: { authorization: `Bearer ${token}` } }); }
+      catch { throw new ApiError(0, FALLBACK[0]!); }
+      if (!res.ok) throw new ApiError(res.status, messageFromBody(res.status, await res.json().catch(() => null)));
+      const m = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '');
+      return { filename: m?.[1] ?? `training-cases.${format}`, blob: await res.blob(), rows: Number(res.headers.get('x-training-rows') ?? 0) };
+    },
     removeMember: (id, facilityId) => call('POST', `/admin/members/${enc(id)}/deactivate`, facilityId ? { facilityId } : {}),
     breakGlassList: async () => (await call<{ grants: never[] }>('GET', '/admin/break-glass')).grants,
     reviewBreakGlass: id => call('POST', `/admin/break-glass/${enc(id)}/review`),

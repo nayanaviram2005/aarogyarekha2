@@ -1,12 +1,12 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
-import type { Deps, EncounterSummary } from '../src/deps.js';
+import type { PGlite } from '@electric-sql/pglite';
+import { beforeAll, describe, expect, it } from 'vitest';
+import type { EncounterSummary } from '../src/deps.js';
 import type { PatientRow } from '../src/fhir/project.js';
 import { buildTrainingCase, csvColumns, csvRow, type TrainingInput } from '../src/training/deidentify.js';
 import { captureTrainingCase } from '../src/training/capture.js';
-import { makeFileSink } from '../src/training/sink.js';
+import { toCsv, toJsonl } from '../src/training/format.js';
+import { makeDbStore, type TrainingStore } from '../src/training/store.js';
+import { makeDb } from './helpers/pg.js';
 
 const PATIENT_ID = '11111111-1111-4111-8111-111111111111';
 const ENC_ID = '22222222-2222-4222-8222-222222222222';
@@ -82,23 +82,63 @@ describe('anonymised training case', () => {
   });
 });
 
-describe('the file sink', () => {
-  const dirs: string[] = [];
-  const tmp = async () => { const d = await mkdtemp(join(tmpdir(), 'training-')); dirs.push(d); return d; };
-  afterAll(async () => { for (const d of dirs) await rm(d, { recursive: true, force: true }); });
+describe('export formats', () => {
+  const c = buildTrainingCase(input(), new Date('2026-10-10T10:00:00.000Z'));
 
-  it('writes one JSON line and one CSV row per case, with a header once, and keeps the same key', async () => {
-    const dir = await tmp(); const sink = makeFileSink(dir);
-    const key = await sink.key();
-    expect(key.length).toBeGreaterThanOrEqual(32);
-    const a = buildTrainingCase({ ...input(), key });
-    await sink.write(a); await sink.write({ ...a, caseId: 'case-second' });
-    const lines = (await readFile(join(dir, 'triage-cases.jsonl'), 'utf8')).trim().split('\n');
-    expect(lines).toHaveLength(2); expect(JSON.parse(lines[0]!).caseId).toBe(a.caseId);
-    const csv = (await readFile(join(dir, 'triage-cases.csv'), 'utf8')).trim().split('\n');
-    expect(csv[0]).toBe(csvColumns.join(',')); expect(csv.length).toBeGreaterThanOrEqual(3);
-    expect(await makeFileSink(dir).key()).toBe(key);
-    expect(await readFile(join(dir, 'README.txt'), 'utf8')).toContain('Do not commit .pseudonym-key');
+  it('writes one CSV row per case under a single header', () => {
+    const lines = toCsv([c, { ...c, caseId: 'case-second' }]).trim().split('\n');
+    expect(lines[0]).toBe(csvColumns.join(',')); expect(lines).toHaveLength(3);
+  });
+
+  it('writes one JSON line per case, with the FHIR bundle', () => {
+    const lines = toJsonl([c, c]).trim().split('\n');
+    expect(lines).toHaveLength(2); expect(JSON.parse(lines[0]!).fhir.resourceType).toBe('Bundle');
+    expect(toJsonl([])).toBe('');
+  });
+
+  it('stops a patient’s own words from running as a spreadsheet formula', () => {
+    const hostile = { ...c, features: { ...c.features, complaint: '=HYPERLINK("http://x","click")', symptoms: [{ text: '+cmd|calc', textEnglish: null, duration: null, severity: null }] } };
+    const csv = toCsv([hostile]);
+    expect(csv).toContain(`"'=HYPERLINK(""http://x"",""click"")"`);
+    expect(csv).toContain(`"'+cmd|calc"`);
+  });
+});
+
+describe('the database store', () => {
+  let db: PGlite; let store: TrainingStore;
+  const q = async (sql: string, p: unknown[] = []) => (await db.query(sql, p as any[])).rows as any[];
+  const mk = (id: string) => ({ ...buildTrainingCase({ ...input(), key: store.key }), caseId: id });
+  beforeAll(async () => { db = await makeDb(); store = makeDbStore({ query: (sql, p) => db.query(sql, p as any[]) as never }, 'k'.repeat(40)); });
+
+  it('keeps a case and gives it back unchanged, with its FHIR bundle', async () => {
+    const a = mk('case-aaaaaaaaaaaa'); await store.write(a);
+    expect(await store.list(10)).toEqual([JSON.parse(JSON.stringify(a))]);
+  });
+
+  it('counts the cases, and a case written twice is kept once', async () => {
+    await store.write(mk('case-aaaaaaaaaaaa')); await store.write(mk('case-bbbbbbbbbbbb'));
+    const s = await store.summary();
+    expect(s.count).toBe(2); expect(typeof s.latestAt).toBe('string');
+    expect(await store.list(1)).toHaveLength(1);
+  });
+
+  it('reports nothing yet for an empty table', async () => {
+    const fresh = await makeDb();
+    expect(await makeDbStore({ query: (sql, p) => fresh.query(sql, p as any[]) as never }, 'k'.repeat(40)).summary()).toEqual({ count: 0, latestAt: null });
+  });
+
+  it('has no link to a patient, an encounter, a facility or a user', async () => {
+    expect((await q(`select count(*)::int n from pg_constraint where conrelid = 'public.training_cases'::regclass and contype = 'f'`))[0].n).toBe(0);
+    const cols = (await q(`select column_name from information_schema.columns where table_schema = 'public' and table_name = 'training_cases'`)).map(r => r.column_name);
+    expect(cols.filter(x => /patient|encounter|facility|user|reviewer|doctor/.test(x))).toEqual([]);
+  });
+
+  it('cannot be edited, and cannot be read or written from the app, only by the server', async () => {
+    await expect(db.query(`update public.training_cases set withheld_fields = 1`)).rejects.toThrow();
+    for (const role of ['anon', 'authenticated']) {
+      for (const priv of ['select', 'insert', 'update', 'delete']) expect((await q(`select has_table_privilege('${role}', 'public.training_cases', '${priv}') ok`))[0].ok, `${role} ${priv}`).toBe(false);
+    }
+    expect((await q(`select has_table_privilege('service_role', 'public.training_cases', 'select') s, has_table_privilege('service_role', 'public.training_cases', 'insert') i`))[0]).toEqual({ s: true, i: true });
   });
 });
 
@@ -110,28 +150,28 @@ describe('capturing a case when a clinician signs off', () => {
   const req = (r: ReturnType<typeof reader>) => ({ reader: r, user: { userId: '66666666-6666-4666-8666-666666666666' }, log: { warn: () => {} }, id: 'r1' }) as never;
   const result = { reviewId: '55555555-5555-4555-8555-555555555555', action: 'approve' as const, fromUrgency: 'orange', effectiveUrgency: 'orange', rulesUrgency: 'orange', downgrade: false, belowRuleFloor: false, facilityId: FAC_ID, patientId: PATIENT_ID };
   const enc = summary().encounter;
-  const fakeSink = () => { const written: unknown[] = []; return { written, sink: { key: async () => 'k'.repeat(40), write: async (c: unknown) => { written.push(c); } } as Deps['trainingSink'] }; };
+  const fakeStore = () => { const written: unknown[] = []; return { written, store: { key: 'k'.repeat(40), write: async (c: unknown) => { written.push(c); }, summary: async () => ({ count: 0, latestAt: null }), list: async () => [] } as unknown as TrainingStore }; };
   const yes = { purpose: 'research_deidentified', granted_at: '2026-10-01T00:00:00.000Z', revoked_at: null, expires_at: null };
 
   it('writes nothing without the patient\'s separate agreement to the anonymous training copy', async () => {
-    const { written, sink } = fakeSink();
-    expect(await captureTrainingCase({ trainingSink: sink }, req(reader([{ ...yes, purpose: 'care_triage' }])), { enc, result, reason: null })).toBe('no_consent');
+    const { written, store } = fakeStore();
+    expect(await captureTrainingCase({ trainingStore: store }, req(reader([{ ...yes, purpose: 'care_triage' }])), { enc, result, reason: null })).toBe('no_consent');
     expect(written).toHaveLength(0);
   });
   it('writes nothing when the agreement was withdrawn', async () => {
-    const { written, sink } = fakeSink();
-    expect(await captureTrainingCase({ trainingSink: sink }, req(reader([{ ...yes, revoked_at: '2026-10-05T00:00:00.000Z' }])), { enc, result, reason: null })).toBe('no_consent');
+    const { written, store } = fakeStore();
+    expect(await captureTrainingCase({ trainingStore: store }, req(reader([{ ...yes, revoked_at: '2026-10-05T00:00:00.000Z' }])), { enc, result, reason: null })).toBe('no_consent');
     expect(written).toHaveLength(0);
   });
   it('writes one case when the patient agreed', async () => {
-    const { written, sink } = fakeSink();
-    expect(await captureTrainingCase({ trainingSink: sink }, req(reader([yes])), { enc, result, reason: null })).toBe('written');
+    const { written, store } = fakeStore();
+    expect(await captureTrainingCase({ trainingStore: store }, req(reader([yes])), { enc, result, reason: null })).toBe('written');
     expect(written).toHaveLength(1);
     expect(JSON.stringify(written[0])).not.toContain('Asha');
   });
-  it('does nothing when the export is off, and never throws when writing fails', async () => {
+  it('does nothing when the export is off, and never throws when saving fails', async () => {
     expect(await captureTrainingCase({}, req(reader([yes])), { enc, result, reason: null })).toBe('not_enabled');
-    const broken = { key: async () => 'k'.repeat(40), write: async () => { throw new Error('disk full'); } } as Deps['trainingSink'];
-    expect(await captureTrainingCase({ trainingSink: broken }, req(reader([yes])), { enc, result, reason: null })).toBe('failed');
+    const broken = { key: 'k'.repeat(40), write: async () => { throw new Error('database down'); }, summary: async () => ({ count: 0, latestAt: null }), list: async () => [] } as unknown as TrainingStore;
+    expect(await captureTrainingCase({ trainingStore: broken }, req(reader([yes])), { enc, result, reason: null })).toBe('failed');
   });
 });

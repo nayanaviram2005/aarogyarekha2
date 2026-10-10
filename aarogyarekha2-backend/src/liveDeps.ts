@@ -24,7 +24,7 @@ import { envForTask, makeProvider } from './ai/provider.js';
 import { makeVision } from './ai/vision.js';
 import { makeTranscriber } from './ai/stt.js';
 import type { FollowupStore, FollowupView } from './deps.js';
-import { makeFileSink } from './training/sink.js';
+import { makeDbStore } from './training/store.js';
 import { isConsentActive } from './intake/consent.js';
 import type { PatientFacts, TriageContext } from './intake/input.js';
 import type { PatientRow, IdentifierRow, EncounterRow, VitalRow } from './fhir/project.js';
@@ -402,7 +402,7 @@ export function makeLiveDeps(config: Config, pool: pg.Pool): Deps {
     translator: makeProvider(envForTask(config.ai, 'TRANSLATE')),
     loadRuleSet: async (name, version) => (await loadRuleSet(pool, name, version)).ruleSet,
     triageAi: makeProvider(envForTask(config.ai, 'TRIAGE')),
-    ...(config.TRAINING_EXPORT === 'on' ? { trainingSink: makeFileSink(config.TRAINING_DATA_DIR?.trim() || 'training-data') } : {}),
+    ...(config.TRAINING_EXPORT === 'on' && config.TRAINING_PSEUDONYM_KEY ? { trainingStore: makeDbStore(pool, config.TRAINING_PSEUDONYM_KEY) } : {}),
     transcriber: makeTranscriber(envForTask(config.ai, 'STT')),
     vision: makeVision(envForTask(config.ai, 'VISION')),
     adminStore: token => makeAdminStore(client(token)),

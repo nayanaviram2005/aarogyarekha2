@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { RouteCtx, RouteHelpers } from './intake.js';
 import { MemberError, PlatformError } from '../deps.js';
+import { toCsv, toJsonl } from '../training/format.js';
 
 const uuid = z.string().uuid();
 export const FACILITY_TYPES = ['sub_centre', 'phc', 'chc', 'district_hospital', 'medical_college', 'company_clinic', 'industrial_unit', 'campus_health_centre', 'health_camp', 'other'] as const;
@@ -84,5 +85,35 @@ export function registerPlatformRoutes(c: RouteCtx, h: RouteHelpers): void {
     if (!(await c.requireMfa(req, reply, 'manage_facilities'))) return;
     try { await deps.memberAdmin.deactivate({ actor: req.user!.userId, facilityId: id.data, userId: uid.data }); return reply.send({ userId: uid.data, removed: true }); }
     catch (err) { return refuse(reply, err) ?? h.dbFail(req, reply, err); }
+  });
+
+  const trainingOff = 'Training data is not turned on. It needs the server setting TRAINING_PSEUDONYM_KEY and migration 0022.';
+  const MAX_EXPORT = 50_000;
+
+  app.get('/platform/training-cases', { preHandler: authenticate }, async (req, reply) => {
+    if (!(await platformOnly(req, reply))) return;
+    if (!deps.trainingStore) return reply.send({ enabled: false, count: 0, latestAt: null });
+    const s = await deps.trainingStore.summary().catch(() => undefined);
+    if (s === undefined) return fail(reply, 502, 'transient', 'The training data could not be counted. Check that migration 0022 is applied.');
+    return reply.send({ enabled: true, ...s });
+  });
+
+  app.get('/platform/training-cases/export', { preHandler: authenticate, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
+    if (!(await platformOnly(req, reply))) return;
+    const q = z.object({ format: z.enum(['csv', 'jsonl']).default('csv') }).safeParse(req.query ?? {});
+    if (!q.success) return h.invalid(reply, q.error);
+    if (!deps.trainingStore) return fail(reply, 503, 'not-supported', trainingOff);
+    if (!(await c.requireMfa(req, reply, 'export_training_data'))) return;
+    const cases = await deps.trainingStore.list(MAX_EXPORT).catch(() => undefined);
+    if (cases === undefined) return fail(reply, 502, 'transient', 'The training data could not be loaded. Try again.');
+    if (!(await c.auditOrFail(req, reply, { action: 'export', entityType: 'training_cases', outcome: 'success', details: { format: q.data.format, count: cases.length } }))) return;
+    const day = new Date().toISOString().slice(0, 10);
+    const csv = q.data.format === 'csv';
+    return reply
+      .header('content-disposition', `attachment; filename="training-cases-${day}.${csv ? 'csv' : 'jsonl'}"`)
+      .header('x-training-rows', String(cases.length))
+      .header('x-content-type-options', 'nosniff')
+      .type(csv ? 'text/csv; charset=utf-8' : 'application/x-ndjson; charset=utf-8')
+      .send(csv ? toCsv(cases) : toJsonl(cases));
   });
 }

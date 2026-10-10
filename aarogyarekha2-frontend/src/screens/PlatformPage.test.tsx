@@ -11,6 +11,8 @@ vi.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ api: current }) }));
 const fac = (o: Partial<PlatformFacilityView> = {}): PlatformFacilityView => ({ id: 'f1', name: 'Khordha PHC', type: 'phc', state: 'Odisha', district: 'Khordha', code: null, active: true, staff: 3, lastActivity: '2026-10-07T08:00:00.000Z', visits30: 12, referrals30: 2, admins: [{ userId: 'a1', name: 'Asha', email: 'asha@x.in' }], ...o });
 const api = (o: Record<string, unknown> = {}) => ({
   platformFacilities: vi.fn().mockResolvedValue([fac()]), createFacility: vi.fn().mockResolvedValue({ id: 'f2' }), setFacilityActive: vi.fn().mockResolvedValue({ id: 'f1', active: false }),
+  trainingSummary: vi.fn().mockResolvedValue({ enabled: true, count: 3, latestAt: '2026-10-10T10:00:00.000Z' }),
+  downloadTrainingData: vi.fn().mockResolvedValue({ filename: 'training-cases-2026-10-10.csv', blob: new Blob(['case_id\n']), rows: 3 }),
   appointFacilityAdmin: vi.fn().mockResolvedValue({ userId: 'x' }), removeFacilityAdmin: vi.fn().mockResolvedValue({ userId: 'a1', removed: true }), ...o,
 }) as unknown as Api & Record<string, ReturnType<typeof vi.fn>>;
 beforeEach(() => { vi.spyOn(window, 'confirm').mockReturnValue(true); });
@@ -53,5 +55,41 @@ describe('facility health', () => {
     current = api({ platformFacilities: vi.fn().mockResolvedValue([fac(), fac({ id: 'f2', name: 'Quiet CHC', visits30: 0, referrals30: 0, lastActivity: null })]) }); render(<PlatformPage />);
     expect(await screen.findByText(/12 visits and 2 referrals sent in 30 days · last activity/)).toBeInTheDocument();
     expect(screen.getByText(/0 visits and 0 referrals sent in 30 days · no activity yet/)).toBeInTheDocument();
+  });
+});
+
+describe('training data', () => {
+  it('says how many anonymous cases are saved, and downloads them as CSV or JSON lines', async () => {
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:x'), revokeObjectURL: vi.fn() });
+    const a = api(); current = a; render(<PlatformPage />);
+    expect(await screen.findByText(/3 cases saved/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Download CSV' }));
+    await waitFor(() => expect(a.downloadTrainingData).toHaveBeenCalledWith('csv'));
+    expect(await screen.findByText('Training data downloaded.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Download JSON lines with FHIR' }));
+    await waitFor(() => expect(a.downloadTrainingData).toHaveBeenCalledWith('jsonl'));
+  });
+
+  it('cannot download when nothing is saved yet', async () => {
+    current = api({ trainingSummary: vi.fn().mockResolvedValue({ enabled: true, count: 0, latestAt: null }) }); render(<PlatformPage />);
+    expect(await screen.findByText(/0 cases saved/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download CSV' })).toBeDisabled();
+  });
+
+  it('explains what to set when training data is off', async () => {
+    current = api({ trainingSummary: vi.fn().mockResolvedValue({ enabled: false, count: 0, latestAt: null }) }); render(<PlatformPage />);
+    expect(await screen.findByText(/TRAINING_PSEUDONYM_KEY/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Download CSV' })).not.toBeInTheDocument();
+  });
+
+  it('shows the server\'s reason when the download is refused', async () => {
+    current = api({ downloadTrainingData: vi.fn().mockRejectedValue(new Error('A verified second factor is needed.')) }); render(<PlatformPage />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Download CSV' }));
+    expect(await screen.findByText(/second factor is needed/)).toBeInTheDocument();
+  });
+
+  it('says so when the count cannot be loaded', async () => {
+    current = api({ trainingSummary: vi.fn().mockRejectedValue(new Error('Check that migration 0022 is applied.')) }); render(<PlatformPage />);
+    expect(await screen.findByText(/migration 0022 is applied/)).toBeInTheDocument();
   });
 });

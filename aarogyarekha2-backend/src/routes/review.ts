@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { RouteCtx, RouteHelpers } from './intake.js';
 import { ReviewError, type ReviewArgs } from '../review/record.js';
 import type { StatusSmsResult } from '../sms/notify.js';
+import { captureTrainingCase } from '../training/capture.js';
 
 const uuid = z.string().uuid();
 const URGENCY = ['red', 'orange', 'yellow', 'green'] as const;
@@ -48,6 +49,8 @@ export function registerReviewRoutes(c: RouteCtx, h: RouteHelpers): void {
       action: 'update', entityType: 'review', entityId: r.reviewId, patientId: r.patientId, facilityId: r.facilityId, outcome: 'success',
       details: { action: r.action, assessmentId: b.assessmentId, from: r.fromUrgency, to: r.effectiveUrgency, rules: r.rulesUrgency, downgrade: r.downgrade, belowRuleFloor: r.belowRuleFloor, ...(b.action === 'override' ? { reasonCode: b.reasonCode } : {}) },
     });
+    const training = await captureTrainingCase(c.deps, req, { enc: ctx.enc, result: r, reason: b.action === 'override' ? b.reason : null });
+    if (training === 'written') await h.note(req, { action: 'export', entityType: 'training_case', entityId: ctx.enc.id, patientId: r.patientId, facilityId: r.facilityId, outcome: 'success', details: { anonymised: true } });
     const sms = c.deps.statusSms
       ? await c.deps.statusSms.afterSignOff({ encounterId: ctx.enc.id, effectiveUrgency: r.effectiveUrgency }).catch((): StatusSmsResult => ({ status: 'failed', reason: 'provider_error' }))
       : null;

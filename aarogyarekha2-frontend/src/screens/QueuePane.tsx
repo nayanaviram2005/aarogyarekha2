@@ -5,6 +5,7 @@ import { useI18n } from '../i18n/I18n';
 import { ageSex, formatWait, isTier } from '../lib/format';
 import { whyText } from '../lib/queueWhy';
 import { QueueFilterBar } from '../components/QueueFilterBar';
+import { DocLink } from '../components/DocLink';
 import { applyQueueFilter, NO_FILTER, type QueueFilter } from '../lib/queueFilter';
 import { useAuth } from '../auth/AuthProvider';
 import { DoneToday, QueueCounts } from '../components/QueueFlow';
@@ -49,7 +50,7 @@ export function QueuePane({ onOpen }: { onOpen?: () => void }) {
         )}
         <ul>
           {applyQueueFilter(entries, filter, now).map(e => (
-            <li key={e.encounterId}>
+            <li key={e.encounterId} className={e.documents?.length ? 'queue-item queue-item--docs' : 'queue-item'}>
               <button className="queue-row" aria-current={e.encounterId === current} onClick={() => { nav(`/encounters/${e.encounterId}`); onOpen?.(); }}>
                 <span className="queue-row__name"><span>{e.patient.full_name}</span><span className="muted small strong">{ageSex(e.patient, now)}</span></span>
                 <span className="queue-row__side">
@@ -66,6 +67,12 @@ export function QueuePane({ onOpen }: { onOpen?: () => void }) {
                   <span className="queue-row__sub tiny strong" style={{ gridColumn: '1 / -1' }}>{t('queue.couldBe', { tier: t(`tier.${e.potentialTier}`).toLowerCase(), n: e.missingCount })}</span>
                 )}
               </button>
+              {api && e.documents && e.documents.length > 0 && (
+                <div className={e.encounterId === current ? 'queue-row__files queue-row__files--current' : 'queue-row__files'}>
+                  <span className="tiny muted">Files</span>
+                  {e.documents.map(d => <DocLink key={d.id} api={api} doc={d} />)}
+                </div>
+              )}
             </li>
           ))}
         </ul>

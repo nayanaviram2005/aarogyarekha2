@@ -28,6 +28,7 @@ import { canReviewAt, canWriteDoctorNoteAt, useMe } from './meContext';
 import { RULES_CLINICALLY_VALIDATED } from '../config';
 import { ApiError } from '../lib/api';
 import { AiOpinion } from '../components/AiOpinion';
+import { DecisionTable, ruleName } from '../components/DecisionTable';
 import { CaseSummary } from '../components/CaseSummary';
 import { VisitPanel } from '../components/VisitPanel';
 import { JourneyBar } from '../components/JourneyBar';
@@ -97,11 +98,18 @@ function Workspace({ summary: s, onChanged }: { summary: EncounterSummary; onCha
   const currentReview = forCurrent[forCurrent.length - 1] ?? null;
   const earlierReview = !currentReview ? [...s.reviews].reverse().find(isReview) ?? null : null;
   const changedByReviewer = !!a && !!effUrgency && effUrgency !== a.urgency_code;
+  const reviewerChanged = changedByReviewer && currentReview?.action === 'override_urgency';
+  const [aiStatus, setAiStatus] = useState<string | null>(null);
+  const assessError = err
+    ? ((err as ApiError).isRulesNotApproved
+      ? <Banner kind="warn" title="Triage rules are not approved yet">No assessment was stored. A qualified reviewer must approve the rule set first.</Banner>
+      : <Banner kind="error" title="Assessment not completed">{err.message}</Banner>)
+    : null;
 
   async function assess(skipSubmit = false) {
     if (!api) return;
     setAssessing(true); setErr(null);
-    try { if (!skipSubmit && pendingCount > 0) { await submitDrafts(api, s.encounter.id, pending); setDrafts({}); } const r = await api.assess(s.encounter.id); setAnsweredSince(0); await onChanged(); }
+    try { if (!skipSubmit && pendingCount > 0) { await submitDrafts(api, s.encounter.id, pending); setDrafts({}); } const r = await api.assess(s.encounter.id); setAiStatus(r.aiOpinion?.status ?? null); setAnsweredSince(0); await onChanged(); }
     catch (e) { setErr(e as Error); }
     finally { setAssessing(false); }
   }
@@ -155,14 +163,15 @@ function Workspace({ summary: s, onChanged }: { summary: EncounterSummary; onCha
 
       {!EDITABLE.has(s.encounter.status) && <Banner kind="info">This encounter is {s.encounter.status} and can no longer be changed.</Banner>}
 
+        {a && (
         <Provenance label="Triage assessment" reviewedBy={currentReview ? currentReview.reviewer_name ?? 'a reviewer' : null} reviewedAt={currentReview ? formatTime(currentReview.created_at) : null}>
-          {a ? (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <UrgencyPlate tier={effTier ?? a.note.tier} large />
                 <span className="muted small">Assessment {a.version} · {formatTime(a.created_at)}</span>
                 {a.note.vulnerable && <span className="chip">Priority group: age or pregnancy</span>}
-                {changedByReviewer && <span className="chip chip--warn">Changed by a reviewer · rules said {TIER_WORD[a.note.tier]}</span>}
+                {reviewerChanged && <span className="chip chip--warn">Changed by a reviewer · rules said {TIER_WORD[a.note.tier]}</span>}
+                {changedByReviewer && !reviewerChanged && <span className="chip chip--warn">Queue keeps the earlier, higher priority · this assessment says {TIER_WORD[a.note.tier]}</span>}
               </div>
               {changedByReviewer && currentReview?.action === 'override_urgency' && (
                 <div>
@@ -173,11 +182,17 @@ function Workspace({ summary: s, onChanged }: { summary: EncounterSummary; onCha
               )}
               {earlierReview && <Banner kind="info">An earlier assessment was reviewed by {earlierReview.reviewer_name ?? 'a reviewer'} on {formatTime(earlierReview.created_at)}. This newer assessment has not been reviewed yet.</Banner>}
               <div>
-                <h4>{changedByReviewer ? `Why the rules said ${TIER_WORD[a.note.tier].toLowerCase()}` : 'Why this priority'}</h4>
-                <p>{a.note.winning.detail}</p>
-                <p className="tiny muted">Rule {a.note.winning.ruleId}</p>
+                <h4>{reviewerChanged ? `Why the rules said ${TIER_WORD[a.note.tier].toLowerCase()}` : changedByReviewer ? `Why this assessment says ${TIER_WORD[a.note.tier].toLowerCase()}` : 'Why this priority'}</h4>
+                <p>{a.note.winning.ruleId.startsWith('EXT-') && a.note.aiOpinion ? a.note.aiOpinion.reason : a.note.winning.detail}</p>
+                <p className="tiny muted">Rule {ruleName(a.note.winning)}</p>
               </div>
               {a.note.aiOpinion && <AiOpinion opinion={a.note.aiOpinion} />}
+              {!a.note.aiOpinion && (aiStatus === 'unavailable' || aiStatus === 'unusable') && (
+                <Banner kind="warn" title="Part of the triage engine did not respond this time">
+                  This priority comes from the basic checks only, so it may be lower than a full check.{' '}
+                  <button type="button" className="linklike" disabled={assessing || !editable} onClick={() => void assess()}>{assessing ? 'Assessing…' : 'Try again'}</button>
+                </Banner>
+              )}
               {isTier(a.note.potentialTier) && a.note.potentialTier < a.note.tier && (
                 <Banner kind="warn" title={`Could be ${TIER_WORD[a.note.potentialTier as Tier].toLowerCase()}`}>
                   Some information is still missing. Answering the questions below may raise the priority.
@@ -187,30 +202,15 @@ function Workspace({ summary: s, onChanged }: { summary: EncounterSummary; onCha
               {a.note.news2.applicable && a.note.news2.score != null && <p className="small">Early-warning score from vital signs: <strong>{a.note.news2.score}</strong></p>}
               <details>
                 <summary className="small strong" style={{ cursor: 'pointer' }}>How this was decided</summary>
-                <table className="table" style={{ marginTop: 8 }}>
-                  <thead><tr><th>Rule</th><th>Result</th><th>Detail</th></tr></thead>
-                  <tbody>{a.note.log.map((l, i) => <tr key={i}><td>{l.ruleId}</td><td>{TIER_WORD[l.tier]}</td><td>{l.detail}</td></tr>)}</tbody>
-                </table>
-                <p className="tiny muted" style={{ marginTop: 8 }}>The most urgent result wins. Rules: {a.note.ruleSet.name} {a.note.ruleSet.version} ({a.note.ruleSet.status}).</p>
+                <DecisionTable log={a.note.log} ruleSet={a.note.ruleSet} />
               </details>
             </>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><UrgencyPlate tier={null} assessed={false} large /><span className="muted small">This encounter has not been assessed.</span></div>
-          )}
-        
-          {err && ((err as ApiError).isRulesNotApproved
-            ? <Banner kind="warn" title="Triage rules are not approved yet">No assessment was stored. A qualified reviewer must approve the rule set first.</Banner>
-            : <Banner kind="error" title="Assessment not completed">{err.message}</Banner>)}
-        
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button className={`btn ${answeredSince > 0 || !a ? 'btn--primary' : ''}`} onClick={() => void assess()} disabled={assessing || !editable}>
-              {assessing ? 'Assessing…' : a ? 'Assess again' : 'Assess now'}
-            </button>
-            {answeredSince > 0 && <span className="small muted">Answers saved. Assess again to update the priority.</span>}
-          </div>
+          {assessError}
         </Provenance>
+        )}
+        {!a && assessError}
 
-      <StepPanel j={jr} selected={sel} onSelect={setSel} assessing={assessing} editable={editable} onAssess={() => void assess()}>
+      <StepPanel j={jr} selected={sel} onSelect={setSel} assessing={assessing} editable={editable} onAssess={() => void assess()} hasAssessment={!!a} reassessHint={answeredSince > 0}>
         {sel === 'checkin' && (
           <>
             {jr.next === 'consent' && api && <ConsentForm api={api} patientId={s.patient.id} onRecorded={() => void onChanged()} />}

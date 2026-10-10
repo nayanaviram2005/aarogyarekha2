@@ -31,7 +31,9 @@ export interface QueueEntry {
   engineTier: number | null;
   reviewed: boolean;
   order?: QueueOrder;
+  documents?: QueueDocument[];
 }
+export interface QueueDocument { id: string; name: string | null; mimeType: string; kind: string }
 export type QueueOrderWhy = 'first' | 'tier' | 'unassessed' | 'vulnerable' | 'wait';
 export interface QueueOrder { position: number; of: number; effectiveTier: number; promoted: boolean; why: QueueOrderWhy; waitedMin: number }
 export interface QueueResponse { generatedAt: string; entries: QueueEntry[] }
@@ -46,7 +48,7 @@ export interface TriageContext {
   consciousness?: 'alert' | 'confusion' | 'voice' | 'pain' | 'unresponsive' | null;
   onSupplementalOxygen?: boolean | null; pregnant?: boolean | null; signs?: Record<string, boolean>;
 }
-export interface DecisionLogEntry { layer: string; ruleId: string; tier: Tier; detail: string }
+export interface DecisionLogEntry { layer: string; ruleId: string; tier: Tier; detail: string; source?: string; why?: string }
 export interface AiOpinionView { tier: Tier; reason: string; provider: string; model: string; machineGenerated: true; rulesTier: Tier; relation: 'agrees' | 'raised' | 'lower' }
 export interface AssessmentNote {
   aiOpinion?: AiOpinionView;
@@ -131,7 +133,7 @@ export interface AnalyticsView {
   secondsToAssessment: Spread; minutesToReview: Spread; review: { approved: number; changed: number; loweredBelowRules: number; agreementRate: number | null };
   feedback: { helpful: number; notHelpful: number } | null; note: string;
 }
-export interface ConsentInput { purpose?: 'care_triage' | 'referral_sharing' | 'external_ai_processing' | 'reminders' | 'status_messages'; givenBy: 'self' | 'guardian' | 'representative'; method: 'digital' | 'verbal_witnessed' | 'paper'; noticeVersion: string; witnessName?: string }
+export interface ConsentInput { purpose?: 'care_triage' | 'referral_sharing' | 'external_ai_processing' | 'reminders' | 'status_messages' | 'research_deidentified'; givenBy: 'self' | 'guardian' | 'representative'; method: 'digital' | 'verbal_witnessed' | 'paper'; noticeVersion: string; witnessName?: string }
 export interface EncounterInput { patientId: string; scenario: string; language: string; chiefComplaint: string }
 export interface SymptomInput { text: string; lang?: string; durationValue?: number; durationUnit?: 'minutes' | 'hours' | 'days' | 'weeks' | 'months' | 'years'; severity?: number }
 export interface InputsPatch { consciousness?: TriageContext['consciousness']; onSupplementalOxygen?: boolean | null; pregnant?: boolean | null; signs?: Record<string, boolean> }

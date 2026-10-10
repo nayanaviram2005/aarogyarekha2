@@ -23,6 +23,12 @@ export const AI_NOTICE_TEXT =
   'Before it is sent we remove your name, phone number and other personal details. The service does not make decisions about your care. ' +
   'A person always reads the result. You can say no. Then your words are read in the original language. You can change your mind at any time.';
 
+export const TRAINING_NOTICE_VERSION = 'training-notice-v0-draft';
+export const TRAINING_NOTICE_TEXT =
+  'Optional. With your permission, a copy of your case may be saved to help train and improve the triage tool. ' +
+  'Your name, phone number, address, dates, the facility and the clinician’s name are removed first, so the copy cannot be traced to you. ' +
+  'It holds what you told us, your measurements, your reports and the priority the nurse or doctor confirmed. You can say no and you will still be seen. You can withdraw this at any time.';
+
 export const REMINDER_NOTICE_VERSION = 'reminders-notice-v0-draft';
 export const REMINDER_NOTICE_TEXT =
   'With your permission the facility will send you a short reminder before your next visit, by SMS, WhatsApp, a call or in the app. ' +
@@ -48,10 +54,25 @@ export function ConsentForm({ api, patientId, onRecorded, purpose = 'care_triage
   const needsWitness = method === 'verbal_witnessed';
   const staff = useMe()?.displayName?.trim() || null;
   const [full, setFull] = useState(false);
+  const [train, setTrain] = useState(false);
+  const offerTraining = purpose === 'care_triage';
+  async function record(input: ConsentInput) {
+    await api.recordConsent(patientId, { purpose, ...input });
+    if (offerTraining && train) await api.recordConsent(patientId, { purpose: 'research_deidentified', givenBy: input.givenBy, method: input.method, noticeVersion: TRAINING_NOTICE_VERSION, ...(input.witnessName ? { witnessName: input.witnessName } : {}) });
+  }
+  const trainingBox = offerTraining && (
+    <div className="field">
+      <label className="small" style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+        <input type="checkbox" checked={train} onChange={e => setTrain(e.target.checked)} style={{ marginTop: 3 }} />
+        <span>The patient also agrees to an anonymous copy of this case being used to train the triage tool (optional)</span>
+      </label>
+      {train && <p className="tiny muted">{TRAINING_NOTICE_TEXT}</p>}
+    </div>
+  );
   async function quickAgree() {
     if (!staff) return;
     setBusy(true); setError(null);
-    try { await api.recordConsent(patientId, { purpose, givenBy: 'self', method: 'verbal_witnessed', noticeVersion, witnessName: staff }); onRecorded(); }
+    try { await record({ givenBy: 'self', method: 'verbal_witnessed', noticeVersion, witnessName: staff }); onRecorded(); }
     catch (err) { setError((err as Error).message); setBusy(false); }
   }
 
@@ -60,7 +81,7 @@ export function ConsentForm({ api, patientId, onRecorded, purpose = 'care_triage
     if (needsWitness && !witness.trim()) { setError('Enter the name of the witness.'); return; }
     setBusy(true); setError(null);
     try {
-      await api.recordConsent(patientId, { purpose, givenBy, method, noticeVersion, ...(needsWitness ? { witnessName: witness.trim() } : {}) });
+      await record({ givenBy, method, noticeVersion, ...(needsWitness ? { witnessName: witness.trim() } : {}) });
       onRecorded();
     } catch (err) { setError((err as Error).message); setBusy(false); }
   }
@@ -76,6 +97,7 @@ export function ConsentForm({ api, patientId, onRecorded, purpose = 'care_triage
           <blockquote style={{ margin: 0, padding: '8px 12px', borderLeft: '3px solid var(--rule-strong)', background: 'var(--paper)' }}>{noticeText}</blockquote>
           <p className="tiny muted">Draft wording ({noticeVersion}). Have it reviewed before use with real patients.</p>
           {error && <Banner kind="error">{error}</Banner>}
+          {trainingBox}
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <button type="button" className="btn btn--primary btn--big" disabled={busy} onClick={() => void quickAgree()}>{busy ? 'Recording…' : 'Patient agrees'}</button>
             <span className="small muted">Recorded as spoken consent from the patient, witnessed by {staff}.</span>
@@ -115,6 +137,7 @@ export function ConsentForm({ api, patientId, onRecorded, purpose = 'care_triage
             <input id="c-witness" className="input" value={witness} onChange={e => setWitness(e.target.value)} maxLength={120} />
           </div>
         )}
+        {trainingBox}
         <div><button className="btn btn--primary" type="submit" disabled={busy}>{busy ? 'Recording…' : 'Record consent'}</button></div>
       </div>
     </form>

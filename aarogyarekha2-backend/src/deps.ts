@@ -12,6 +12,7 @@ import type { Vision } from './ai/vision.js';
 import type { RuleSet } from './triage/types.js';
 import type { SmsStore, StatusSms } from './sms/notify.js';
 import type { AuditRow } from './admin/suspicious.js';
+import type { TrainingSink } from './training/sink.js';
 
 export interface AuditEvent {
   action: 'read' | 'create' | 'update' | 'delete' | 'export' | 'share' | 'break_glass' | 'login' | 'login_failed' | 'logout' | 'consent_change' | 'erasure';
@@ -41,7 +42,9 @@ export interface QueueEntry {
   queueStatus: string | null; waitingSince: string | null; assessmentVersion: number | null;
   engineTier: number | null;
   reviewed: boolean;
+  documents?: QueueDocument[];
 }
+export interface QueueDocument { id: string; name: string | null; mimeType: string; kind: string }
 
 export interface FacilityRow { id: string; name: string; type: string | null; state: string | null; district: string | null; capabilities: string[] }
 export type ReferralPriority = 'routine' | 'urgent' | 'asap' | 'stat';
@@ -278,6 +281,7 @@ export interface Deps {
   scheduleReminder?: (a: { scheduleId: string; consentId: string; dueAt: string; channel: 'sms' | 'whatsapp' | 'ivr' | 'in_app' }) => Promise<{ id: string }>;
   loadRuleSet?: (name: string, version: string) => Promise<RuleSet>;
   triageAi?: { name: ProviderName; model: string; generate: Generate };
+  trainingSink?: TrainingSink;
   vision?: Vision;
   transcriber?: { name: ProviderName; model: string; supported: boolean; transcribe: Transcribe };
   readText: ReadText;

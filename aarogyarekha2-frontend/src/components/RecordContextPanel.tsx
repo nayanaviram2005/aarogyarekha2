@@ -25,7 +25,7 @@ export function RecordContextPanel({ api, encounterId, refreshKey = 0 }: { api: 
             <>
               <p className="small">{s.rows} test result{s.rows === 1 ? '' : 's'} read from {s.read} record{s.read === 1 ? '' : 's'}. {s.flagged === 0 ? 'None are marked outside the printed range.' : `${s.flagged} marked outside the printed range by the lab:`}</p>
               {s.lines.length > 0 && <ul className="small">{s.lines.map(l => <li key={l}>{l}</li>)}</ul>}
-              {unchecked > 0 && <Banner kind="warn">{unchecked} result{unchecked === 1 ? ' has' : 's have'} not been checked by a person. Check them against the report before relying on them. The AI second opinion only uses checked results.</Banner>}
+              {unchecked > 0 && <Banner kind="warn">{unchecked} result{unchecked === 1 ? ' has' : 's have'} not been checked by a person. Check them against the report before relying on them. The triage engine only uses checked results.</Banner>}
             </>
           )}
         {s.notRead > 0 && s.rows > 0 && <p className="tiny muted">{s.notRead} record{s.notRead === 1 ? ' was' : 's were'} not readable (for example a photo that is too dark). Open it to check by eye.</p>}

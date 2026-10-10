@@ -13,13 +13,13 @@ const FACILITIES = [
   { key: 'B', code: 'SEED-DH-01', name: 'Seed District Hospital Bhubaneswar', type: 'district_hospital', state: 'Odisha', district: 'Khordha', pincode: '751001', caps: ['general_medicine', 'paediatrics', 'obstetrics', 'emergency'] },
 ];
 const USERS = [
-  { key: 'hw_a',     name: 'Health Worker A',         facility: 'A', role: 'health_worker' },
-  { key: 'nurse_a',  name: 'Nurse A',                 facility: 'A', role: 'nurse' },
-  { key: 'doctor_a', name: 'Doctor A',                facility: 'A', role: 'doctor' },
-  { key: 'doctor_b', name: 'Doctor B',                facility: 'B', role: 'doctor' },
-  { key: 'admin_a',  name: 'Facility Admin A',        facility: 'A', role: 'facility_admin' },
-  { key: 'platform', name: 'Platform Admin',          platform: true },
-  { key: 'outsider', name: 'Outsider (no membership)' },
+  { key: 'hw_a',     name: 'Seed Health Worker A', facility: 'A', role: 'health_worker' },
+  { key: 'nurse_a',  name: 'Seed Nurse A',         facility: 'A', role: 'nurse' },
+  { key: 'doctor_a', name: 'Seed Doctor A',        facility: 'A', role: 'doctor' },
+  { key: 'doctor_b', name: 'Seed Doctor B',        facility: 'B', role: 'doctor' },
+  { key: 'admin_a',  name: 'Seed Facility Admin A', facility: 'A', role: 'facility_admin' },
+  { key: 'platform', name: 'Seed Platform Admin',  platform: true },
+  { key: 'outsider', name: 'Seed Outsider (no membership)' },
 ];
 const PATIENTS = [
   { mrn: 'SEED-MRN-A-001', name: 'Seed Patient 01', facility: 'A', sex: 'female', age: 34, lang: 'or', scenario: 'opd_queue',

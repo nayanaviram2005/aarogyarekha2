@@ -8,6 +8,8 @@ const NO_AIRWAY = { airway_obstructed_or_not_breathing: false };
 const adult = (v: Partial<typeof NORMAL> = {}, o: Partial<TriageInput> = {}): TriageInput => ({ ageYears: 40, pregnant: false, vitals: { ...NORMAL, ...v }, consciousness: 'alert' as Consciousness, onSupplementalOxygen: false, signs: { ...NO_AIRWAY }, ...o });
 const withSign = (i: TriageInput, ...codes: string[]): TriageInput => ({ ...i, signs: { ...i.signs, ...Object.fromEntries(codes.map(c => [c, true])) } });
 const child = (age: number, ...codes: string[]): TriageInput => withSign({ ageYears: age, pregnant: false, vitals: { temperature_c: 37.2, pulse_bpm: 110, resp_rate_pm: 28, spo2_pct: 98 }, consciousness: 'alert', onSupplementalOxygen: false, signs: { ...NO_AIRWAY } }, ...codes);
+const kid = (age: number, vitals: TriageInput['vitals']): TriageInput => ({ ageYears: age, pregnant: false, vitals, consciousness: 'alert', onSupplementalOxygen: false, signs: { ...NO_AIRWAY } });
+const ESI = 'ESI v4 paediatric danger zone, applied automatically in the draft (ESI says consider). Needs clinical review';
 const preg = (v: Partial<typeof NORMAL> = {}, ...codes: string[]): TriageInput => withSign({ ageYears: 26, pregnant: true, vitals: { ...NORMAL, ...v }, consciousness: 'alert', onSupplementalOxygen: false, signs: { ...NO_AIRWAY } }, ...codes);
 
 const c = (id: string, group: CaseGroup, text: string, input: TriageInput, expected: Tier, source: string, extra: Partial<EvalCase> = {}): EvalCase => ({ id, group, text, input, expected, source, ...extra });
@@ -40,14 +42,14 @@ export const CASES: EvalCase[] = [
   c('D03', 'adult_danger_signs', 'Central cyanosis', withSign(adult(), 'central_cyanosis'), 1, 'ETAT emergency sign'),
   c('D04', 'adult_danger_signs', 'Signs of shock', withSign(adult(), 'shock_signs'), 1, 'ETAT emergency sign'),
   c('D05', 'adult_danger_signs', 'Unconscious or convulsing now', withSign(adult({}, { consciousness: 'unresponsive' }), 'unconscious_or_convulsing_now'), 1, 'ETAT emergency sign'),
-  c('D06', 'adult_danger_signs', 'Severe pain reported', withSign(adult(), 'adult_severe_pain'), 3, 'ETAT priority sign. v0.1.1 applies priority signs to children under 5 only, so an adult gets no floor from it', { gap: true, fixedIn: '0.2.0' }),
-  c('D07', 'adult_danger_signs', 'Major trauma or burns', withSign(adult(), 'adult_major_trauma_or_burns'), 2, 'Clinical judgement: major trauma needs an adult sign; v0.1.1 has none', { gap: true, fixedIn: '0.2.0' }),
-  c('D08', 'adult_danger_signs', 'Poisoning reported', withSign(adult(), 'adult_poisoning_reported'), 2, 'Clinical judgement: poisoning needs an adult sign; v0.1.1 has none', { gap: true, fixedIn: '0.2.0' }),
+  c('D06', 'adult_danger_signs', 'Severe pain reported', withSign(adult(), 'adult_severe_pain'), 3, 'ETAT priority sign. v0.1.1 applies priority signs to children under 5 only, so an adult gets no floor from it', { gap: true, fixedIn: '0.2.1' }),
+  c('D07', 'adult_danger_signs', 'Major trauma or burns', withSign(adult(), 'adult_major_trauma_or_burns'), 2, 'Clinical judgement: major trauma needs an adult sign; v0.1.1 has none', { gap: true, fixedIn: '0.2.1' }),
+  c('D08', 'adult_danger_signs', 'Poisoning reported', withSign(adult(), 'adult_poisoning_reported'), 2, 'Clinical judgement: poisoning needs an adult sign; v0.1.1 has none', { gap: true, fixedIn: '0.2.1' }),
 
-  c('N01', 'adult_danger_signs', 'Chest pain or heaviness', withSign(adult(), 'chest_pain'), 2, 'Product brief lists chest pain as a red flag; not in v0.1.1', { gap: true, fixedIn: '0.2.0' }),
-  c('N02', 'adult_danger_signs', 'Chest pain in a pregnant patient', withSign(preg(), 'chest_pain'), 2, 'Product brief lists chest pain as a red flag; not in v0.1.1', { gap: true, fixedIn: '0.2.0' }),
-  c('N03', 'adult_danger_signs', 'Stiff neck with fever', withSign(adult({ temperature_c: 39.2 }), 'stiff_neck_with_fever'), 2, 'Product brief lists "high fever with a stiff neck"; not in v0.1.1', { gap: true, fixedIn: '0.2.0' }),
-  c('N04', 'adult_danger_signs', 'Severe bleeding that will not stop', withSign(adult(), 'severe_bleeding'), 1, 'Product brief lists severe bleeding; v0.1.1 has it only for pregnancy', { gap: true, fixedIn: '0.2.0' }),
+  c('N01', 'adult_danger_signs', 'Chest pain or heaviness', withSign(adult(), 'chest_pain'), 2, 'Product brief lists chest pain as a red flag; not in v0.1.1', { gap: true, fixedIn: '0.2.1' }),
+  c('N02', 'adult_danger_signs', 'Chest pain in a pregnant patient', withSign(preg(), 'chest_pain'), 2, 'Product brief lists chest pain as a red flag; not in v0.1.1', { gap: true, fixedIn: '0.2.1' }),
+  c('N03', 'adult_danger_signs', 'Stiff neck with fever', withSign(adult({ temperature_c: 39.2 }), 'stiff_neck_with_fever'), 2, 'Product brief lists "high fever with a stiff neck"; not in v0.1.1', { gap: true, fixedIn: '0.2.1' }),
+  c('N04', 'adult_danger_signs', 'Severe bleeding that will not stop', withSign(adult(), 'severe_bleeding'), 1, 'Product brief lists severe bleeding; v0.1.1 has it only for pregnancy', { gap: true, fixedIn: '0.2.1' }),
 
   c('C01', 'child', 'Well child of 3, no danger signs', child(3), 4, 'IMNCI: no general danger sign'),
   c('C02', 'child', 'Lethargic child', child(3, 'lethargic'), 2, 'IMNCI general danger sign, local tier T2'),
@@ -66,7 +68,15 @@ export const CASES: EvalCase[] = [
   c('C15', 'child', 'Lethargic and very high fever: the more urgent wins', child(3, 'lethargic', 'very_high_fever_child'), 2, 'Most urgent layer wins'),
   c('C16', 'child', 'Convulsing and severe respiratory distress', child(3, 'convulsions_this_illness', 'severe_respiratory_distress'), 1, 'Most urgent layer wins'),
   c('C17', 'child', 'Infant 8 months, fever 39.5, alert, no danger signs', { ...child(0.67), vitals: { temperature_c: 39.5, pulse_bpm: 140, resp_rate_pm: 34, spo2_pct: 97 } }, 4, 'IMNCI: fever without a general danger sign is not urgent referral'),
-  c('C18', 'child', 'Child 4 with SpO2 88 and no sign ticked', { ...child(4), vitals: { temperature_c: 37.5, pulse_bpm: 150, resp_rate_pm: 48, spo2_pct: 88 } }, 2, 'Clinical judgement: low oxygen in a child needs urgent assessment; the draft rules score adults only', { gap: true }),
+  c('C18', 'child', 'Child 4 with SpO2 88 and no sign ticked', { ...child(4), vitals: { temperature_c: 37.5, pulse_bpm: 150, resp_rate_pm: 48, spo2_pct: 88 } }, 1, 'ESI level 1 example (oxygen below 90) and the WHO oxygen threshold. Fixed in 0.1.2 by the child vital-sign limits'),
+  c('C19', 'child', 'Child 6, oxygen 90, pulse 130', kid(6, { temperature_c: 37.5, pulse_bpm: 130, resp_rate_pm: 24, spo2_pct: 90 }), 2, ESI),
+  c('C20', 'child', 'Child 6, oxygen 89', kid(6, { temperature_c: 37.5, pulse_bpm: 110, resp_rate_pm: 24, spo2_pct: 89 }), 1, 'ESI level 1 example (oxygen below 90) and the WHO oxygen threshold'),
+  c('C21', 'child', 'Toddler 2, pulse 170', kid(2, { temperature_c: 37.5, pulse_bpm: 170, resp_rate_pm: 30, spo2_pct: 98 }), 2, ESI),
+  c('C22', 'child', 'Child 10, breathing 24', kid(10, { temperature_c: 37.5, pulse_bpm: 90, resp_rate_pm: 24, spo2_pct: 98 }), 2, ESI),
+  c('C23', 'child', 'Infant 2 months, pulse 190', kid(0.17, { temperature_c: 37.5, pulse_bpm: 190, resp_rate_pm: 40, spo2_pct: 98 }), 2, ESI),
+  c('C24', 'child', 'Child 6, all measurements normal for age', kid(6, { temperature_c: 37.2, pulse_bpm: 100, resp_rate_pm: 22, spo2_pct: 98 }), 4, 'ESI v4: nothing in the danger zone'),
+  c('C25', 'child', 'Child 10, pulse 100 exactly (limit is above 100)', kid(10, { temperature_c: 37.2, pulse_bpm: 100, resp_rate_pm: 18, spo2_pct: 98 }), 4, 'ESI v4: the limit is above 100'),
+  c('C26', 'child', 'Child 6, some breathing difficulty (priority sign)', withSign(kid(6, { temperature_c: 37.2, pulse_bpm: 100, resp_rate_pm: 22, spo2_pct: 98 }), 'breathing_difficulty_not_severe'), 3, 'WHO Pocket Book triage chart priority sign, which is for all sick children'),
 
   c('P01', 'pregnancy', 'Pregnant, normal readings, no signs', preg(), 4, 'No danger sign, normal blood pressure'),
   c('P02', 'pregnancy', 'Blood pressure 165/112', preg({ bp_systolic_mmhg: 165, bp_diastolic_mmhg: 112 }), 2, 'WHO severe hypertension in pregnancy'),
@@ -84,7 +94,7 @@ export const CASES: EvalCase[] = [
 
   c('M01', 'missing_data', 'Nothing assessed at all', { ageYears: 40, pregnant: false, vitals: {}, consciousness: null, onSupplementalOxygen: null, signs: {} }, 3, 'Safety choice: never T4 when nothing was checked'),
   c('M02', 'missing_data', 'Normal vitals but no sign question answered', { ...adult(), signs: {} }, 4, 'Unanswered is not "no"; tier from what is known', { potentialTier: 3 }),
-  c('M03', 'missing_data', 'Age unknown, fever only', { ageYears: null, pregnant: null, vitals: { temperature_c: 38.7 }, consciousness: null, signs: {} }, 3, 'Cautious when age and pregnancy are unknown. The draft cannot score NEWS2 without an age, so this falls to the default', { gap: true, fixedIn: '0.2.0' }),
+  c('M03', 'missing_data', 'Age unknown, fever only', { ageYears: null, pregnant: null, vitals: { temperature_c: 38.7 }, consciousness: null, signs: {} }, 3, 'Cautious when age and pregnancy are unknown. The draft cannot score NEWS2 without an age, so this falls to the default', { gap: true, fixedIn: '0.2.1' }),
   c('M04', 'missing_data', 'Only a pulse of 135 recorded', { ageYears: 40, pregnant: false, vitals: { pulse_bpm: 135 }, consciousness: null, signs: {} }, 2, `${N2}: single parameter 3 from the one reading`),
   c('M05', 'missing_data', 'Adult with every vital but consciousness missing', { ...adult(), consciousness: null }, 4, 'Missing is not abnormal; shown as still needed'),
 

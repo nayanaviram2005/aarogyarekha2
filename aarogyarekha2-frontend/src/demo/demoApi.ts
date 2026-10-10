@@ -251,7 +251,7 @@ export function createDemoApi(opts: { rulesApproved: boolean }): Api {
       });
       const all = docs.flatMap(d => d.rows), flagged = all.filter(r => r.printedFlag && r.printedFlag !== 'normal');
       return wait({ summary: { documents: docs.length, read: docs.filter(d => d.rows.length > 0).length, notRead: docs.filter(d => d.rows.length === 0).length, rows: all.length, verified: all.filter(r => r.verified).length, flagged: flagged.length,
-        lines: flagged.slice(0, 12).map(r => `${r.name.replace(/_/g, ' ')} ${r.valueText ?? r.valueNum ?? '?'}${r.unit ? ' ' + r.unit : ''} (printed ${String(r.printedFlag).toUpperCase()}${r.verified ? '' : ', not yet checked by a person'})`) }, documents: docs });
+        lines: flagged.slice(0, 12).map(r => `${r.name.replace(/_/g, ' ')} ${r.valueText ?? r.valueNum ?? '?'}${r.unit ? ' ' + r.unit : ''} (printed ${String(r.printedFlag).toUpperCase()})`) }, documents: docs });
     },
     documentFile: async id => id === 'demo-doc-discharge' ? wait({ blob: new Blob(['%PDF-1.1\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 150]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF'], { type: 'application/pdf' }), filename: 'document.pdf' }) : wait({ blob: new Blob([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='), c => c.charCodeAt(0))], { type: 'image/png' }), filename: 'document.png' }),
     extractDocument: async id => {

@@ -14,8 +14,8 @@ const added: FloorRule[] = [
 
 export const RULESET_PROPOSED: RuleSet = {
   ...RULESET_DRAFT,
-  version: '0.2.0',
-  provenance: 'PROPOSED additions to v0.1.1 (see the header of ruleset.proposed.ts). Not reviewed by a clinician. Not approved. Do not use for real patients.',
+  version: '0.2.1',
+  provenance: 'PROPOSED additions to v0.1.2 (see the header of ruleset.proposed.ts). Not reviewed by a clinician. Not approved. Do not use for real patients.',
   floors: [...RULESET_DRAFT.floors, ...added, ...CHART_FLAGS],
   news2: { ...RULESET_DRAFT.news2, applyWhenAgeUnknown: true },
 };

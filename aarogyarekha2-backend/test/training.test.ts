@@ -44,6 +44,19 @@ describe('anonymised training case', () => {
     }
   });
 
+  it('holds back Hindi and Odia script text, which could carry a name written in that script, and keeps the English version', () => {
+    const i = input();
+    i.summary.encounter.chief_complaint_original = 'आशा राव को सांस की तकलीफ';
+    i.summary.symptoms[0]!.text_original = 'ଜ୍ୱର';
+    i.summary.symptoms[0]!.text_translated = 'Fever';
+    const held = buildTrainingCase(i, new Date('2026-10-10T10:00:00.000Z'));
+    expect(held.features.complaint).toBeNull();
+    expect(held.features.complaintEnglish).toBe('[NAME] has trouble breathing');
+    expect(held.features.symptoms[0]).toMatchObject({ text: null, textEnglish: 'Fever' });
+    expect(held.withheldFields).toBeGreaterThanOrEqual(2);
+    expect(JSON.stringify(held)).not.toMatch(/[ऀ-ॿ଀-୿]/);
+  });
+
   it('keeps what a model needs: the case, the engine output and the clinician-confirmed priority', () => {
     expect(c.features).toMatchObject({ ageYears: 7, sex: 'female', language: 'hi', pregnant: false, facilityType: 'phc', vitals: { spo2_pct: 90, pulse_bpm: 130 } });
     expect(c.features.symptoms[0]).toMatchObject({ text: 'Cough since morning', duration: '1 days', severity: 6 });

@@ -8,7 +8,7 @@ import type { FloorRule, TriageInput } from '../src/triage/types.js';
 const who = (pop: FloorRule['population']): Pick<TriageInput, 'ageYears' | 'pregnant'> => pop === 'child_under_5' ? { ageYears: 2, pregnant: false } : pop === 'pregnant' ? { ageYears: 28, pregnant: true } : { ageYears: 30, pregnant: false };
 const run = (f: FloorRule, p: Pick<TriageInput, 'ageYears' | 'pregnant'>, rs = PROP) => triage({ ...p, vitals: {}, signs: { [f.sign]: true } }, rs);
 
-describe('flags from the GP triage chart (proposed v0.2.0)', () => {
+describe('flags from the GP triage chart (proposed v0.2.1)', () => {
   it('there are 50, with unique ids and signs, each with a question, a source and a valid tier', () => {
     expect(CHART_FLAGS).toHaveLength(50); expect(new Set(CHART_FLAGS.map(f => f.id)).size).toBe(50); expect(new Set(CHART_FLAGS.map(f => f.sign)).size).toBe(50);
     for (const f of CHART_FLAGS) { expect([1, 2, 3]).toContain(f.tier); expect(f.question.endsWith('?')).toBe(true); expect(f.source).toMatch(/needs clinical review/); }

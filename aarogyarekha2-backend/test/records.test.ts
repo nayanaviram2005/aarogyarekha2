@@ -18,7 +18,7 @@ describe('what the records say', () => {
   it('summarises with the lab\'s own flags, and says which rows no person has checked', () => {
     const s = summariseRecords(docs);
     expect(s).toMatchObject({ documents: 2, read: 1, notRead: 1, rows: 3, verified: 2, flagged: 2 });
-    expect(s.lines).toEqual(['Haemoglobin 9.1 g/dL (printed LOW)', 'WBC 11200 (printed HIGH, not yet checked by a person)']);
+    expect(s.lines).toEqual(['Haemoglobin 9.1 g/dL (printed LOW)', 'WBC 11200 (printed HIGH)']);
   });
   it('lists what the records cannot tell you yet: unread files, readers that disagree, low confidence; never a test to order', () => {
     const g = recordGaps(docs);
@@ -30,10 +30,10 @@ describe('what the records say', () => {
     expect(recordGaps([])).toEqual([]);
     expect(summariseRecords(docs).gaps).toHaveLength(1);
   });
-  it('gives the AI only checked rows, flagged first, with no file names or dates', () => {
+  it('gives the extended check every row read, flagged first, with no file names or dates', () => {
     const n = reportNotes(docs);
-    expect(n).toEqual(['Haemoglobin 9.1 g/dL (printed LOW)', 'Platelets 240']);
-    expect(JSON.stringify(n)).not.toMatch(/cbc|2026|WBC/);
+    expect(n).toEqual(['Haemoglobin 9.1 g/dL (printed LOW)', 'WBC 11200 (printed HIGH)', 'Platelets 240']);
+    expect(JSON.stringify(n)).not.toMatch(/cbc|2026/);
   });
 });
 
@@ -121,5 +121,28 @@ describe('the access budget on the API', () => {
     expect((await open(ids[0]!)).statusCode).toBe(200);
     expect(w.audits.filter(a => a.entityType === 'access_budget')).toHaveLength(1);
     expect(w.audits.find(a => a.entityType === 'access_budget')!.details).toMatchObject({ distinctPatients: 2, limitPerHour: 2 });
+  });
+});
+
+describe('reading the saved rows back for the summary', () => {
+  const ext = (fields: object[]) => ({ status: 'completed', fields });
+  const run = async (fields: object[]) => {
+    const { loadRecordContext } = await import('../src/routes/records.js');
+    const req = { reader: { listDocuments: async () => [{ id: 'd1', kind: 'lab_report', original_filename: 'cbc.pdf', created_at: '2026-10-08', scan_status: 'clean' }], getExtraction: async () => ext(fields) } } as never;
+    return loadRecordContext(req, E);
+  };
+  const row = (over: object) => ({ field_name: 'haemoglobin', extracted_value_text: 'Haemoglobin 9.1 g/dL 12.0 - 15.5 L', value_text: null, value_num: 9.1, unit: 'g/dL', printed_flag: 'low', verified_at: null, agreement: null, confidence: 0.9, ...over });
+
+  it('does not show the whole printed line as the value of a row that has a number', async () => {
+    const [d] = await run([row({})]);
+    expect(d!.fields[0]).toMatchObject({ valueText: null, valueNum: 9.1, unit: 'g/dL' });
+    expect(summariseRecords(d ? [d] : []).lines).toEqual(['haemoglobin 9.1 g/dL (printed LOW)']);
+    expect(reportNotes([d!])).toEqual(['haemoglobin 9.1 g/dL (printed LOW)']);
+  });
+
+  it('keeps the printed text for a row that is not a number, and a person’s corrected value', async () => {
+    const [d] = await run([row({ field_name: 'urine_protein', extracted_value_text: 'Positive', value_num: null, unit: null, printed_flag: null }), row({ value_text: '9.2', value_num: 9.2, verified_at: '2026-10-09' })]);
+    expect(d!.fields[0]).toMatchObject({ valueText: 'Positive', valueNum: null });
+    expect(d!.fields[1]).toMatchObject({ valueText: '9.2', valueNum: 9.2, verified: true });
   });
 });

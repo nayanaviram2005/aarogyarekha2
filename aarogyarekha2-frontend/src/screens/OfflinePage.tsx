@@ -80,6 +80,7 @@ function Offline({ outbox: given }: { outbox?: Outbox }) {
           </div>
           <div className="field"><label htmlFor="off-cc">Main complaint, in the person's words</label><textarea id="off-cc" className="textarea" lang={draft.language} value={draft.complaint} onChange={e => set('complaint', e.target.value)} maxLength={2000} /></div>
           <label className="small"><input type="checkbox" checked={draft.consented} onChange={e => set('consented', e.target.checked)} /> The notice was read to this person and they agreed</label>
+          <label className="small"><input type="checkbox" checked={!!draft.training} disabled={!draft.consented} onChange={e => set('training', e.target.checked)} /> They also agree to an anonymous copy of this case being used to train the triage tool (optional)</label>
           <div><button type="button" className="btn btn--primary" onClick={() => void save()}>Save on this computer</button></div>
         </div>
       </section>

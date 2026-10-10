@@ -33,7 +33,7 @@ describe('evaluate', () => {
     expect(s.results.filter(r => !r.gapNote && r.verdict !== 'match').map(r => r.case.id)).toEqual([]);
   });
   it('the known gaps are exactly the ones we documented (adding or removing one is a deliberate act)', () => {
-    expect(CASES.filter(c => c.gap).map(c => c.id).sort()).toEqual(['C18', 'D06', 'D07', 'D08', 'M03', 'N01', 'N02', 'N03', 'N04', 'P11', 'P12', 'P13', 'S03']);
+    expect(CASES.filter(c => c.gap).map(c => c.id).sort()).toEqual(['D06', 'D07', 'D08', 'M03', 'N01', 'N02', 'N03', 'N04', 'P11', 'P12', 'P13', 'S03']);
   });
   it('every known gap is still a gap: the engine really is less urgent than the label (if one gets fixed, remove it from the list)', () => {
     expect(s.results.filter(r => r.gapNote && r.verdict === 'match').map(r => r.case.id)).toEqual([]);
@@ -75,7 +75,7 @@ describe('renderReport', () => {
   });
 });
 
-describe('proposed v0.2.0', () => {
+describe('proposed v0.2.1', () => {
   const ps = evaluate(PROP);
   it('is a different version with a different hash, and is still a draft', () => { expect(PROP.version).not.toBe(RS.version); expect(PROP.status).toBe('draft'); expect(PROP.provenance).toMatch(/Not approved/); });
   it('only ADDS: every v0.1.1 sign is still there with the same tier and population', () => {
@@ -84,7 +84,7 @@ describe('proposed v0.2.0', () => {
   });
   it('never under-triages a scored case, and closes exactly the gaps it says it closes', () => {
     expect(ps.results.filter(r => !r.gapNote && r.verdict !== 'match').map(r => r.case.id)).toEqual([]);
-    expect(ps.results.filter(r => r.gapNote).map(r => r.case.id).sort()).toEqual(['C18', 'P11', 'P12', 'P13', 'S03']);
+    expect(ps.results.filter(r => r.gapNote).map(r => r.case.id).sort()).toEqual(['P11', 'P12', 'P13', 'S03']);
   });
   it('is never LESS urgent than v0.1.1 on any case (it only adds)', () => {
     const base = evaluate(RS); for (const r of ps.results) expect(r.tier, r.case.id).toBeLessThanOrEqual(base.results.find(x => x.case.id === r.case.id)!.tier);
@@ -97,6 +97,6 @@ describe('proposed v0.2.0', () => {
   });
   it('the report lists what the proposal changes', () => {
     const md = renderReport(evaluate(RS), checkInvariants(RS, 50), [], { name: 'n', version: RS.version, status: 'draft' }, new Date('2026-10-07'), { version: PROP.version, summary: ps, invariants: checkInvariants(PROP, 50) });
-    expect(md).toContain('Proposed v0.2.0'); expect(md).toMatch(/Gaps the proposal closes \(8\)/); expect(md).toMatch(/Not in use and not approved/);
+    expect(md).toContain('Proposed v0.2.1'); expect(md).toMatch(/Gaps the proposal closes \(8\)/); expect(md).toMatch(/Not in use and not approved/);
   });
 });

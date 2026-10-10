@@ -147,3 +147,27 @@ describe('guard and atomicity', () => {
     expect(await count('triage_assessments', E2)).toBe(before);
   });
 });
+
+describe('what the saved assessment says about the extended check', () => {
+  const input: TriageInput = { ageYears: 40, pregnant: false, vitals: { pulse_bpm: 72 }, consciousness: 'alert', onSupplementalOxygen: false, signs: {} };
+  const fresh = async () => { const id = randomUUID(); await db.query(`insert into public.encounters (id, patient_id, facility_id, status) values ($1, $2, $3, 'submitted')`, [id, P, F]); return id; };
+  const note = async (encounterId: string) => (await rows(`select note from public.triage_assessments where encounter_id = $1 order by version desc limit 1`, [encounterId]))[0].note;
+
+  it('remembers that the extended check did not answer, so the warning survives a reload', async () => {
+    const id = await fresh();
+    await assessEncounter(pool, { encounterId: id, facilityId: F, ruleSetName: 't-approved', ruleSetVersion: '1.0.0', input, aiStatus: 'unavailable' });
+    const n = await note(id); expect(n.aiStatus).toBe('unavailable'); expect(n.aiOpinion).toBeUndefined();
+  });
+
+  it('keeps the opinion and no failure note when it answered', async () => {
+    const id = await fresh();
+    await assessEncounter(pool, { encounterId: id, facilityId: F, ruleSetName: 't-approved', ruleSetVersion: '1.0.0', input, aiOpinion: { tier: 2, reason: 'Needs to be seen soon.', provider: 'p', model: 'm' }, aiStatus: 'ok' });
+    const n = await note(id); expect(n.aiOpinion).toMatchObject({ tier: 2, reason: 'Needs to be seen soon.' }); expect(n.aiStatus).toBeUndefined();
+  });
+
+  it('adds nothing when no status is given', async () => {
+    const id = await fresh();
+    await assessEncounter(pool, { encounterId: id, facilityId: F, ruleSetName: 't-approved', ruleSetVersion: '1.0.0', input });
+    const n = await note(id); expect(n.aiStatus).toBeUndefined(); expect(n.aiOpinion).toBeUndefined();
+  });
+});

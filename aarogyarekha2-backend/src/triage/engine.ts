@@ -102,8 +102,12 @@ export function triage(input: TriageInput, rs: RuleSet): TriageDecision {
   }
 
   const pv = rs.paediatricVitals;
+  const paedMissing: { param: string; tier: Tier }[] = [];
   if (pv && input.ageYears != null && input.ageYears < n.minAgeYears) {
     const age = input.ageYears;
+    if (!isNum(v.pulse_bpm)) paedMissing.push({ param: 'pulse_bpm', tier: pv.dangerTier });
+    if (!isNum(v.resp_rate_pm)) paedMissing.push({ param: 'resp_rate_pm', tier: pv.dangerTier });
+    if (!isNum(v.spo2_pct)) paedMissing.push({ param: 'spo2_pct', tier: pv.immediateTier });
     const band = pv.bands.find(b => b.upToYears === undefined || age <= b.upToYears) ?? pv.bands[pv.bands.length - 1]!;
     const hits: string[] = [];
     let paedTier: Tier = pv.dangerTier;
@@ -171,6 +175,7 @@ export function triage(input: TriageInput, rs: RuleSet): TriageDecision {
       missing.push({ code: `vital.${p}`, label: `Not yet recorded: ${p.replace(/_/g, ' ')}`, potentialTier: capped(pt) });
     }
   }
+  for (const m of paedMissing) missing.push({ code: `vital.${m.param}`, label: `Not yet recorded: ${m.param.replace(/_/g, ' ')}`, potentialTier: capped(m.tier) });
   if (input.pregnant === true && !isNum(v.bp_systolic_mmhg) && !isNum(v.bp_diastolic_mmhg))
     missing.push({ code: 'vital.bp_pregnancy', label: 'Not yet recorded: blood pressure (pregnancy)', potentialTier: capped(pb.tier) });
   for (const k of unknownCtx) missing.push({ code: `context.${k}`, label: k === 'age' ? 'Age not recorded' : 'Pregnancy status not recorded', potentialTier: null });

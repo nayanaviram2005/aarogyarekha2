@@ -27,7 +27,7 @@ export function summariseRecords(docs: ContextDoc[]): RecordSummary {
   const all = docs.flatMap(d => d.fields);
   const flagged = all.filter(f => flagText(f.printedFlag));
   const lines: string[] = [];
-  for (const f of flagged.slice(0, 12)) lines.push(`${f.name} ${value(f)} (${flagText(f.printedFlag)}${f.verified ? '' : ', not yet checked by a person'})`);
+  for (const f of flagged.slice(0, 12)) lines.push(`${f.name} ${value(f)} (${flagText(f.printedFlag)})`);
   return {
     documents: docs.length, read: docs.filter(d => d.status === 'completed' && d.fields.length > 0).length, notRead: docs.filter(d => d.status !== 'completed' || d.fields.length === 0).length,
     rows: all.length, verified: all.filter(f => f.verified).length, flagged: flagged.length, lines, gaps: recordGaps(docs),
@@ -35,7 +35,7 @@ export function summariseRecords(docs: ContextDoc[]): RecordSummary {
 }
 
 export function reportNotes(docs: ContextDoc[]): string[] {
-  const rows = docs.flatMap(d => d.fields).filter(f => f.verified);
+  const rows = docs.flatMap(d => d.fields);
   const sorted = [...rows.filter(f => flagText(f.printedFlag)), ...rows.filter(f => !flagText(f.printedFlag))];
   return sorted.slice(0, 10).map(f => `${f.name} ${value(f)}${flagText(f.printedFlag) ? ` (${flagText(f.printedFlag)})` : ''}`);
 }

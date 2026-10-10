@@ -70,7 +70,8 @@ function Camp() {
                     <td><select aria-label={`Language, row ${i + 1}`} className="select" value={r.language} onChange={e => patch(r.key, { language: e.target.value })} disabled={locked}>{LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}</select></td>
                     <td><input aria-label={`Complaint, row ${i + 1}`} className="input" lang={r.language} value={r.complaint} onChange={e => patch(r.key, { complaint: e.target.value })} disabled={locked} maxLength={2000} /></td>
                     <td><input aria-label={`Temperature, row ${i + 1}`} className="input" inputMode="decimal" style={{ width: 72 }} value={r.temperature} onChange={e => patch(r.key, { temperature: e.target.value })} disabled={locked} /></td>
-                    <td><label className="small"><input type="checkbox" aria-label={`Consent given, row ${i + 1}`} checked={r.consented} onChange={e => patch(r.key, { consented: e.target.checked })} disabled={locked} /> Read and agreed</label></td>
+                    <td><label className="small"><input type="checkbox" aria-label={`Consent given, row ${i + 1}`} checked={r.consented} onChange={e => patch(r.key, { consented: e.target.checked })} disabled={locked} /> Read and agreed</label>
+                      <label className="tiny" style={{ display: 'block' }}><input type="checkbox" aria-label={`Anonymous training copy agreed, row ${i + 1}`} checked={!!r.training} onChange={e => patch(r.key, { training: e.target.checked })} disabled={locked || !r.consented} /> Also agrees to an anonymous training copy</label></td>
                     <td className="small" aria-live="polite">
                       {r.status === 'run' && 'Saving…'}
                       {r.status === 'done' && <span>{r.message}{r.encounterId && <> <Link to={`/encounters/${r.encounterId}`}>Open</Link></>}</span>}

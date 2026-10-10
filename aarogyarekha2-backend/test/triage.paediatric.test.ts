@@ -88,3 +88,29 @@ describe('the WHO triage-chart signs apply to every child under 16', () => {
     expect(askable(16)).not.toContain('severe_pain');
   });
 });
+
+describe('a child with measurements still to take is asked for them', () => {
+  const codes = (i: TriageInput) => triage(i, RS).missing.map(m => m.code);
+
+  it('asks for pulse, breathing rate and oxygen when none are recorded, with what each could change', () => {
+    const d = triage(kid(6), RS);
+    expect(d.missing.filter(m => m.code.startsWith('vital.')).map(m => m.code).sort()).toEqual(['vital.pulse_bpm', 'vital.resp_rate_pm', 'vital.spo2_pct']);
+    expect(d.potentialTier).not.toBeNull();
+    expect(d.potentialTier!).toBeLessThan(d.tier);
+  });
+
+  it('asks only for the ones still missing, and for none once all three are taken', () => {
+    expect(codes(kid(6, { spo2_pct: 97 })).filter(c => c.startsWith('vital.')).sort()).toEqual(['vital.pulse_bpm', 'vital.resp_rate_pm']);
+    expect(codes(kid(6, { spo2_pct: 97, pulse_bpm: 100, resp_rate_pm: 24 })).filter(c => c.startsWith('vital.'))).toEqual([]);
+  });
+
+  it('works for infants and does not apply from 16, where the early-warning score asks instead', () => {
+    expect(codes(kid(0.5)).filter(c => c.startsWith('vital.'))).toContain('vital.spo2_pct');
+    expect(codes(kid(16)).filter(c => c.startsWith('vital.'))).toContain('vital.spo2_pct');
+    expect(codes(kid(null)).filter(c => c.startsWith('vital.'))).toEqual([]);
+  });
+
+  it('never changes the priority itself', () => {
+    expect(triage(kid(6, { spo2_pct: 99 }), RS).tier).toBe(triage(kid(6, { spo2_pct: 99, pulse_bpm: 90, resp_rate_pm: 20 }), RS).tier);
+  });
+});

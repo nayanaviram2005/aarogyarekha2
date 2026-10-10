@@ -187,7 +187,7 @@ function Workspace({ summary: s, onChanged }: { summary: EncounterSummary; onCha
                 <p className="tiny muted">Rule {ruleName(a.note.winning)}</p>
               </div>
               {a.note.aiOpinion && <AiOpinion opinion={a.note.aiOpinion} />}
-              {!a.note.aiOpinion && (aiStatus === 'unavailable' || aiStatus === 'unusable') && (
+              {!a.note.aiOpinion && ['unavailable', 'unusable'].includes(a.note.aiStatus ?? aiStatus ?? '') && (
                 <Banner kind="warn" title="Part of the triage engine did not respond this time">
                   This priority comes from the basic checks only, so it may be lower than a full check.{' '}
                   <button type="button" className="linklike" disabled={assessing || !editable} onClick={() => void assess()}>{assessing ? 'Assessing…' : 'Try again'}</button>

@@ -51,7 +51,7 @@ export interface TriageContext {
 export interface DecisionLogEntry { layer: string; ruleId: string; tier: Tier; detail: string; source?: string; why?: string }
 export interface AiOpinionView { tier: Tier; reason: string; provider: string; model: string; machineGenerated: true; rulesTier: Tier; relation: 'agrees' | 'raised' | 'lower' }
 export interface AssessmentNote {
-  aiOpinion?: AiOpinionView;
+  aiOpinion?: AiOpinionView; aiStatus?: string;
   disclaimer?: string; tier: Tier; potentialTier: Tier | null; winning: DecisionLogEntry; log: DecisionLogEntry[];
   missing: { code: string; label: string; potentialTier: Tier | null }[];
   news2: { applicable: boolean; score: number | null };

@@ -17,7 +17,18 @@ export interface TriageInput {
   externalHints?: { code: string; tier: Tier; source: 'external_secondary' | 'external_primary' }[];
 }
 
-export type Population = 'any' | 'child_under_5' | 'adult' | 'pregnant';
+export type Population = 'any' | 'child' | 'child_under_5' | 'adult' | 'pregnant';
+
+export interface PaediatricBand { upToYears?: number; pulseAbove: number; respAbove: number }
+export interface PaediatricVitals {
+  id: string;
+  source: string;
+  bands: PaediatricBand[];
+  spo2Below: number;
+  spo2ImmediateBelow: number;
+  dangerTier: Tier;
+  immediateTier: Tier;
+}
 
 export interface FloorRule {
   id: string;
@@ -40,6 +51,7 @@ export interface RuleSet {
   potentialTierCap: number;
   floors: FloorRule[];
   pregnancyHypertension: { sbp: number; dbp: number; tier: Tier; id: string; label: string; source: string };
+  paediatricVitals?: PaediatricVitals;
   news2: {
     minAgeYears: number;
     applyWhenAgeUnknown?: boolean;
@@ -61,7 +73,7 @@ export interface Signal {
   display_text: string; evidence: Record<string, unknown>;
 }
 
-export interface DecisionLogEntry { layer: 'floor' | 'news2' | 'pregnancy_bp' | 'external' | 'insufficient_data' | 'default'; ruleId: string; tier: Tier; detail: string }
+export interface DecisionLogEntry { layer: 'floor' | 'news2' | 'paed_vitals' | 'pregnancy_bp' | 'external' | 'insufficient_data' | 'default'; ruleId: string; tier: Tier; detail: string; source?: string; why?: string }
 
 export interface TriageDecision {
   tier: Tier;

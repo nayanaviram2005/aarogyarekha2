@@ -14,7 +14,7 @@ const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 export const canonicalJson = (v: unknown) => JSON.stringify(sortKeys(v));
 export const hashRuleSet = (r: RuleSet) => { const { status: _s, provenance: _p, integrityHash: _h, ...behaviour } = r as RuleSet & { integrityHash?: string }; return sha256(canonicalJson(behaviour)); };
 
-const LAYER_ORDER: DecisionLogEntry['layer'][] = ['floor', 'pregnancy_bp', 'news2', 'external', 'insufficient_data', 'default'];
+const LAYER_ORDER: DecisionLogEntry['layer'][] = ['floor', 'pregnancy_bp', 'news2', 'paed_vitals', 'external', 'insufficient_data', 'default'];
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
 function bandScore(bands: ScoreBand[], value: number): number {
@@ -25,6 +25,7 @@ function bandScore(bands: ScoreBand[], value: number): number {
 function inPopulation(pop: Population, i: TriageInput, rs: RuleSet): boolean | 'unknown' {
   switch (pop) {
     case 'any': return true;
+    case 'child': return i.ageYears == null ? 'unknown' : i.ageYears < rs.news2.minAgeYears;
     case 'child_under_5': return i.ageYears == null ? 'unknown' : i.ageYears < 5;
     case 'adult': return i.ageYears == null ? 'unknown' : i.ageYears >= rs.news2.minAgeYears && i.pregnant !== true;
     case 'pregnant': return i.pregnant == null ? 'unknown' : i.pregnant;
@@ -56,7 +57,7 @@ export function triage(input: TriageInput, rs: RuleSet): TriageDecision {
     if (pop === false) continue;
     const v = input.signs[f.sign];
     if (v === true) {
-      log.push({ layer: 'floor', ruleId: f.id, tier: f.tier, detail: f.label });
+      log.push({ layer: 'floor', ruleId: f.id, tier: f.tier, detail: f.label, source: f.source, why: `Marked Yes for: "${f.question}"` });
       signals.push({ signal_code: `red_flag.${code(f.id)}`, kind: 'red_flag', source: 'rule', weight: null, display_text: f.label, evidence: { rule: f.id, sign: f.sign, source: f.source } });
     } else if (v == null && pop === true) {
       unassessed.push({ floor: f });
@@ -67,11 +68,13 @@ export function triage(input: TriageInput, rs: RuleSet): TriageDecision {
   const news2Applicable = (input.ageYears != null ? input.ageYears >= n.minAgeYears : n.applyWhenAgeUnknown === true) && input.pregnant !== true;
   const knownParams: string[] = []; const missingParams: string[] = [];
   let score = 0; let anyRed = false;
+  const parts: string[] = [];
   const v = input.vitals;
   const scoreParam = (name: keyof typeof n.bands, value: number | null | undefined, label: string, unit: string) => {
     if (!isNum(value)) { missingParams.push(name); return; }
     const s = bandScore(n.bands[name], value);
     knownParams.push(name); score += s; if (s >= n.tierMap.singleRedScore) anyRed = true;
+    if (s > 0) parts.push(`${label} ${value}${unit}: ${s} point${s === 1 ? '' : 's'}`);
     if (s > 0) signals.push({ signal_code: `vital.${name}`, kind: 'abnormal_vital', source: 'rule', weight: s, display_text: `${label} ${value}${unit} (early-warning points: ${s})`, evidence: { param: name, value, points: s, source: n.source } });
   };
   if (news2Applicable) {
@@ -85,14 +88,38 @@ export function triage(input: TriageInput, rs: RuleSet): TriageDecision {
       knownParams.push('consciousness');
       if (input.consciousness !== 'alert') {
         score += n.consciousnessNotAlert; anyRed = anyRed || n.consciousnessNotAlert >= n.tierMap.singleRedScore;
+        parts.push(`Level of consciousness ${input.consciousness}: ${n.consciousnessNotAlert} points`);
         signals.push({ signal_code: 'vital.consciousness', kind: 'abnormal_vital', source: 'rule', weight: n.consciousnessNotAlert, display_text: `Level of consciousness recorded as ${input.consciousness} (early-warning points: ${n.consciousnessNotAlert})`, evidence: { param: 'consciousness', value: input.consciousness, points: n.consciousnessNotAlert, source: n.source } });
       }
     }
     if (input.onSupplementalOxygen == null) missingParams.push('oxygen');
-    else { knownParams.push('oxygen'); if (input.onSupplementalOxygen) { score += n.supplementalOxygen; signals.push({ signal_code: 'vital.supplemental_oxygen', kind: 'abnormal_vital', source: 'rule', weight: n.supplementalOxygen, display_text: `On supplemental oxygen (early-warning points: ${n.supplementalOxygen})`, evidence: { param: 'oxygen', points: n.supplementalOxygen, source: n.source } }); } }
+    else { knownParams.push('oxygen'); if (input.onSupplementalOxygen) { score += n.supplementalOxygen; parts.push(`On extra oxygen: ${n.supplementalOxygen} points`); signals.push({ signal_code: 'vital.supplemental_oxygen', kind: 'abnormal_vital', source: 'rule', weight: n.supplementalOxygen, display_text: `On supplemental oxygen (early-warning points: ${n.supplementalOxygen})`, evidence: { param: 'oxygen', points: n.supplementalOxygen, source: n.source } }); } }
     if (knownParams.length > 0) {
       const tier = news2Tier(rs, score, anyRed);
-      log.push({ layer: 'news2', ruleId: 'NEWS2', tier, detail: `Early-warning score ${score} from ${knownParams.length} of 7 parameters${anyRed ? ', one parameter in the highest band' : ''}` });
+      log.push({ layer: 'news2', ruleId: 'NEWS2', tier, detail: `Early-warning score ${score} from ${knownParams.length} of 7 parameters${anyRed ? ', one parameter in the highest band' : ''}`, source: n.source.split('. ')[0],
+        why: `${parts.length ? parts.join('; ') : 'Every recorded measurement is in the normal range'}. Total ${score} from ${knownParams.length} of 7 measurements.` });
+    }
+  }
+
+  const pv = rs.paediatricVitals;
+  if (pv && input.ageYears != null && input.ageYears < n.minAgeYears) {
+    const age = input.ageYears;
+    const band = pv.bands.find(b => b.upToYears === undefined || age <= b.upToYears) ?? pv.bands[pv.bands.length - 1]!;
+    const hits: string[] = [];
+    let paedTier: Tier = pv.dangerTier;
+    const flag = (param: string, text: string, value: number, limit: number) => {
+      hits.push(text);
+      signals.push({ signal_code: `vital.paed_${param}`, kind: 'abnormal_vital', source: 'rule', weight: null, display_text: text, evidence: { param, value, limit, source: pv.source } });
+    };
+    if (isNum(v.pulse_bpm) && v.pulse_bpm > band.pulseAbove) flag('pulse_bpm', `Pulse ${v.pulse_bpm} per minute is above ${band.pulseAbove} for this age`, v.pulse_bpm, band.pulseAbove);
+    if (isNum(v.resp_rate_pm) && v.resp_rate_pm > band.respAbove) flag('resp_rate_pm', `Breathing rate ${v.resp_rate_pm} per minute is above ${band.respAbove} for this age`, v.resp_rate_pm, band.respAbove);
+    if (isNum(v.spo2_pct) && v.spo2_pct < pv.spo2Below) {
+      flag('spo2_pct', `Oxygen saturation ${v.spo2_pct}% is below ${pv.spo2Below}%`, v.spo2_pct, pv.spo2Below);
+      if (v.spo2_pct < pv.spo2ImmediateBelow) paedTier = Math.min(paedTier, pv.immediateTier) as Tier;
+    }
+    if (hits.length > 0) {
+      const ageText = age < 2 ? `${Math.round(age * 12)} months old` : `${Math.floor(age)} years old`;
+      log.push({ layer: 'paed_vitals', ruleId: pv.id, tier: paedTier, detail: hits.join('; '), source: pv.source, why: `This patient is ${ageText}. ${hits.join('; ')}.` });
     }
   }
 
@@ -100,26 +127,29 @@ export function triage(input: TriageInput, rs: RuleSet): TriageDecision {
   if (input.pregnant === true) {
     const hi = (isNum(v.bp_systolic_mmhg) && v.bp_systolic_mmhg >= pb.sbp) || (isNum(v.bp_diastolic_mmhg) && v.bp_diastolic_mmhg >= pb.dbp);
     if (hi) {
-      log.push({ layer: 'pregnancy_bp', ruleId: pb.id, tier: pb.tier, detail: pb.label });
+      log.push({ layer: 'pregnancy_bp', ruleId: pb.id, tier: pb.tier, detail: pb.label, source: pb.source, why: `Recorded blood pressure ${v.bp_systolic_mmhg ?? 'not taken'}/${v.bp_diastolic_mmhg ?? 'not taken'} mmHg. The limit in pregnancy is ${pb.sbp}/${pb.dbp}.` });
       signals.push({ signal_code: `red_flag.${code(pb.id)}`, kind: 'red_flag', source: 'rule', weight: null, display_text: pb.label, evidence: { rule: pb.id, systolic: v.bp_systolic_mmhg ?? null, diastolic: v.bp_diastolic_mmhg ?? null, source: pb.source } });
     }
   }
 
   for (const h of input.externalHints ?? []) {
     if (!(Number.isInteger(h.tier) && h.tier >= 1 && h.tier <= 4)) continue;
-    log.push({ layer: 'external', ruleId: `EXT-${code(h.code)}`, tier: h.tier, detail: `External suggestion: ${h.code}` });
-    signals.push({ signal_code: `external.${code(h.code)}`, kind: 'external_hint', source: h.source, weight: null, display_text: `External suggestion: ${h.code}`, evidence: { code: h.code, tier: h.tier } });
+    const extra = h.code === 'ai_second_opinion';
+    const text = extra ? 'Extended check of the case details' : `External suggestion: ${h.code}`;
+    log.push({ layer: 'external', ruleId: `EXT-${code(h.code)}`, tier: h.tier, detail: text, source: 'Triage engine extended check',
+      why: 'The extended check read the words, measurements and answers recorded for this case and suggested this level. It can only raise the priority, never lower it.' });
+    signals.push({ signal_code: `external.${code(h.code)}`, kind: 'external_hint', source: h.source, weight: null, display_text: text, evidence: { code: h.code, tier: h.tier } });
   }
 
   const anyVital = Object.values(v).some(isNum) || input.consciousness != null || input.onSupplementalOxygen != null;
   const anySignAnswered = Object.values(input.signs).some(x => typeof x === 'boolean');
   const insufficientData = !anyVital && !anySignAnswered && (input.externalHints ?? []).length === 0;
   if (insufficientData) {
-    log.push({ layer: 'insufficient_data', ruleId: 'INSUFFICIENT', tier: rs.insufficientDataTier, detail: 'No vitals or danger-sign answers recorded yet' });
+    log.push({ layer: 'insufficient_data', ruleId: 'INSUFFICIENT', tier: rs.insufficientDataTier, detail: 'No vitals or danger-sign answers recorded yet', source: 'Built-in rule', why: 'Nothing has been measured or answered yet, so there is nothing to check. The level stays provisional until something is recorded.' });
     signals.push({ signal_code: 'missing.nothing_assessed', kind: 'missing_information', source: 'missing_data', weight: null, display_text: 'No vitals or danger-sign answers recorded yet', evidence: {} });
   }
 
-  log.push({ layer: 'default', ruleId: 'DEFAULT', tier: 4, detail: 'No urgency signal found in the information recorded so far' });
+  log.push({ layer: 'default', ruleId: 'DEFAULT', tier: 4, detail: 'No urgency signal found in the information recorded so far', source: 'Built-in rule', why: 'None of the checks found an urgent sign in what has been recorded so far. More answers or measurements can change this.' });
 
   const sorted = [...log].sort((a, b) => a.tier - b.tier || LAYER_ORDER.indexOf(a.layer) - LAYER_ORDER.indexOf(b.layer));
   const winning = sorted[0]!;

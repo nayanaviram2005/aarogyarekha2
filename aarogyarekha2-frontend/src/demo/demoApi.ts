@@ -187,6 +187,8 @@ export function createDemoApi(opts: { rulesApproved: boolean }): Api {
     setMemberRole: async (id, role) => { const m = demoMembers.find(x => x.userId === id); if (m) { m.role = role; m.active = true; } return wait({ userId: id, role, previous: 'nurse' }); },
     platformFacilities: async () => wait([]),
     createFacility: async () => wait({ id: 'demo-facility' }),
+    trainingSummary: async () => wait({ enabled: true, count: 0, latestAt: null }),
+    downloadTrainingData: async format => wait({ filename: `training-cases.${format}`, blob: new Blob([format === 'csv' ? 'case_id\n' : ''], { type: 'text/plain' }), rows: 0 }),
     setFacilityActive: async (id, active) => wait({ id, active }),
     appointFacilityAdmin: async () => wait({ userId: 'demo-admin' }),
     removeFacilityAdmin: async (_f, userId) => wait({ userId, removed: true as const }),

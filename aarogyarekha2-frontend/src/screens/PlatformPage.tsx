@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Banner } from '../components/Provenance';
 import { FACILITY_TYPE_LABEL, formatTime } from '../lib/format';
-import type { PlatformFacilityView } from '../lib/types';
+import type { PlatformFacilityView, TrainingSummary } from '../lib/types';
 import { useAuth } from '../auth/AuthProvider';
 
 const TYPES = Object.keys(FACILITY_TYPE_LABEL);
@@ -18,6 +18,19 @@ export function PlatformPage() {
 
   const load = useCallback(async () => { if (!api) return; try { setRows(await api.platformFacilities()); } catch (e) { setError((e as Error).message); } }, [api]);
   useEffect(() => { void load(); }, [load]);
+  const [training, setTraining] = useState<TrainingSummary | null>(null);
+  const [trainingErr, setTrainingErr] = useState<string | null>(null);
+  useEffect(() => {
+    if (!api) return;
+    void Promise.resolve().then(() => api.trainingSummary()).then(s => { setTraining(s); setTrainingErr(null); }).catch((e: Error) => setTrainingErr(e.message));
+  }, [api]);
+  function download(format: 'csv' | 'jsonl') {
+    if (!api) return;
+    void run('dl-' + format, async () => {
+      const f = await api.downloadTrainingData(format);
+      const url = URL.createObjectURL(f.blob); const a = document.createElement('a'); a.href = url; a.download = f.filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }, 'Training data downloaded.');
+  }
 
   async function run(key: string, fn: () => Promise<unknown>, message: string) {
     setBusy(key); setError(null); setDone(null);
@@ -87,6 +100,26 @@ export function PlatformPage() {
           <div><button type="submit" className="btn btn--primary" disabled={busy === 'create'}>{busy === 'create' ? 'Adding…' : 'Add facility'}</button></div>
         </div>
       </form>
+
+      <section className="block" aria-label="Training data">
+        <div className="block__head"><h3>Training data</h3>{training?.enabled && <span className="chip">{training.count}</span>}</div>
+        <div className="block__body">
+          <p className="small muted">After a nurse or doctor signs off, an anonymous copy of the case is saved here, but only when the patient agreed. It has no name, phone, address, dates, facility or clinician name, and it cannot be traced back to the patient.</p>
+          {trainingErr && <Banner kind="warn" title="Training data could not be checked">{trainingErr}</Banner>}
+          {!training && !trainingErr && <p className="small muted" role="status">Loading…</p>}
+          {training && !training.enabled && <Banner kind="info" title="Training data is off">Set TRAINING_PSEUDONYM_KEY on the server and apply migration 0022 to turn it on.</Banner>}
+          {training?.enabled && (
+            <>
+              <p className="small">{training.count} {training.count === 1 ? 'case' : 'cases'} saved{training.latestAt ? ` · latest ${formatTime(training.latestAt)}` : ''}</p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" className="btn" disabled={training.count === 0 || busy !== null} onClick={() => download('csv')}>{busy === 'dl-csv' ? 'Preparing…' : 'Download CSV'}</button>
+                <button type="button" className="btn" disabled={training.count === 0 || busy !== null} onClick={() => download('jsonl')}>{busy === 'dl-jsonl' ? 'Preparing…' : 'Download JSON lines with FHIR'}</button>
+              </div>
+              <p className="tiny muted">Every download is logged and needs your second factor.</p>
+            </>
+          )}
+        </div>
+      </section>
     </>
   );
 }

@@ -8,9 +8,9 @@ import { buildTrainingCase } from './deidentify.js';
 
 export type TrainingStatus = 'written' | 'no_consent' | 'not_enabled' | 'failed';
 
-export async function captureTrainingCase(deps: Pick<Deps, 'trainingSink'>, req: FastifyRequest, a: { enc: EncounterRow; result: ReviewResult; reason: string | null }): Promise<TrainingStatus> {
-  const sink = deps.trainingSink;
-  if (!sink) return 'not_enabled';
+export async function captureTrainingCase(deps: Pick<Deps, 'trainingStore'>, req: FastifyRequest, a: { enc: EncounterRow; result: ReviewResult; reason: string | null }): Promise<TrainingStatus> {
+  const store = deps.trainingStore;
+  if (!store) return 'not_enabled';
   try {
     const reader = req.reader!;
     const consents = await reader.getConsents(a.enc.patient_id);
@@ -21,12 +21,11 @@ export async function captureTrainingCase(deps: Pick<Deps, 'trainingSink'>, req:
     ]);
     if (!patient || !summary) return 'failed';
     const membership = me.memberships.find(m => m.facilityId === a.enc.facility_id) ?? me.memberships[0];
-    const key = await sink.key();
     const c = buildTrainingCase({
-      key, patient, identifiers, summary, records, facilityType: membership?.facilityType ?? null,
+      key: store.key, patient, identifiers, summary, records, facilityType: membership?.facilityType ?? null,
       review: { id: a.result.reviewId, action: a.result.action, effectiveUrgency: a.result.effectiveUrgency, rulesUrgency: a.result.rulesUrgency, reviewerId: req.user!.userId, reviewerName: me.displayName, reviewerRole: membership?.role ?? null, reason: a.reason },
     });
-    await sink.write(c);
+    await store.write(c);
     return 'written';
   } catch (err) {
     req.log.warn({ reqId: req.id, err: (err as Error).message }, 'training case could not be written');

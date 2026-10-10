@@ -12,7 +12,7 @@ import type { Vision } from './ai/vision.js';
 import type { RuleSet } from './triage/types.js';
 import type { SmsStore, StatusSms } from './sms/notify.js';
 import type { AuditRow } from './admin/suspicious.js';
-import type { TrainingSink } from './training/sink.js';
+import type { TrainingStore } from './training/store.js';
 
 export interface AuditEvent {
   action: 'read' | 'create' | 'update' | 'delete' | 'export' | 'share' | 'break_glass' | 'login' | 'login_failed' | 'logout' | 'consent_change' | 'erasure';
@@ -281,7 +281,7 @@ export interface Deps {
   scheduleReminder?: (a: { scheduleId: string; consentId: string; dueAt: string; channel: 'sms' | 'whatsapp' | 'ivr' | 'in_app' }) => Promise<{ id: string }>;
   loadRuleSet?: (name: string, version: string) => Promise<RuleSet>;
   triageAi?: { name: ProviderName; model: string; generate: Generate };
-  trainingSink?: TrainingSink;
+  trainingStore?: TrainingStore;
   vision?: Vision;
   transcriber?: { name: ProviderName; model: string; supported: boolean; transcribe: Transcribe };
   readText: ReadText;

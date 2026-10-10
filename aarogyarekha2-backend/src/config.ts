@@ -13,7 +13,7 @@ const schema = z.object({
   OCR_PROVIDER: z.enum(['local', 'mock']).default('local'),
   OCR_PHOTOS: z.enum(['local', 'ai', 'ai_then_local']).default('ai'),
   TRAINING_EXPORT: z.enum(['on', 'off']).default('on'),
-  TRAINING_DATA_DIR: z.string().optional(),
+  TRAINING_PSEUDONYM_KEY: z.preprocess(v => (v === '' ? undefined : v), z.string().min(32, 'at least 32 characters').optional()),
   TESSDATA_PATH: z.string().optional(),
   MFA_REQUIRED: z.enum(['true', 'false']).default('true'),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(60).max(5000).default(600),

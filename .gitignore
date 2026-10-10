@@ -16,7 +16,3 @@ docs/
 *.pub
 intro-video/
 skills-lock.json
-
-# anonymised triage training cases are tracked; the secret key that makes their ids is never committed
-aarogyarekha2-backend/training-data/.pseudonym-key
-training-data/.pseudonym-key

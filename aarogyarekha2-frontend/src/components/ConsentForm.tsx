@@ -27,7 +27,7 @@ export const TRAINING_NOTICE_VERSION = 'training-notice-v0-draft';
 export const TRAINING_NOTICE_TEXT =
   'Optional. With your permission, a copy of your case may be saved to help train and improve the triage tool. ' +
   'Your name, phone number, address, dates, the facility and the clinician’s name are removed first, so the copy cannot be traced to you. ' +
-  'It holds what you told us, your measurements, your reports and the priority the nurse or doctor confirmed. You can say no and you will still be seen. You can withdraw this at any time.';
+  'It holds what you told us, your measurements, your reports and the priority the nurse or doctor confirmed. You can say no and you will still be seen. You can withdraw this at any time, which stops any new copies. A copy already made cannot be taken back, because it cannot be traced to you.';
 
 export const REMINDER_NOTICE_VERSION = 'reminders-notice-v0-draft';
 export const REMINDER_NOTICE_TEXT =

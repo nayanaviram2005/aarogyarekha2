@@ -168,8 +168,10 @@ describe('viewing a referral', () => {
     const b = r.json();
     expect(b.preview).toBe(true);
     expect(b.readiness).toEqual({ signedOff: true, sharingConsent: true, hasReceiver: true, hasReason: true });
-    expect(b.bundle.type).toBe('document');
-    expect(b.bundle.entry[0].resource).toMatchObject({ resourceType: 'Composition', status: 'preliminary' });
+    expect(b.bundle.type).toBe('collection');
+    expect(b.bundle.entry.map((e: { resource: { resourceType: string } }) => e.resource.resourceType)).toEqual(expect.arrayContaining(['Patient', 'ServiceRequest']));
+    expect(b.bundle.entry.find((e: { resource: { resourceType: string } }) => e.resource.resourceType === 'ServiceRequest').resource.status).toBe('draft');
+    expect(b.fromFacility).toEqual(expect.any(String));
     expect(w.audits[0]).toMatchObject({ action: 'read', entityType: 'referral', entityId: R, patientId: P });
   });
   it('readiness reflects missing sign-off, consent, receiver and reason', async () => {
@@ -240,7 +242,8 @@ describe('sending', () => {
     expect(a).toMatchObject({ senderId: 'u-clinician', referralId: R, assessmentId: A });
     expect(() => validateResource(a.bundle as never)).not.toThrow();
     expect(a.sha256).toBe(createHash('sha256').update(canonicalJson(a.bundle)).digest('hex'));
-    expect(a.bundle.entry![0]!.resource).toMatchObject({ resourceType: 'Composition', status: 'final' });
+    expect(a.bundle.entry!.find(e => e.resource?.resourceType === 'ServiceRequest')!.resource).toMatchObject({ status: 'active' });
+    expect(a.bundle.entry!.map(e => e.fullUrl)).toEqual(a.bundle.entry!.map(() => undefined));
     const json = JSON.stringify(a.bundle);
     for (const secret of ['+919999900000', '12 Secret Lane', '752001']) expect(json).not.toContain(secret);
     expect(json).toContain('Needs assessment at a higher facility.');
@@ -298,6 +301,7 @@ describe('downloading the sent document', () => {
     expect(r.headers['content-type']).toContain('application/fhir+json');
     expect(r.headers['content-disposition']).toMatch(/attachment; filename="referral-66666666\.json"/);
     expect(r.json()).toEqual(frozen);
+    expect(r.body).toBe(JSON.stringify(frozen, null, 2));
     expect(w.audits.find(a => a.action === 'export')).toMatchObject({ entityType: 'referral', entityId: R, patientId: P, details: { bundleSha256: 'b'.repeat(64) } });
   });
   it('refuses a draft, withholds the file when the export cannot be audited, and hides it from outsiders', async () => {

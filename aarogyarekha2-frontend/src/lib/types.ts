@@ -146,9 +146,9 @@ export interface ReferralMeta {
   id: string; encounterId: string; patientId: string; status: ReferralStatus; priority: ReferralPriority; reasonText: string | null;
   toFacility: { id: string; name: string | null } | null; sentAt: string | null; createdAt: string; bundleSha256: string | null;
 }
-export interface FhirBundle { resourceType: 'Bundle'; type: string; timestamp?: string; entry?: { fullUrl?: string; resource: { resourceType: string; id?: string; [k: string]: unknown } }[] }
+export interface FhirBundle { resourceType: 'Bundle'; type: string; entry?: { resource: { resourceType: string; id?: string; [k: string]: unknown } }[] }
 export interface ReferralView {
-  referral: ReferralMeta; preview: boolean; bundle: FhirBundle;
+  referral: ReferralMeta; fromFacility?: string | null; preview: boolean; bundle: FhirBundle;
   readiness: { signedOff: boolean; sharingConsent: boolean; hasReceiver: boolean; hasReason: boolean };
 }
 export interface BoardReferral {

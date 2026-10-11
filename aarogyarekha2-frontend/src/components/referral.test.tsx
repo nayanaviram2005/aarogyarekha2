@@ -8,7 +8,7 @@ import { ReferralNote, readNote } from './ReferralNote';
 import { ReferralPanel } from './ReferralPanel';
 
 const div = (inner: string) => ({ status: 'generated', div: `<div xmlns="http://www.w3.org/1999/xhtml">${inner}</div>` });
-const bundle = (over: { status?: string; reviewer?: boolean } = {}): FhirBundle => ({
+const legacyBundle = (over: { status?: string; reviewer?: boolean } = {}): FhirBundle => ({
   resourceType: 'Bundle', type: 'document', entry: [
     { resource: { resourceType: 'Composition', id: 'c', status: over.status ?? 'final', title: 'Referral note', custodian: { reference: 'Organization/o1' },
       ...(over.reviewer === false ? {} : { attester: [{ mode: 'professional', time: '2026-10-06T11:00:00Z', party: { reference: 'Practitioner/p', display: 'Dr Mehta' } }] }),
@@ -16,6 +16,16 @@ const bundle = (over: { status?: string; reviewer?: boolean } = {}): FhirBundle 
     { resource: { resourceType: 'Patient', id: 'pt', name: [{ text: 'Test Patient' }], gender: 'female', extension: [{ url: 'https://x/ext/age-years-reported', valueInteger: 27 }], identifier: [{ system: 'https://x/identifier/public-ref', value: 'AR-0001' }], communication: [{ language: { coding: [{ code: 'hi' }] } }] } },
     { resource: { resourceType: 'ServiceRequest', id: 'sr', priority: 'asap', performer: [{ reference: 'Organization/o2' }], extension: [{ url: 'x', extension: [{ url: 'tier', valueInteger: 2 }, { url: 'changedByReviewer', valueBoolean: true }] }] } },
     { resource: { resourceType: 'Organization', id: 'o1', name: 'Seed PHC' } }, { resource: { resourceType: 'Organization', id: 'o2', name: 'Seed District Hospital' } },
+  ],
+});
+const bundle = (over: { status?: string } = {}): FhirBundle => ({
+  resourceType: 'Bundle', type: 'collection', entry: [
+    { resource: { resourceType: 'Patient', id: 'pt', name: [{ text: 'Test Patient' }], gender: 'female' } },
+    { resource: { resourceType: 'ServiceRequest', id: 'sr', status: over.status === 'preliminary' ? 'draft' : 'active', intent: 'order', priority: 'asap', subject: { reference: 'Patient/pt' }, reasonCode: [{ text: 'Needs an obstetrician.' }],
+      note: [{ text: 'Reported complaint: Headache and swollen feet' }, { text: 'Symptoms reported: Headache, for 2 days; Swollen feet' }, { text: 'Danger-sign checks: convulsions in pregnancy: no; severe pain: yes' }, { text: 'Review priority (rule-based): Very urgent (tier 2 of 4). Reason: Blood pressure in the severe range. A reviewer changed this priority' }, { text: 'Not yet collected: Heavy bleeding' }] } },
+    { resource: { resourceType: 'Observation', id: 'age', status: 'final', code: { coding: [{ system: 'http://loinc.org', code: '30525-0', display: 'Age' }] }, valueQuantity: { value: 27, unit: 'years' } } },
+    { resource: { resourceType: 'Observation', id: 'o1', status: 'final', code: { coding: [{ system: 'http://loinc.org', code: '8867-4', display: 'Heart rate' }] }, valueQuantity: { value: 90, unit: '/min' } } },
+    { resource: { resourceType: 'Observation', id: 'o2', status: 'final', code: { coding: [{ system: 'http://loinc.org', code: '85354-9', display: 'Blood pressure panel with all children optional' }] }, component: [{ code: { coding: [{ display: 'Systolic blood pressure' }] }, valueQuantity: { value: 165, unit: 'mmHg' } }, { code: { coding: [{ display: 'Diastolic blood pressure' }] }, valueQuantity: { value: 104, unit: 'mmHg' } }] } },
   ],
 });
 const meta = (over: Partial<ReferralMeta> = {}): ReferralMeta => ({ id: 'r1', encounterId: 'e1', patientId: 'p1', status: 'draft', priority: 'asap', reasonText: 'Needs an obstetrician.', toFacility: { id: 'f2', name: 'Seed District Hospital' }, sentAt: null, createdAt: '2026-10-06T11:10:00Z', bundleSha256: null, ...over });
@@ -43,30 +53,54 @@ describe('Narrative: shows document text without injecting markup', () => {
 });
 
 describe('readNote', () => {
-  it('pulls the header facts out of the document', () => {
-    const n = readNote(bundle());
+  it('pulls the header facts out of the health-only document, with the facilities given separately', () => {
+    const n = readNote(bundle(), { from: 'Seed PHC', to: 'Seed District Hospital' });
+    expect(n).toMatchObject({ title: 'Referral note', from: 'Seed PHC', to: 'Seed District Hospital', priority: 'asap', tier: 2, changed: true, status: 'final' });
+    expect(n.patient).toMatchObject({ name: 'Test Patient', age: '27 y', sex: 'female' }); expect(n.patient?.ref).toBeUndefined(); expect(n.reviewer).toBeUndefined();
+    expect(n.sections.map(s => s.title)).toEqual(['Reason for referral', 'Reported complaint', 'Symptoms reported', 'Measurements', 'Danger-sign checks', 'Review priority (rule-based)', 'Not yet collected', 'Notice']);
+    expect(n.sections.find(s => s.title === 'Measurements')!.lines).toEqual(['Heart rate: 90 /min', 'Blood pressure panel with all children optional: Systolic blood pressure 165 mmHg, Diastolic blood pressure 104 mmHg']);
+    expect(n.sections.find(s => s.title === 'Symptoms reported')!.lines).toEqual(['Headache, for 2 days', 'Swollen feet']);
+  });
+  it('the tier follows the request priority when no tier was recorded', () => {
+    for (const [p, t] of [['stat', 1], ['asap', 2], ['urgent', 3], ['routine', 4]] as const) {
+      const b = bundle(); (b.entry![1]!.resource as unknown as { priority: string }).priority = p; expect(readNote(b).tier).toBe(t);
+    }
+  });
+  it('still reads a referral that was sent in the earlier, longer format', () => {
+    const n = readNote(legacyBundle());
     expect(n).toMatchObject({ title: 'Referral note', from: 'Seed PHC', to: 'Seed District Hospital', priority: 'asap', tier: 2, changed: true, reviewer: 'Dr Mehta', status: 'final' });
     expect(n.patient).toMatchObject({ name: 'Test Patient', ref: 'AR-0001', age: '27 y', sex: 'female', language: 'hi' });
     expect(n.sections.map(s => s.title)).toEqual(['Reason for referral', 'Measurements']);
   });
   it('does not invent anything that is missing', () => {
-    const n = readNote({ resourceType: 'Bundle', type: 'document', entry: [] });
-    expect(n.patient).toBeNull(); expect(n.tier).toBeUndefined(); expect(n.reviewer).toBeUndefined();
+    const n = readNote({ resourceType: 'Bundle', type: 'collection', entry: [] });
+    expect(n.patient).toBeNull(); expect(n.tier).toBeUndefined(); expect(n.reviewer).toBeUndefined(); expect(n.sections.map(s => s.title)).toEqual(['Notice']);
+  });
+  it('shows typed text as plain text, never as markup', () => {
+    const b = bundle(); (b.entry![1]!.resource as unknown as { reasonCode: { text: string }[] }).reasonCode[0]!.text = '<img src=x onerror=alert(1)>';
+    const view = { referral: meta(), preview: true, bundle: b, readiness: { signedOff: true, sharingConsent: true, hasReceiver: true, hasReason: true } } as ReferralView;
+    const { container } = render(<ReferralNote view={view} onClose={() => {}} />);
+    expect(container.querySelector('img')).toBeNull(); expect(container.textContent).toContain('<img src=x onerror=alert(1)>');
   });
 });
 
 describe('ReferralNote', () => {
   const sentMeta = meta({ status: 'requested', sentAt: '2026-10-06T12:00:00Z', bundleSha256: 'ab'.repeat(32) });
   it('a preview is clearly marked as not sent, and shows every part of the note', () => {
-    render(<ReferralNote view={view(meta())} onClose={() => {}} />);
+    render(<ReferralNote view={{ ...view(meta()), fromFacility: 'Seed PHC' }} onClose={() => {}} />);
     expect(screen.getByText(/PREVIEW. This referral has not been sent/)).toBeInTheDocument();
     expect(screen.getByText('Test Patient')).toBeInTheDocument();
-    expect(screen.getByText('Seed District Hospital')).toBeInTheDocument();
+    expect(screen.getByText('Seed PHC')).toBeInTheDocument(); expect(screen.getAllByText('Seed District Hospital').length).toBeGreaterThan(0);
     expect(screen.getByText('Needs an obstetrician.')).toBeInTheDocument();
-    expect(screen.getByText('Pulse: 90')).toBeInTheDocument();
-    expect(screen.getByText(/signed off by/i)).toHaveTextContent('Dr Mehta');
-    expect(screen.getByRole('img', { name: /Very urgent/ })).toBeInTheDocument();
+    expect(screen.getByText('Heart rate: 90 /min')).toBeInTheDocument();
+    expect(screen.getByText('Headache, for 2 days')).toBeInTheDocument();
+    expect(screen.getByText(/The priority has been signed off by a nurse or doctor/)).toBeInTheDocument();
+    expect(screen.getAllByRole('img', { name: /Very urgent/ }).length).toBeGreaterThan(0);
     expect(screen.getByText(/A reviewer changed the priority/)).toBeInTheDocument();
+  });
+  it('a note in the earlier format still shows who signed it off', () => {
+    render(<ReferralNote view={{ ...view(meta()), bundle: legacyBundle() }} onClose={() => {}} />);
+    expect(screen.getByText(/signed off by/i)).toHaveTextContent('Dr Mehta'); expect(screen.getByText('Pulse: 90')).toBeInTheDocument();
   });
   it('a sent note shows when it was sent and its checksum, with no preview banner', () => {
     render(<ReferralNote view={view(sentMeta, {}, false)} onClose={() => {}} />);
@@ -74,8 +108,7 @@ describe('ReferralNote', () => {
     expect(screen.getByText(/Document checksum/)).toHaveTextContent('abababababababab');
   });
   it('says plainly when the priority has not been signed off', () => {
-    const v = { ...view(meta()), bundle: bundle({ reviewer: false }) };
-    render(<ReferralNote view={v} onClose={() => {}} />);
+    render(<ReferralNote view={view(meta(), { signedOff: false })} onClose={() => {}} />);
     expect(screen.getByText('The priority has not been signed off.')).toBeInTheDocument();
   });
   it('prints, closes on the button and on Escape, and offers a download only when given one', async () => {

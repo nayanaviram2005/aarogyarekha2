@@ -6,7 +6,6 @@ import { ConsentForm } from './ConsentForm';
 import { UrgencyPlate } from './Plate';
 import { Banner } from './Provenance';
 
-export const REVIEW_ROLES = ['nurse', 'doctor', 'medical_officer'];
 
 interface Props {
   api: Api;

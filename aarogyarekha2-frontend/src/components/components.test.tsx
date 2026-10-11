@@ -1,16 +1,12 @@
 import { useState } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { Api } from '../lib/types';
 import { describe, expect, it, vi } from 'vitest';
 import { FollowUpControl } from './FollowUpControl';
 import { draftReady, submitDrafts, type Draft } from '../lib/answerDrafts';
 import { UrgencyPlate } from './Plate';
 import { Provenance } from './Provenance';
-import type { Api } from '../lib/types';
-
-const fakeApi = (over: Partial<Api> = {}): Api => ({
-  saveInputs: vi.fn().mockResolvedValue({ ok: true }), addVital: vi.fn().mockResolvedValue({ id: 'v' }), ...over,
-} as unknown as Api);
 
 describe('UrgencyPlate', () => {
   it('names the tier in words and exposes it to screen readers', () => {

@@ -31,7 +31,6 @@ const TESTS: [string, RegExp][] = [
   ['hdl', /\bhdl\b/], ['ldl', /\bldl\b/], ['cholesterol_total', /\b(total\s+)?cholesterol\b/], ['triglycerides', /\btriglycerides?\b/],
   ['tsh', /\btsh\b/], ['temperature', /\btemp(erature)?\b/], ['pulse', /\b(pulse|heart\s+rate)\b/], ['spo2', /\b(spo2|oxygen\s+saturation)\b/],
 ];
-export const VITAL_KIND: Record<string, string> = { temperature: 'temperature_c', pulse: 'pulse_bpm', spo2: 'spo2_pct' };
 
 export const canonicalTest = (printed: string): string | null => {
   const s = printed.toLowerCase();

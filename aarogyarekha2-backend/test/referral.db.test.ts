@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { makeDb } from './helpers/pg.js';
 
 let db: PGlite;
-const F1 = randomUUID(), F2 = randomUUID(), P = randomUUID(), RS = randomUUID();
+const F1 = randomUUID(), F2 = randomUUID(), RS = randomUUID();
 const U = { nurse: randomUUID(), doctor: randomUUID(), hw: randomUUID(), other: randomUUID(), outsider: randomUUID(), receiver: randomUUID() };
 const BUNDLE = { resourceType: 'Bundle', type: 'document', entry: [] };
 const SHA = createHash('sha256').update(JSON.stringify(BUNDLE)).digest('hex');

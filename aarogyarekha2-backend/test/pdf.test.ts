@@ -1,4 +1,4 @@
-import { PDFArray, PDFDocument, PDFName, PDFString, StandardFonts } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFString, StandardFonts } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { inspectPdf } from '../src/files/pdf.js';
 import { MAX_PDF_PAGES } from '../src/files/safe.js';

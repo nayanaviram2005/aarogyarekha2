@@ -22,19 +22,6 @@ function SlidingNote({ message, label, tone, shared }: { message: string; label:
   );
 }
 
-export function HackathonBar() {
-  if (!SHOW_HACKATHON_BAR) return null;
-  return <SlidingNote message={HACKATHON_MESSAGE} label="Prototype notice" tone="prototype" />;
-}
-
-export function SlowServerBar() {
-  const { status } = useAuth();
-  const { pathname } = useLocation();
-  const onSignIn = status === 'signedOut' && pathname !== '/';
-  if (!SHOW_SLOW_SERVER_NOTICE || onSignIn) return null;
-  return <SlidingNote message={SLOW_SERVER_MESSAGE} label="Speed notice" tone="warn" />;
-}
-
 export function NoticeBars() {
   const [paused, setPaused] = useState(false);
   const { status } = useAuth();

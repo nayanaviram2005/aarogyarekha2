@@ -9,7 +9,21 @@ type Res = { resourceType: string; id?: string; [k: string]: any };
 const all = (b: FhirBundle, type: string): Res[] => (b.entry ?? []).map(e => e.resource as Res).filter(r => r.resourceType === type);
 const first = (b: FhirBundle, type: string): Res | undefined => all(b, type)[0];
 
-export function readNote(bundle: FhirBundle) {
+const TIER_OF_PRIORITY = { stat: 1, asap: 2, urgent: 3, routine: 4 } as const;
+const SECTION_ORDER = ['Reported complaint', 'Symptoms reported', 'Measurements', 'Danger-sign checks'];
+const NOTICE = 'Organises information for review. Does not diagnose or advise treatment.';
+
+const measurement = (o: Res): string => {
+  const label = o.code?.text ?? o.code?.coding?.[0]?.display ?? 'Measurement';
+  const q = o.valueQuantity as { value?: number; unit?: string } | undefined;
+  const parts = ((o.component ?? []) as Res[]).map(c => `${c.code?.coding?.[0]?.display ?? c.code?.text ?? ''} ${c.valueQuantity?.value ?? ''} ${c.valueQuantity?.unit ?? ''}`.trim());
+  return `${label}: ${q ? `${q.value} ${q.unit ?? ''}`.trim() : parts.join(', ')}`;
+};
+const isAge = (o: Res) => o.code?.coding?.[0]?.code === '30525-0';
+
+export interface NoteSection { title: string; lines?: string[]; xhtml?: string }
+
+export function readNote(bundle: FhirBundle, facilities: { from?: string | null; to?: string | null } = {}) {
   const comp = first(bundle, 'Composition');
   const patient = first(bundle, 'Patient');
   const sr = first(bundle, 'ServiceRequest');
@@ -19,29 +33,56 @@ export function readNote(bundle: FhirBundle) {
   const ext = ((sr?.extension as Res[] | undefined)?.[0]?.extension as Res[] | undefined) ?? [];
   const x = (url: string) => ext.find(e => e.url === url);
   const ageExt = (patient?.extension as Res[] | undefined)?.find(e => String(e.url).endsWith('/age-years-reported'));
+  const ageObs = all(bundle, 'Observation').find(isAge)?.valueQuantity as { value?: number } | undefined;
+  const priority = sr?.priority as 'routine' | 'urgent' | 'asap' | 'stat' | undefined;
+
+  let sections: NoteSection[];
+  let changed = x('changedByReviewer')?.valueBoolean as boolean | undefined;
+  if (comp) {
+    sections = ((comp.section as { title: string; text?: { div?: string } }[] | undefined) ?? []).map(s => ({ title: s.title, xhtml: s.text?.div ?? '' }));
+  } else {
+    const named = new Map<string, string[]>(); const rest: NoteSection[] = [];
+    for (const n of (sr?.note ?? []) as { text?: string }[]) {
+      const text = String(n.text ?? ''); const cut = text.indexOf(': ');
+      if (cut < 0) continue;
+      const title = text.slice(0, cut); const lines = text.slice(cut + 2).split('; ').map(l => l.trim()).filter(Boolean);
+      if (SECTION_ORDER.includes(title)) named.set(title, lines); else rest.push({ title, lines });
+      if (title.startsWith('Review priority') && /A reviewer changed this priority/.test(text)) changed = true;
+    }
+    const measurements = all(bundle, 'Observation').filter(o => !isAge(o)).map(measurement);
+    if (measurements.length) named.set('Measurements', measurements);
+    const reason = sr?.reasonCode?.[0]?.text as string | undefined;
+    sections = [
+      ...(reason ? [{ title: 'Reason for referral', lines: [reason] }] : []),
+      ...SECTION_ORDER.filter(t => named.has(t)).map(t => ({ title: t, lines: named.get(t)! })),
+      ...rest, { title: 'Notice', lines: [NOTICE] },
+    ];
+  }
   return {
     title: (comp?.title as string) ?? 'Referral note',
-    sections: ((comp?.section as { title: string; text?: { div?: string } }[] | undefined) ?? []),
-    from: org(idOf(comp?.custodian?.reference))?.name as string | undefined,
-    to: org(idOf(sr?.performer?.[0]?.reference))?.name as string | undefined,
+    sections,
+    from: (org(idOf(comp?.custodian?.reference))?.name as string | undefined) ?? facilities.from ?? undefined,
+    to: (org(idOf(sr?.performer?.[0]?.reference))?.name as string | undefined) ?? facilities.to ?? undefined,
     patient: patient ? {
       name: (patient.name?.[0]?.text as string) ?? 'Name not recorded',
       ref: (patient.identifier as { system: string; value: string }[] | undefined)?.find(i => i.system.endsWith('/public-ref'))?.value,
       sex: (patient.gender as 'female' | 'male' | 'other' | 'unknown') ?? 'unknown',
-      age: formatAge({ birth_date: (patient.birthDate as string) ?? null, age_years_reported: (ageExt?.valueInteger as number) ?? null }),
+      age: formatAge({ birth_date: (patient.birthDate as string) ?? null, age_years_reported: (ageExt?.valueInteger as number) ?? ageObs?.value ?? null }),
       language: patient.communication?.[0]?.language?.coding?.[0]?.code as string | undefined,
     } : null,
-    priority: sr?.priority as 'routine' | 'urgent' | 'asap' | 'stat' | undefined,
-    tier: x('tier')?.valueInteger as number | undefined,
-    changed: x('changedByReviewer')?.valueBoolean as boolean | undefined,
+    priority,
+    tier: (x('tier')?.valueInteger as number | undefined) ?? (priority ? TIER_OF_PRIORITY[priority] : undefined),
+    changed,
     reviewer: comp?.attester?.[0]?.party?.display as string | undefined,
     reviewedAt: comp?.attester?.[0]?.time as string | undefined,
-    status: comp?.status as string | undefined,
+    status: (comp?.status as string | undefined) ?? (sr?.status === 'active' ? 'final' : sr?.status === 'draft' ? 'preliminary' : undefined),
   };
 }
 
+const Lines = ({ lines }: { lines: string[] }) => (lines.length === 1 ? <p>{lines[0]}</p> : <ul>{lines.map((l, i) => <li key={i}>{l}</li>)}</ul>);
+
 export function ReferralNote({ view, onClose, onDownload }: { view: ReferralView; onClose: () => void; onDownload?: () => void }) {
-  const n = readNote(view.bundle);
+  const n = readNote(view.bundle, { from: view.fromFacility, to: view.referral.toFacility?.name });
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     closeRef.current?.focus();
@@ -91,12 +132,12 @@ export function ReferralNote({ view, onClose, onDownload }: { view: ReferralView
         {n.sections.map((s, i) => (
           <section key={i} className="note-section">
             <h3>{s.title}</h3>
-            {s.text?.div ? <Narrative xhtml={s.text.div} /> : <p className="muted">Nothing recorded.</p>}
+            {s.xhtml ? <Narrative xhtml={s.xhtml} /> : s.lines?.length ? <Lines lines={s.lines} /> : <p className="muted">Nothing recorded.</p>}
           </section>
         ))}
 
         <footer className="note-foot">
-          {n.reviewer ? <p>Priority signed off by <strong>{n.reviewer}</strong>{n.reviewedAt ? `, ${formatTime(n.reviewedAt)}` : ''}.</p> : <p>The priority has not been signed off.</p>}
+          {n.reviewer ? <p>Priority signed off by <strong>{n.reviewer}</strong>{n.reviewedAt ? `, ${formatTime(n.reviewedAt)}` : ''}.</p> : view.readiness.signedOff ? <p>The priority has been signed off by a nurse or doctor.</p> : <p>The priority has not been signed off.</p>}
           {SHOW_HACKATHON_BAR && <p className="tiny" style={{ marginTop: 8, fontWeight: 600 }}>Hackathon prototype. Synthetic data only. Triage rules are not clinically validated. Not for use with real patients.</p>}
           {sent && view.referral.bundleSha256 && <p className="tiny muted">Document checksum (SHA-256): {view.referral.bundleSha256.slice(0, 16)}…</p>}
         </footer>

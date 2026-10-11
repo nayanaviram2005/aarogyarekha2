@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertNoteNonDiagnostic, assertNonDiagnostic, checkNonDiagnostic, NonDiagnosticViolation } from '../src/guard/nonDiagnostic.js';
+import { assertNoteNonDiagnostic, checkNonDiagnostic, NonDiagnosticViolation } from '../src/guard/nonDiagnostic.js';
 
 const blocked = [
   'Diagnosis: dengue fever',
@@ -57,14 +57,6 @@ describe('non-diagnostic guard: warn vs block', () => {
 });
 
 describe('assert helpers', () => {
-  it('assertNonDiagnostic returns clean text unchanged', () => {
-    expect(assertNonDiagnostic('Cough for 5 days.')).toBe('Cough for 5 days.');
-  });
-
-  it('assertNonDiagnostic throws a typed error carrying the findings', () => {
-    expect(() => assertNonDiagnostic('Diagnosis: malaria')).toThrow(NonDiagnosticViolation);
-  });
-
   it('assertNoteNonDiagnostic finds a violation nested in a structured note and reports its path', () => {
     const note = { summary: 'Fever 3 days', followUps: ['Ask about travel', { q: 'Patient has dengue' }] };
     try {

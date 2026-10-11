@@ -1,7 +1,6 @@
 export const SYS = {
   loinc: 'http://loinc.org',
   ucum: 'http://unitsofmeasure.org',
-  snomed: 'http://snomed.info/sct',
   observationCategory: 'http://terminology.hl7.org/CodeSystem/observation-category',
   v3ActCode: 'http://terminology.hl7.org/CodeSystem/v3-ActCode',
   local: 'https://aarogyarekha.example/fhir/CodeSystem',

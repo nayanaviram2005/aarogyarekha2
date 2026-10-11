@@ -1,6 +1,6 @@
 import { triage } from '../triage/engine.js';
 import type { RuleSet, Tier, TriageDecision, TriageInput } from '../triage/types.js';
-import { CASES, type CaseGroup, type EvalCase } from './cases.js';
+import { CASES, type EvalCase } from './cases.js';
 
 export interface CaseResult { case: EvalCase; tier: Tier; potentialTier: Tier | null; winning: string; verdict: 'match' | 'under' | 'over'; gapNote: boolean }
 export interface Summary {

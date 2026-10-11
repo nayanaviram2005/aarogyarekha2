@@ -154,7 +154,7 @@ function Workspace({ summary: s, onChanged }: { summary: EncounterSummary; onCha
         <p lang={lang} style={{ marginTop: 8, fontSize: 'var(--fs-16)' }}>{s.encounter.chief_complaint_original ?? <span className="muted">No complaint recorded</span>}</p>
         <TextHints text={[s.encounter.chief_complaint_original ?? '', ...s.symptoms.map(x => x.text_original)].join(' . ')} language={lang} />
         {s.encounter.chief_complaint_translated && <p className="small muted">In English (machine translation, not verified): {s.encounter.chief_complaint_translated}</p>}
-        {api && editable && (lang === 'hi' || lang === 'or') && (!s.encounter.chief_complaint_translated || s.symptoms.some(x => (x.lang === 'hi' || x.lang === 'or') && !x.text_translated)) && <div style={{ marginTop: 8 }}><TranslateBar api={api} encounterId={s.encounter.id} patientId={s.patient.id} onDone={() => void onChanged()} /></div>}
+        {api && editable && (lang === 'hi' || lang === 'or') && (!s.encounter.chief_complaint_translated || s.symptoms.some(x => (x.lang === 'hi' || x.lang === 'or') && !x.text_translated)) && <div style={{ marginTop: 8 }}><TranslateBar api={api} encounterId={s.encounter.id} onDone={() => void onChanged()} /></div>}
       </header>
 
       <JourneyBar j={jr} selected={sel} onSelect={setSel} />

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { hasTemplate, noteFor, scenarioChecklist, TEMPLATES } from './scenarioTemplates';
+import { noteFor, scenarioChecklist, TEMPLATES } from './scenarioTemplates';
 import type { EncounterSummary } from './types';
 
 const s = (symptoms: string[], vitalKinds: string[] = []): EncounterSummary => ({ symptoms: symptoms.map((t, i) => ({ id: String(i), text_original: t, text_translated: null, lang: null, duration_value: null, duration_unit: null, severity: null, created_at: '' })), vitals: vitalKinds.map((k, i) => ({ id: String(i), encounter_id: 'e', kind: k, value: 1, unit: 'u', measured_at: '' })) } as unknown as EncounterSummary);
 
 describe('templates', () => {
   it('there is one for each field-based scenario and none for plain outpatient or camp', () => {
-    for (const k of ['campus_fever', 'occupational', 'maternal_followup', 'chronic_checkin']) expect(hasTemplate(k)).toBe(true);
-    expect(hasTemplate('opd_queue')).toBe(false); expect(hasTemplate('health_camp')).toBe(false);
+    for (const k of ['campus_fever', 'occupational', 'maternal_followup', 'chronic_checkin']) expect(TEMPLATES[k]).toBeDefined();
+    expect(TEMPLATES.opd_queue).toBeUndefined(); expect(TEMPLATES.health_camp).toBeUndefined();
   });
   it('field keys and labels are unique within a scenario (the label is how an answer is found again)', () => {
     for (const [k, t] of Object.entries(TEMPLATES)) { expect(new Set(t.fields.map(f => f.key)).size, k).toBe(t.fields.length); expect(new Set(t.fields.map(f => f.label.toLowerCase())).size, k).toBe(t.fields.length); }

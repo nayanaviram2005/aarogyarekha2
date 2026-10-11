@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { RouteCtx, RouteHelpers } from './intake.js';
 import type { ConsentBrief, ReferralRow } from '../deps.js';
 import { buildReferralBundle, PRIORITY_FOR_URGENCY, unresolvedReferences, type ReferralBuildInput, type UrgencyCode } from '../fhir/referral.js';
-import { canonicalJson, ENGINE_VERSION } from '../triage/engine.js';
+import { canonicalJson } from '../triage/engine.js';
 import { isConsentActive } from '../intake/consent.js';
 import { SendError, SEND_TEXT, type SendFailure } from '../referral/send.js';
 
@@ -38,31 +38,25 @@ export function registerReferralRoutes(c: RouteCtx, h: RouteHelpers): void {
 
   async function assemble(req: Parameters<typeof authenticate>[0], ref: Omit<ReferralRow, 'bundle'>, final: boolean) {
     const r = req.reader!;
-    const [summary, patient, identifiers, from, to, consents] = await Promise.all([
-      r.getEncounterSummary(ref.encounter_id), r.getPatient(ref.patient_id), r.getIdentifiers(ref.patient_id),
+    const [summary, patient, from, to, consents] = await Promise.all([
+      r.getEncounterSummary(ref.encounter_id), r.getPatient(ref.patient_id),
       r.getFacility(ref.from_facility_id), ref.to_facility_id ? r.getFacility(ref.to_facility_id) : Promise.resolve(null), r.getConsents(ref.patient_id),
     ]);
     if (!summary || !patient || !from) return null;
     const a = summary.assessment;
     const reviewsOfCurrent = a ? summary.reviews.filter(x => x.assessment_id === a.id && (x.action === 'approve' || x.action === 'override_urgency')) : [];
     const rv = reviewsOfCurrent[reviewsOfCurrent.length - 1] ?? null;
-    const names = await r.getNames([ref.requested_by, ...(rv ? [rv.reviewer_id] : [])]);
     const active = activeConsents(consents, ['care_triage', 'referral_sharing']);
     const input: ReferralBuildInput = {
-      referralId: ref.id, now: new Date(), final,
-      patient, identifiers, encounter: summary.encounter,
-      from: { id: from.id, name: from.name, type: from.type, state: from.state, district: from.district },
-      to: to ? { id: to.id, name: to.name, type: to.type, state: to.state, district: to.district } : { id: ref.to_facility_id ?? ref.from_facility_id, name: 'Receiving facility not chosen', type: null, state: null, district: null },
-      requester: { id: ref.requested_by, name: names[ref.requested_by] ?? null },
+      referralId: ref.id, final,
+      patient, encounter: summary.encounter,
       priority: ref.priority, reasonText: ref.reason_text ?? '',
       symptoms: summary.symptoms, vitals: summary.vitals, signs: summary.triageContext.signs ?? {},
-      assessment: a ? { id: a.id, version: a.version, urgency_code: a.urgency_code as UrgencyCode, note: a.note as never } : null,
+      assessment: a ? { urgency_code: a.urgency_code as UrgencyCode, note: a.note as never } : null,
       effectiveUrgency: ((summary.queue?.urgency_code ?? a?.urgency_code ?? 'green') as UrgencyCode),
-      review: rv ? { reviewer: { id: rv.reviewer_id, name: names[rv.reviewer_id] ?? rv.reviewer_name }, at: rv.created_at, action: rv.action as 'approve' | 'override_urgency', reason: rv.reason } : null,
-      consents: active, engineVersion: ENGINE_VERSION,
     };
     return {
-      summary, patient, input, toName: to?.name ?? null, bundle: buildReferralBundle(input),
+      fromName: from.name, toName: to?.name ?? null, bundle: buildReferralBundle(input),
       signedOff: !!rv, sharingConsent: active.some(x => x.purpose === 'referral_sharing'), assessmentId: a?.id ?? null,
     };
   }
@@ -143,7 +137,7 @@ export function registerReferralRoutes(c: RouteCtx, h: RouteHelpers): void {
     if (!built) return fail(reply, 404, 'not-found', 'No such referral, or you do not have access.');
     if (!(await c.auditOrFail(req, reply, { action: 'read', entityType: 'referral', entityId: ref.id, patientId: ref.patient_id, facilityId: ref.from_facility_id, outcome: 'success' }))) return;
     return reply.send({
-      referral: meta(ref, built.toName), preview: !sent,
+      referral: meta(ref, built.toName), fromFacility: built.fromName, preview: !sent,
       bundle: sent ? ref.bundle : built.bundle,
       readiness: { signedOff: built.signedOff, sharingConsent: built.sharingConsent, hasReceiver: !!ref.to_facility_id, hasReason: (ref.reason_text ?? '').trim().length >= 10 },
     });
@@ -212,7 +206,7 @@ export function registerReferralRoutes(c: RouteCtx, h: RouteHelpers): void {
     const ref = await openReferral(req, reply); if (!ref) return;
     if (!ref.bundle || ref.status === 'draft' || ref.status === 'cancelled') return fail(reply, 409, 'conflict', 'This referral has not been sent yet. Preview it instead.');
     if (!(await c.auditOrFail(req, reply, { action: 'export', entityType: 'referral', entityId: ref.id, patientId: ref.patient_id, facilityId: ref.from_facility_id, outcome: 'success', details: { bundleSha256: ref.bundle_sha256 } }))) return;
-    return reply.header('content-disposition', `attachment; filename="referral-${ref.id.slice(0, 8)}.json"`).type(FHIR).send(ref.bundle);
+    return reply.header('content-disposition', `attachment; filename="referral-${ref.id.slice(0, 8)}.json"`).type(FHIR).send(JSON.stringify(ref.bundle, null, 2));
   });
 
   app.get('/referrals/:id/pdf', { preHandler: authenticate, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req, reply) => {

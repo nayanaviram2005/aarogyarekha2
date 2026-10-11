@@ -1,22 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { buildReferralBundle, type ReferralBuildInput } from '../src/fhir/referral.js';
+import { ID, sample } from './helpers/referralInput.js';
 import { noteContent, renderReferralPdf, runsOf } from '../src/referral/pdf.js';
 import { inspectPdf } from '../src/files/pdf.js';
 
-const ID = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-const input = (over: Partial<ReferralBuildInput> = {}): ReferralBuildInput => ({
-  referralId: ID(1), now: new Date('2026-10-06T12:00:00Z'), final: true,
-  patient: { id: ID(2), public_ref: 'AR-0001', registered_facility_id: ID(10), full_name: 'अनीता राव', preferred_language: 'hi', sex: 'female', birth_date: null, age_years_reported: 27, phone: '+919999900000', address_line: '12 Secret Lane', village_town: 'Khordha', district: 'Khordha', state: 'Odisha', pincode: '752001', updated_at: '2026-10-06T10:00:00Z' } as never,
-  identifiers: [],
-  encounter: { id: ID(3), patient_id: ID(2), facility_id: ID(10), status: 'in_review', scenario: 'maternal_followup', language: 'hi', chief_complaint_original: 'सिर में तेज़ दर्द', chief_complaint_translated: 'Severe headache', submitted_at: '2026-10-06T09:30:00Z', closed_at: null, created_at: '2026-10-06T09:00:00Z', updated_at: '2026-10-06T10:00:00Z' },
-  from: { id: ID(10), name: 'Seed PHC Khordha', type: 'phc', state: 'Odisha', district: 'Khordha' }, to: { id: ID(11), name: 'Seed District Hospital', type: 'district_hospital', state: 'Odisha', district: 'Khordha' },
-  requester: { id: ID(20), name: 'Nurse Rao' }, priority: 'asap', reasonText: 'Needs assessment by an obstetrician at a higher facility.',
+const input = (over: Partial<ReferralBuildInput> = {}): ReferralBuildInput => sample({
+  patient: { ...sample().patient, full_name: 'अनीता राव' },
+  encounter: { ...sample().encounter, chief_complaint_original: 'सिर में तेज़ दर्द', chief_complaint_translated: 'Severe headache' },
   symptoms: [{ id: ID(30), text_original: 'ଜ୍ୱର ଓ ମୁଣ୍ଡବିଷ', text_translated: 'Fever and headache', duration_value: 2, duration_unit: 'days', severity: 5 }],
-  vitals: [{ id: ID(40), encounter_id: ID(3), kind: 'bp_systolic_mmhg', value: '165', unit: 'mm[Hg]', measured_at: '2026-10-06T09:40:00Z' }, { id: ID(41), encounter_id: ID(3), kind: 'bp_diastolic_mmhg', value: '104', unit: 'mm[Hg]', measured_at: '2026-10-06T09:40:00Z' }],
-  signs: { convulsions_in_pregnancy: false },
-  assessment: { id: ID(50), version: 1, urgency_code: 'orange', note: { tier: 2, winning: { ruleId: 'WHO-PREG-BP', detail: 'Blood pressure in the severe range for pregnancy' }, log: [], missing: [], ruleSet: { name: 'aarogyarekha-layered', version: '0.1.1', hash: 'abc123' }, vulnerable: true } as never },
-  effectiveUrgency: 'orange', review: { reviewer: { id: ID(21), name: 'Dr Mehta' }, at: '2026-10-06T11:00:00Z', action: 'approve', reason: null },
-  consents: [{ purpose: 'care_triage', granted_at: '2026-10-06T08:55:00Z' }, { purpose: 'referral_sharing', granted_at: '2026-10-06T11:05:00Z' }], engineVersion: 'aarogyarekha-engine/0.1.0', ...over,
+  ...over,
 });
 const bundle = () => buildReferralBundle(input());
 

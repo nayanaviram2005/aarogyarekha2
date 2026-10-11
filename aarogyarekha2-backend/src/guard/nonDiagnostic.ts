@@ -55,11 +55,6 @@ export class NonDiagnosticViolation extends Error {
     super(`AI output rejected by non-diagnostic guard: ${findings.filter(f => f.severity === 'block').map(f => f.rule).join(', ')}`);
   }
 }
-export function assertNonDiagnostic(text: string): string {
-  const r = checkNonDiagnostic(text);
-  if (!r.allowed) throw new NonDiagnosticViolation(r.findings);
-  return text;
-}
 
 export function assertNoteNonDiagnostic(value: unknown, path = '$'): void {
   if (typeof value === 'string') {

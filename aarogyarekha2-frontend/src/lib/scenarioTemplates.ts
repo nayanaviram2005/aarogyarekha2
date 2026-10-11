@@ -52,4 +52,3 @@ export function scenarioChecklist(scenario: string, s: EncounterSummary): Checkl
   ];
 }
 
-export const hasTemplate = (scenario: string) => !!TEMPLATES[scenario];

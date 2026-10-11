@@ -73,29 +73,22 @@ function seed(): Rec[] {
   return [e7, e3, e2, e1, e4].map(s => ({ summary: s, followUps: [] }));
 }
 
-const esc = (x: unknown) => String(x ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const div = (inner: string) => ({ status: 'generated', div: `<div xmlns="http://www.w3.org/1999/xhtml">${inner}</div>` });
 const WORDS: Record<string, string> = { red: 'Immediate', orange: 'Very urgent', yellow: 'Urgent', green: 'Routine' };
+const TIERS: Record<string, number> = { red: 1, orange: 2, yellow: 3, green: 4 };
 
 function demoBundle(s: EncounterSummary, r: ReferralMeta, final: boolean): FhirBundle {
   const a = s.assessment; const eff = (s.queue?.urgency_code ?? a?.urgency_code ?? 'green') as UrgencyCode;
-  const rv = a ? [...s.reviews].reverse().find(x => x.assessment_id === a.id) : undefined;
-  const meas = s.vitals.map(v => `<li>${esc(v.kind.replace(/_/g, ' '))}: ${esc(v.value)}</li>`).join('');
-  return { resourceType: 'Bundle', type: 'document', timestamp: new Date().toISOString(), entry: [
-    { resource: { resourceType: 'Composition', id: r.id + '-note', status: final ? 'final' : 'preliminary', title: 'Referral note', custodian: { reference: 'Organization/from' },
-      ...(rv ? { attester: [{ mode: 'professional', time: rv.created_at, party: { reference: 'Practitioner/rv', display: rv.reviewer_name } }] } : {}),
-      section: [
-        { title: 'Reason for referral', text: div(`<p>${esc(r.reasonText)}</p>`) },
-        { title: 'Reported complaint', text: div(`<p>${esc(s.encounter.chief_complaint_original ?? 'None recorded')}</p>${s.encounter.chief_complaint_translated ? `<p>In English: ${esc(s.encounter.chief_complaint_translated)}</p>` : ''}`) },
-        { title: 'Symptoms reported', text: div(s.symptoms.length ? `<ul>${s.symptoms.map(x => `<li>${esc(x.text_original)}${x.duration_value != null ? `, for ${esc(x.duration_value)} ${esc(x.duration_unit)}` : ''}</li>`).join('')}</ul>` : '<p>None recorded.</p>') },
-        { title: 'Measurements', text: div(meas ? `<ul>${meas}</ul>` : '<p>None recorded.</p>') },
-        ...(a ? [{ title: 'Review priority (rule-based, not a diagnosis)', text: div(`<p><strong>${esc(WORDS[eff])}</strong>.</p><p>Rules concluded: ${esc(WORDS[a.urgency_code])}. Reason: ${esc(a.note.winning.detail)} (rule ${esc(a.note.winning.ruleId)}).</p>`) }] : []),
-        { title: 'Notice', text: div('<p>Organises information for review. Does not diagnose or advise treatment.</p>') },
-      ] } },
-    { resource: { resourceType: 'Patient', id: s.patient.id, name: [{ text: s.patient.full_name }], gender: s.patient.sex, birthDate: s.patient.birth_date ?? undefined, identifier: [{ system: 'https://aarogyarekha.example/fhir/identifier/public-ref', value: s.patient.public_ref }], communication: [{ language: { coding: [{ code: s.patient.preferred_language }] } }] } },
-    { resource: { resourceType: 'ServiceRequest', id: r.id, priority: r.priority, performer: [{ reference: 'Organization/to' }], extension: [{ url: 'x/triage-priority', extension: [{ url: 'tier', valueInteger: { red: 1, orange: 2, yellow: 3, green: 4 }[eff] }, { url: 'changedByReviewer', valueBoolean: !!a && eff !== a.urgency_code }] }] } },
-    { resource: { resourceType: 'Organization', id: 'from', name: 'Seed PHC Khordha' } },
-    { resource: { resourceType: 'Organization', id: 'to', name: r.toFacility?.name ?? 'Receiving facility' } },
+  const complaint = s.encounter.chief_complaint_original;
+  const notes = [
+    ...(complaint ? [`Reported complaint: ${complaint}${s.encounter.chief_complaint_translated ? ` (in English: ${s.encounter.chief_complaint_translated})` : ''}`] : []),
+    ...(s.symptoms.length ? [`Symptoms reported: ${s.symptoms.map(x => `${x.text_original}${x.duration_value != null ? `, for ${x.duration_value} ${x.duration_unit}` : ''}`).join('; ')}`] : []),
+    ...(a ? [`Review priority (rule-based): ${WORDS[eff]} (tier ${TIERS[eff]} of 4). Reason: ${a.note.winning.detail}${eff !== a.urgency_code ? '. A reviewer changed this priority' : ''}`] : []),
+  ];
+  return { resourceType: 'Bundle', type: 'collection', entry: [
+    { resource: { resourceType: 'Patient', id: s.patient.id, name: [{ text: s.patient.full_name }], gender: s.patient.sex, ...(s.patient.birth_date ? { birthDate: s.patient.birth_date } : {}) } },
+    { resource: { resourceType: 'ServiceRequest', id: r.id, status: final ? 'active' : 'draft', intent: 'order', priority: r.priority, subject: { reference: `Patient/${s.patient.id}` }, reasonCode: [{ text: r.reasonText }], ...(notes.length ? { note: notes.map(text => ({ text })) } : {}) } },
+    ...(!s.patient.birth_date && s.patient.age_years_reported != null ? [{ resource: { resourceType: 'Observation', id: r.id + '-age', status: 'final', code: { coding: [{ system: 'http://loinc.org', code: '30525-0', display: 'Age' }] }, valueQuantity: { value: s.patient.age_years_reported, unit: 'years' } } }] : []),
+    ...s.vitals.map(v => ({ resource: { resourceType: 'Observation', id: v.id, status: 'final', code: { text: v.kind.replace(/_/g, ' ') }, valueQuantity: { value: Number(v.value), unit: v.unit } } })),
   ] };
 }
 
@@ -274,7 +267,7 @@ export function createDemoApi(opts: { rulesApproved: boolean }): Api {
     referral: async id => {
       const r = referrals.get(id); if (!r) throw new ApiError(404, 'No such referral, or you do not have access.');
       const s = encOf(r.encounterId); const sent = r.status !== 'draft' && r.status !== 'cancelled';
-      const v: ReferralView = { referral: r, preview: !sent, bundle: demoBundle(s, r, sent), readiness: { signedOff: signedOff(s), sharingConsent: sharingConsent.has(s.patient.id), hasReceiver: !!r.toFacility, hasReason: (r.reasonText ?? '').trim().length >= 10 } };
+      const v: ReferralView = { referral: r, fromFacility: 'Seed PHC Khordha', preview: !sent, bundle: demoBundle(s, r, sent), readiness: { signedOff: signedOff(s), sharingConsent: sharingConsent.has(s.patient.id), hasReceiver: !!r.toFacility, hasReason: (r.reasonText ?? '').trim().length >= 10 } };
       return wait(v);
     },
     updateReferral: async (id, b) => {

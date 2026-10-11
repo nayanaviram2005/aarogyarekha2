@@ -80,6 +80,7 @@ export function toFhirEncounter(e: EncounterRow): Encounter {
 
 export interface VitalRow { id: string; encounter_id: string; kind: VitalKind; value: number | string; unit: string; measured_at: string }
 
+const BP_PAIR_MS = 5 * 60_000;
 const num = (v: number | string) => (typeof v === 'string' ? Number(v) : v);
 
 export function toFhirVitals(patientId: string, vitals: VitalRow[]): Observation[] {
@@ -91,35 +92,35 @@ export function toFhirVitals(patientId: string, vitals: VitalRow[]): Observation
     effectiveDateTime: v.measured_at,
   });
   const out: Observation[] = [];
-  const systolic = new Map<string, VitalRow>();
-  const diastolic = new Map<string, VitalRow>();
+  const diastolic = vitals.filter(v => v.kind === 'bp_diastolic_mmhg').sort((x, y) => Date.parse(x.measured_at) - Date.parse(y.measured_at));
+  const used = new Set<string>();
   for (const v of vitals) {
-    if (v.kind === 'bp_systolic_mmhg') systolic.set(`${v.encounter_id}|${v.measured_at}`, v);
-    else if (v.kind === 'bp_diastolic_mmhg') diastolic.set(`${v.encounter_id}|${v.measured_at}`, v);
-    else {
-      const m = VITALS[v.kind];
-      out.push({
-        ...base(v), id: v.id,
-        category: [{ coding: [{ system: SYS.observationCategory, code: m.category }] }],
-        code: { coding: [{ system: m.system, code: m.code, display: m.display }] },
-        valueQuantity: { value: num(v.value), unit: m.ucumDisplay, system: SYS.ucum, code: m.ucum },
-      });
-    }
-  }
-  const keys = new Set([...systolic.keys(), ...diastolic.keys()]);
-  for (const k of keys) {
-    const s = systolic.get(k); const d = diastolic.get(k); const any = (s ?? d)!;
-    const comp = (c: typeof BP_SYSTOLIC, v: VitalRow) => ({
-      code: { coding: [{ system: c.system, code: c.code, display: c.display }] },
-      valueQuantity: { value: num(v.value), unit: MMHG.display, system: SYS.ucum, code: MMHG.ucum },
-    });
+    if (v.kind === 'bp_systolic_mmhg' || v.kind === 'bp_diastolic_mmhg') continue;
+    const m = VITALS[v.kind];
     out.push({
-      ...base(any), id: (s ?? d)!.id,
-      category: [{ coding: [{ system: SYS.observationCategory, code: 'vital-signs' }] }],
-      code: { coding: [{ system: BP_PANEL.system, code: BP_PANEL.code, display: BP_PANEL.display }] },
-      component: [...(s ? [comp(BP_SYSTOLIC, s)] : []), ...(d ? [comp(BP_DIASTOLIC, d)] : [])],
+      ...base(v), id: v.id,
+      category: [{ coding: [{ system: SYS.observationCategory, code: m.category }] }],
+      code: { coding: [{ system: m.system, code: m.code, display: m.display }] },
+      valueQuantity: { value: num(v.value), unit: m.ucumDisplay, system: SYS.ucum, code: m.ucum },
     });
   }
+  const comp = (c: typeof BP_SYSTOLIC, v: VitalRow) => ({
+    code: { coding: [{ system: c.system, code: c.code, display: c.display }] },
+    valueQuantity: { value: num(v.value), unit: MMHG.display, system: SYS.ucum, code: MMHG.ucum },
+  });
+  const panel = (any: VitalRow, parts: ReturnType<typeof comp>[]): Observation => ({
+    ...base(any), id: any.id,
+    category: [{ coding: [{ system: SYS.observationCategory, code: 'vital-signs' }] }],
+    code: { coding: [{ system: BP_PANEL.system, code: BP_PANEL.code, display: BP_PANEL.display }] },
+    component: parts,
+  });
+  for (const s of vitals.filter(v => v.kind === 'bp_systolic_mmhg')) {
+    const near = diastolic.filter(d => !used.has(d.id) && d.encounter_id === s.encounter_id && Math.abs(Date.parse(d.measured_at) - Date.parse(s.measured_at)) <= BP_PAIR_MS)
+      .sort((x, y) => Math.abs(Date.parse(x.measured_at) - Date.parse(s.measured_at)) - Math.abs(Date.parse(y.measured_at) - Date.parse(s.measured_at)))[0];
+    if (near) used.add(near.id);
+    out.push(panel(s, [comp(BP_SYSTOLIC, s), ...(near ? [comp(BP_DIASTOLIC, near)] : [])]));
+  }
+  for (const d of diastolic) if (!used.has(d.id)) out.push(panel(d, [comp(BP_DIASTOLIC, d)]));
   return out;
 }
 

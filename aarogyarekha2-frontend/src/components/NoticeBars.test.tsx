@@ -24,6 +24,15 @@ describe('the two moving notices share one Pause control', () => {
   });
 });
 
+describe('the speed notice on the landing page', () => {
+  it('shows over the landing page when signed out, and each moving notice is announced once', () => {
+    status = 'signedOut'; const { container } = at('/');
+    expect(screen.getByRole('note', { name: 'Speed notice' })).toBeInTheDocument();
+    const copies = container.querySelectorAll('.hbar__text'); expect(copies).toHaveLength(4);
+    expect([...copies].filter(c => c.getAttribute('aria-hidden') === 'true')).toHaveLength(2);
+  });
+});
+
 describe('question effect line', () => {
   const base = { fieldCode: 'sign.airway', question: 'Is the airway blocked?', rank: 1, potentialTier: 2 as const, onDraft: () => {} };
   it('says what a Yes could change by default, and can leave it out when the list says it once', () => {

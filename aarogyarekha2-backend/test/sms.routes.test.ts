@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import type { AuditEvent, Deps, UserReader, UserWriter } from '../src/deps.js';
 import type { EncounterRow } from '../src/fhir/project.js';

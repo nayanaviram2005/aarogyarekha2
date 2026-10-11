@@ -28,22 +28,53 @@ const tags = (xhtml: string): string[] => {
   return t.split('\n').map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
 };
 
-export function noteContent(b: Bundle): { title: string; sections: { title: string; lines: string[] }[]; when: string | null } {
+const NOTICE = 'Organises information for review. Does not diagnose or advise treatment.';
+const SECTION_ORDER = ['Reported complaint', 'Symptoms reported', 'Measurements', 'Danger-sign checks'];
+
+const measurementLine = (o: Res) => {
+  const label = o.code?.text ?? o.code?.coding?.[0]?.display ?? 'Measurement';
+  const q = o.valueQuantity; const comps = (o.component ?? []) as Res[];
+  const val = q ? `${q.value} ${q.unit ?? ''}`.trim() : comps.map(c => `${c.code?.coding?.[0]?.display ?? c.code?.text ?? ''} ${c.valueQuantity?.value ?? ''} ${c.valueQuantity?.unit ?? ''}`.trim()).join(', ');
+  return `• ${label}: ${val}${o.effectiveDateTime ? ` (${o.effectiveDateTime})` : ''}`;
+};
+
+function legacyContent(b: Bundle, comp: Res): { title: string; sections: { title: string; lines: string[] }[]; when: string | null } {
   const res = (b.entry ?? []).map(e => e.resource as Res).filter(Boolean);
   const byRef = new Map(res.map(r => [`${r.resourceType}/${r.id}`, r]));
-  const comp = res.find(r => r.resourceType === 'Composition');
-  const sections = ((comp?.section ?? []) as Res[]).map(s => {
+  const sections = ((comp.section ?? []) as Res[]).map(s => {
     const lines = s.text?.div ? tags(String(s.text.div)) : [];
-    for (const e of (s.entry ?? []) as { reference?: string }[]) {
-      const o = e.reference ? byRef.get(e.reference) : undefined; if (!o) continue;
-      const label = o.code?.text ?? o.code?.coding?.[0]?.display ?? 'Measurement';
-      const q = o.valueQuantity; const comps = (o.component ?? []) as Res[];
-      const val = q ? `${q.value} ${q.unit ?? ''}`.trim() : comps.length ? comps.map(c => `${c.code?.text ?? c.code?.coding?.[0]?.display ?? ''} ${c.valueQuantity?.value ?? ''} ${c.valueQuantity?.unit ?? ''}`.trim()).join(', ') : (o.valueString ?? o.valueCodeableConcept?.text ?? '');
-      lines.push(`• ${label}: ${val}${o.effectiveDateTime ? ` (${o.effectiveDateTime})` : ''}`);
-    }
+    for (const e of (s.entry ?? []) as { reference?: string }[]) { const o = e.reference ? byRef.get(e.reference) : undefined; if (o) lines.push(measurementLine(o)); }
     return { title: String(s.title ?? ''), lines };
   }).filter(s => s.title || s.lines.length);
-  return { title: String(comp?.title ?? 'Referral note'), sections, when: (b.timestamp as string | undefined) ?? null };
+  return { title: String(comp.title ?? 'Referral note'), sections, when: (b.timestamp as string | undefined) ?? null };
+}
+
+export function noteContent(b: Bundle): { title: string; sections: { title: string; lines: string[] }[]; when: string | null } {
+  const res = (b.entry ?? []).map(e => e.resource as Res).filter(Boolean);
+  const comp = res.find(r => r.resourceType === 'Composition');
+  if (comp) return legacyContent(b, comp);
+  const patient = res.find(r => r.resourceType === 'Patient');
+  const request = res.find(r => r.resourceType === 'ServiceRequest');
+  if (!patient && !request) return { title: 'Referral note', sections: [], when: null };
+  const sections: { title: string; lines: string[] }[] = [];
+  if (patient) {
+    const age = res.find(r => r.resourceType === 'Observation' && r.code?.coding?.[0]?.code === '30525-0')?.valueQuantity;
+    sections.push({ title: 'Patient', lines: [String(patient.name?.[0]?.text ?? 'Name not recorded'), [age ? `Age ${age.value} ${age.unit}` : patient.birthDate ? `Born ${patient.birthDate}` : null, patient.gender].filter(Boolean).join(', ')].filter(Boolean) });
+  }
+  const reason = request?.reasonCode?.[0]?.text;
+  if (reason) sections.push({ title: 'Reason for referral', lines: [String(reason)] });
+  const named = new Map<string, string[]>(); const priority: { title: string; lines: string[] }[] = [];
+  for (const n of (request?.note ?? []) as { text?: string }[]) {
+    const text = String(n.text ?? ''); const cut = text.indexOf(': ');
+    if (cut < 0) continue;
+    const title = text.slice(0, cut); const lines = text.slice(cut + 2).split('; ').map(l => l.trim()).filter(Boolean);
+    if (SECTION_ORDER.includes(title)) named.set(title, lines); else priority.push({ title, lines });
+  }
+  const measurements = res.filter(r => r.resourceType === 'Observation' && r.code?.coding?.[0]?.code !== '30525-0').map(measurementLine);
+  if (measurements.length) named.set('Measurements', measurements);
+  for (const t of SECTION_ORDER) if (named.has(t)) sections.push({ title: t, lines: named.get(t)! });
+  sections.push(...priority, { title: 'Notice', lines: [NOTICE] });
+  return { title: 'Referral note', sections, when: null };
 }
 
 export async function renderReferralPdf(bundle: Bundle, meta: { sha256: string | null; fromFacility?: string | null; toFacility?: string | null; priority?: string | null; sentAt?: string | null }): Promise<Buffer> {

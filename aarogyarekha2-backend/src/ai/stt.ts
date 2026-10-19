@@ -16,6 +16,10 @@ export function sniffAudio(b: Buffer): AudioMime | null {
 }
 
 const LANG_NAME: Record<SttLanguage, string> = { en: 'English', hi: 'Hindi', or: 'Odia' };
+const SARVAM_CODE: Record<SttLanguage, string> = { en: 'en-IN', hi: 'hi-IN', or: 'od-IN' };
+const FROM_SARVAM: Record<string, string> = { 'en-IN': 'en', 'hi-IN': 'hi', 'od-IN': 'or' };
+const AUDIO_EXT: Record<AudioMime, string> = { 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/wav': 'wav', 'audio/mp4': 'mp4' };
+export const SARVAM_DEFAULT_MODEL = 'saaras:v4';
 const Reply = z.object({ text: z.string(), language: z.string().nullable().optional() });
 const clean = (s: string) => s.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 2000);
 
@@ -63,6 +67,21 @@ export function makeTranscriber(env: Partial<AiEnvValues> & { OPENAI_STT_MODEL?:
       const text = clean(String((j as { text?: unknown }).text ?? ''));
       if (!text) throw bad();
       return { text, language: language ?? null, provider: name, model };
+    } };
+  }
+
+  if (name === 'sarvam') {
+    const key = env.SARVAM_API_KEY?.trim(); const model = env.SARVAM_MODEL?.trim() || SARVAM_DEFAULT_MODEL;
+    if (!key) return { name, model, supported: true, transcribe: async () => { throw new AiError('not_configured', 'The outside AI service is not set up.'); } };
+    return { name, model, supported: true, transcribe: async ({ bytes, mime, language }) => {
+      const fd = new FormData();
+      fd.append('file', new Blob([new Uint8Array(bytes)], { type: mime }), `audio.${AUDIO_EXT[mime]}`);
+      fd.append('model', model); fd.append('language_code', language ? SARVAM_CODE[language] : 'unknown');
+      const j = await post(fetchImpl, 'https://api.sarvam.ai/speech-to-text', { 'api-subscription-key': key }, fd, Math.max(timeout, 30000)) as { transcript?: unknown; language_code?: unknown };
+      const text = clean(String(j.transcript ?? ''));
+      if (!text) throw bad();
+      const heard = typeof j.language_code === 'string' ? FROM_SARVAM[j.language_code] ?? 'other' : null;
+      return { text, language: heard ?? language ?? null, provider: name, model };
     } };
   }
 

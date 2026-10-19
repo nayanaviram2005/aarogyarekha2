@@ -5,7 +5,7 @@ import type { Api } from '../lib/types';
 import { ConsentForm } from './ConsentForm';
 import { Banner } from './Provenance';
 
-const MAX_SECONDS = 60;
+const MAX_SECONDS = 29;
 type Lang = 'en' | 'hi' | 'or';
 const LANG_LABEL: Record<Lang, string> = { en: 'English', hi: 'Hindi', or: 'Odia' };
 

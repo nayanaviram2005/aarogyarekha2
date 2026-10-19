@@ -95,6 +95,8 @@ function makeVisionOnce(env: Partial<AiEnvValues>, fetchImpl: typeof fetch): Vis
   const done = (text: string, model: string, identity = false): VisionRead => ({ ...parseVisionReply(text, identity), provider: name, model });
   const off = (model = ''): Vision => ({ name, model, supported: false, accepts: () => false, read: async () => { throw new AiError('not_configured', 'The selected AI service is not set up to read images.'); } });
 
+  if (name === 'sarvam') return off();
+
   if (name === 'mock') return { name, model: 'mock', supported: true, accepts: m => IMAGES.has(m), read: async () => ({ rows: [], provider: 'mock', model: 'mock', dropped: 0 }) };
 
   if (name === 'gemini') {

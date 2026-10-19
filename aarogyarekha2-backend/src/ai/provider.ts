@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export type ProviderName = 'mock' | 'gemini' | 'claude' | 'openai' | 'openrouter';
+export type ProviderName = 'mock' | 'gemini' | 'claude' | 'openai' | 'openrouter' | 'sarvam';
 export interface AiRequest { system: string; user: string; json?: boolean; maxTokens?: number }
 export interface AiResponse { text: string; provider: ProviderName; model: string }
 export type Generate = (req: AiRequest) => Promise<AiResponse>;
@@ -9,7 +9,7 @@ export class AiError extends Error {
   constructor(public readonly kind: 'not_configured' | 'timeout' | 'rejected' | 'bad_response' | 'network' | 'busy', message: string) { super(message); this.name = 'AiError'; }
 }
 
-const ProviderEnum = z.enum(['mock', 'gemini', 'claude', 'openai', 'openrouter']);
+const ProviderEnum = z.enum(['mock', 'gemini', 'claude', 'openai', 'openrouter', 'sarvam']);
 const OptProvider = z.preprocess(v => (v === '' ? undefined : v), ProviderEnum.optional());
 export const AiEnv = z.object({
   AI_PROVIDER: ProviderEnum.default('mock'),
@@ -17,6 +17,7 @@ export const AiEnv = z.object({
   ANTHROPIC_API_KEY: z.string().optional(), ANTHROPIC_MODEL: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(), OPENAI_MODEL: z.string().optional(),
   OPENROUTER_API_KEY: z.string().optional(), OPENROUTER_MODEL: z.string().optional(),
+  SARVAM_API_KEY: z.string().optional(), SARVAM_MODEL: z.string().optional(),
   AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),
   AI_FALLBACK_MODEL: z.string().optional(),
   AI_FALLBACK_PROVIDER: OptProvider,
@@ -31,8 +32,8 @@ export const AiEnv = z.object({
 export type AiEnvValues = z.infer<typeof AiEnv>;
 
 export type AiTask = 'TRANSLATE' | 'TRIAGE' | 'STT' | 'VISION';
-const KEY_VAR = { gemini: 'GEMINI_API_KEY', claude: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY', openrouter: 'OPENROUTER_API_KEY' } as const;
-const MODEL_VAR = { gemini: 'GEMINI_MODEL', claude: 'ANTHROPIC_MODEL', openai: 'OPENAI_MODEL', openrouter: 'OPENROUTER_MODEL' } as const;
+const KEY_VAR = { gemini: 'GEMINI_API_KEY', claude: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY', openrouter: 'OPENROUTER_API_KEY', sarvam: 'SARVAM_API_KEY' } as const;
+const MODEL_VAR = { gemini: 'GEMINI_MODEL', claude: 'ANTHROPIC_MODEL', openai: 'OPENAI_MODEL', openrouter: 'OPENROUTER_MODEL', sarvam: 'SARVAM_MODEL' } as const;
 
 export function envForTask(env: AiEnvValues, task: AiTask): AiEnvValues {
   const own = env as unknown as Record<string, string | undefined>;
@@ -97,12 +98,14 @@ export function makeProvider(env: Partial<AiEnvValues> & { AI_PROVIDER?: Provide
     claude: { key: env.ANTHROPIC_API_KEY, model: env.ANTHROPIC_MODEL },
     openai: { key: env.OPENAI_API_KEY, model: env.OPENAI_MODEL },
     openrouter: { key: env.OPENROUTER_API_KEY, model: env.OPENROUTER_MODEL },
+    sarvam: { key: env.SARVAM_API_KEY, model: env.SARVAM_MODEL },
   }[name];
   const key = cfg.key?.trim(); const model = cfg.model?.trim();
   const unconfigured: Generate = async () => { throw new AiError('not_configured', MESSAGES.not_configured); };
   if (!key || !model) return { name, model: model ?? '', generate: unconfigured };
 
   const run = async (model: string, r: AiRequest): Promise<AiResponse> => {
+    if (name === 'sarvam') throw new AiError('not_configured', 'This service only turns speech into text.');
     const max = r.maxTokens ?? 1024;
     if (name === 'gemini') {
       const j = await post(fetchImpl, `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, { 'x-goog-api-key': key },

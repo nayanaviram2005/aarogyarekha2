@@ -9,7 +9,7 @@ const note = (o: Partial<ReviewerNote> = {}): ReviewerNote => ({ id: 'n1', kind:
 const mk = (over: Record<string, unknown> = {}) => ({
   notes: vi.fn().mockResolvedValue([note(), note({ id: 'n2', kind: 'comment', body: 'Recheck pulse', author: 'Nurse Das' })]), addNote: vi.fn().mockResolvedValue({ id: 'n3' }), ...over,
 }) as unknown as Api & Record<string, ReturnType<typeof vi.fn>>;
-const view = (a: Api, p: Partial<{ status: string; canWrite: boolean; disabled: boolean }> = {}) => render(<DoctorNotesPanel api={a} encounterId="e1" status={p.status ?? 'reviewed'} canWrite={p.canWrite ?? true} {...(p.disabled ? { disabled: true } : {})} />);
+const view = (a: Api, p: Partial<{ signedOff: boolean; canWrite: boolean; disabled: boolean }> = {}) => render(<DoctorNotesPanel api={a} encounterId="e1" signedOff={p.signedOff ?? true} canWrite={p.canWrite ?? true} {...(p.disabled ? { disabled: true } : {})} />);
 
 describe('DoctorNotesPanel', () => {
   it('lists only the doctor’s notes, with who wrote them and when, and says they join the patient’s file', async () => {
@@ -34,7 +34,7 @@ describe('DoctorNotesPanel', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Only a doctor or medical officer'); expect(screen.getByLabelText('Doctor’s note')).toHaveValue('Seen');
   });
   it('before sign-off there is no form, only the reason why', async () => {
-    view(mk(), { status: 'in_review' }); expect(await screen.findByText(/once the priority has been signed off/)).toBeInTheDocument(); expect(screen.queryByLabelText('Doctor’s note')).toBeNull();
+    view(mk(), { signedOff: false }); expect(await screen.findByText(/once the priority has been signed off/)).toBeInTheDocument(); expect(screen.queryByLabelText('Doctor’s note')).toBeNull();
   });
   it('a nurse sees the notes but no form', async () => {
     view(mk(), { canWrite: false }); expect(await screen.findByText('Started oral antibiotics; review in 3 days.')).toBeInTheDocument();

@@ -1,0 +1,26 @@
+{
+  "name": "AarogyaRekha",
+  "short_name": "AarogyaRekha",
+  "description": "Organises information for review. Does not diagnose or advise treatment.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "lang": "en",
+  "theme_color": "#14232c",
+  "background_color": "#eceff1",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

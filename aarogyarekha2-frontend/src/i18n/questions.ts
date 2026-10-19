@@ -1,3 +1,5 @@
+import { MORE_QUESTIONS } from './questionsMore';
+
 export type QLang = 'hi' | 'or';
 export const QUESTION_LANGS: { code: 'en' | QLang; label: string }[] = [{ code: 'en', label: 'English' }, { code: 'hi', label: 'हिन्दी' }, { code: 'or', label: 'ଓଡ଼ିଆ' }];
 
@@ -98,6 +100,8 @@ const Q: Record<string, { hi: string; or: string }> = {
   'sign.sudden_rash': { hi: 'क्या अचानक दाने या चकत्ते निकल आए हैं?', or: 'ହଠାତ୍ ଦାଗ ବା ଫୁଟକା ବାହାରିଛି କି?' },
   'sign.young_or_older_unwell_over_2_days': { hi: 'क्या यह 3 साल से छोटा बच्चा या 65 से ऊपर का व्यक्ति है, जिसे 2 दिन से ज़्यादा बुखार, उल्टी, दस्त या खाँसी है?', or: 'ଏହା 3 ବର୍ଷରୁ କମ୍ ପିଲା ବା 65 ରୁ ଅଧିକ ବ୍ୟକ୍ତି କି, ଯାହାଙ୍କୁ 2 ଦିନରୁ ଅଧିକ ଜ୍ୱର, ବାନ୍ତି, ଝାଡ଼ା ବା କାଶ ଅଛି?' },
 };
+
+Object.assign(Q, MORE_QUESTIONS);
 
 export const questionCodes = () => Object.keys(Q);
 export function questionIn(fieldCode: string, lang: 'en' | QLang): string | null {

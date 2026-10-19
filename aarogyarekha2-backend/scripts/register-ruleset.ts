@@ -1,9 +1,10 @@
 import pg from 'pg';
 import { RULESET_DRAFT } from '../src/triage/ruleset.draft.js';
 import { RULESET_PROPOSED } from '../src/triage/ruleset.proposed.js';
+import { RULESET_EXPANDED } from '../src/triage/ruleset.expanded.js';
 import { hashRuleSet } from '../src/triage/engine.js';
 
-const RS = process.argv.includes('--proposed') ? RULESET_PROPOSED : RULESET_DRAFT;
+const RS = process.argv.includes('--expanded') ? RULESET_EXPANDED : process.argv.includes('--proposed') ? RULESET_PROPOSED : RULESET_DRAFT;
 const url = process.env.DATABASE_URL_POOLER?.replace(':6543/', ':5432/') || process.env.DATABASE_URL_DIRECT;
 const c = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 15000 });
 await c.connect();

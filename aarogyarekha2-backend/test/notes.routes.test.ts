@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { DbError, type AuditEvent, type Deps, type NoteKind, type NoteRow, type UserReader, type UserWriter } from '../src/deps.js';
 import type { EncounterRow, PatientRow } from '../src/fhir/project.js';
@@ -54,31 +54,25 @@ describe('writing', () => {
 });
 
 describe('doctor’s notes', () => {
-  const setStatus = (s: string) => { (enc as { status: string }).status = s; };
-  afterEach(() => setStatus('in_review'));
-  it('adds one after sign-off, up to 2000 characters, and the audit entry holds the kind only', async () => {
-    setStatus('reviewed');
+  it('adds one, up to 2000 characters, and the audit entry holds the kind only', async () => {
     const r = await call(await make(), 'POST', { kind: 'doctor_note', body: 'x'.repeat(2000) });
     expect(r.statusCode).toBe(201); expect(w.added[0]).toMatchObject({ kind: 'doctor_note', body: 'x'.repeat(2000) });
     const a = w.audits.find(x => x.entityType === 'reviewer_notes' && x.action === 'create')!; expect(a.details).toEqual({ kind: 'doctor_note' });
   });
-  it('also on a referred or closed visit', async () => {
-    for (const s of ['referred', 'closed']) { setStatus(s); expect((await call(await make(), 'POST', { kind: 'doctor_note', body: 'Seen and treated' })).statusCode, s).toBe(201); }
-  });
-  it('is refused before sign-off, and nothing is written', async () => {
-    setStatus('in_review');
+  it('is refused with a plain reason when the database says the priority is not signed off yet, and nothing is kept', async () => {
+    w.addError = new DbError('23514', 'A doctor’s note can be added once the priority has been signed off.');
     const r = await call(await make(), 'POST', { kind: 'doctor_note', body: 'Too early' });
     expect(r.statusCode).toBe(409); expect(r.json().issue[0].details.text).toMatch(/signed off/); expect(w.added).toHaveLength(0);
   });
   it('needs text, and other notes stay at 1000 characters', async () => {
-    setStatus('reviewed'); const app = await make();
+    const app = await make();
     expect((await call(app, 'POST', { kind: 'doctor_note' })).statusCode).toBe(400);
     expect((await call(app, 'POST', { kind: 'doctor_note', body: 'x'.repeat(2001) })).statusCode).toBe(400);
     expect((await call(app, 'POST', { kind: 'comment', body: 'x'.repeat(1001) })).statusCode).toBe(400);
     expect(w.added).toHaveLength(0);
   });
   it('says plainly that only a doctor or medical officer can write one', async () => {
-    setStatus('reviewed'); w.addError = new DbError('42501', 'denied');
+    w.addError = new DbError('42501', 'denied');
     const r = await call(await make(), 'POST', { kind: 'doctor_note', body: 'Seen' });
     expect(r.statusCode).toBe(403); expect(r.json().issue[0].details.text).toMatch(/doctor or medical officer/);
   });

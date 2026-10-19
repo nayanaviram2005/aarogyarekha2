@@ -13,8 +13,6 @@ const body = z.object({
   if ((b.kind === 'feedback_up' || b.kind === 'feedback_down') && !b.assessmentId) ctx.addIssue({ code: 'custom', message: 'Feedback is about a specific assessment.', path: ['assessmentId'] });
 });
 
-const SIGNED_OFF = new Set(['reviewed', 'referred', 'closed']);
-
 export function registerNoteRoutes(c: RouteCtx, h: RouteHelpers): void {
   const { app, deps, authenticate, fail } = c;
   const storeFor = (req: Parameters<typeof authenticate>[0]): NotesStore | null => (deps.notes ? deps.notes(req.headers.authorization!.slice(7).trim(), req.user!.userId) : null);
@@ -33,7 +31,6 @@ export function registerNoteRoutes(c: RouteCtx, h: RouteHelpers): void {
     const store = storeFor(req); if (!store) return fail(reply, 503, 'not-supported', 'Reviewer notes are not set up.');
     const parsed = body.safeParse(req.body); if (!parsed.success) return h.invalid(reply, parsed.error);
     const ctx = await h.openEncounter(req, reply, false); if (!ctx) return;
-    if (parsed.data.kind === 'doctor_note' && !SIGNED_OFF.has(ctx.enc.status)) return fail(reply, 409, 'conflict', 'A doctor’s note can be added once the priority has been signed off.');
     try {
       const r = await store.add({ encounterId: ctx.enc.id, assessmentId: parsed.data.assessmentId, kind: parsed.data.kind, body: parsed.data.body });
       await h.note(req, { action: 'create', entityType: 'reviewer_notes', entityId: r.id, patientId: ctx.enc.patient_id, facilityId: ctx.enc.facility_id, outcome: 'success', details: { kind: parsed.data.kind } });

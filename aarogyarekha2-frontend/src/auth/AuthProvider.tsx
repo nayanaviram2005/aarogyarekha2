@@ -26,6 +26,7 @@ export interface AuthState {
   notice: string | null;
   signIn(email: string, password: string): Promise<string | null>;
   signOut(): Promise<void>;
+  signOutOthers(): Promise<string | null>;
   mfa: MfaApi | null;
 }
 const Ctx = createContext<AuthState | null>(null);
@@ -53,6 +54,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void sb.auth.getSession().then(({ data }) => setStatus(data.session ? 'signedIn' : 'signedOut'));
     const { data: sub } = sb.auth.onAuthStateChange((_e, session) => setStatus(session ? 'signedIn' : 'signedOut'));
     return () => sub.subscription.unsubscribe();
+  }, [demo]);
+
+  const signOutOthers = useCallback(async (): Promise<string | null> => {
+    if (demo.on) return null;
+    const { error } = await supabase().auth.signOut({ scope: 'others' });
+    return error ? 'The other devices could not be signed out. Try again.' : null;
   }, [demo]);
 
   const signOut = useCallback(async () => { if (demo.on) { sessionStorage.removeItem('ar.demo'); window.location.assign('/'); return; } await supabase().auth.signOut(); }, [demo]);
@@ -104,6 +111,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   }), [demo.on]);
 
-  const value = useMemo<AuthState>(() => ({ status, demo: demo.on, api, notice, signIn, signOut, mfa }), [status, demo.on, api, notice, signIn, signOut, mfa]);
+  const value = useMemo<AuthState>(() => ({ status, demo: demo.on, api, notice, signIn, signOut, signOutOthers, mfa }), [status, demo.on, api, notice, signIn, signOut, signOutOthers, mfa]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

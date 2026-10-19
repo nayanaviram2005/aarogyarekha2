@@ -79,7 +79,7 @@ const PAGES: [string, React.ReactElement][] = [
   ['history panel', <HistoryPanel api={api} patientId="p" editable canConfirm defaultLanguage="en" />],
   ['follow-up panel', <FollowupsPanel api={api} encounterId="e" patientId="p" editable />],
   ['notes panel', <NotesPanel api={api} encounterId="e" assessmentId="a" canWrite />],
-  ['doctor notes panel', <DoctorNotesPanel api={api} encounterId="e" status="reviewed" canWrite />],
+  ['doctor notes panel', <DoctorNotesPanel api={api} encounterId="e" signedOff canWrite />],
   ['trend panel', <TrendPanel api={api} patientId="p" />],
   ['analytics panel', <AnalyticsPanel api={api} />],
   ['people and roles', <MembersPanel api={api} />],

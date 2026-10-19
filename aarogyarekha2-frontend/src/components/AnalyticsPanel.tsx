@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { analyticsCsv, analyticsFilename } from '../lib/analyticsCsv';
 import { scenarioLabel, TIER_WORD, tierOfUrgency } from '../lib/format';
 import type { Api, AnalyticsView, Spread } from '../lib/types';
 import { Banner } from './Provenance';
@@ -12,6 +13,12 @@ export function AnalyticsPanel({ api }: { api: Api }) {
   const [a, setA] = useState<AnalyticsView | null>(null);
   const [error, setError] = useState<Error | null>(null);
   useEffect(() => { let live = true; setA(null); api.analytics(days).then(x => { if (live) { setA(x); setError(null); } }).catch(e => { if (live) setError(e as Error); }); return () => { live = false; }; }, [api, days]);
+
+  function download() {
+    if (!a) return;
+    const url = URL.createObjectURL(new Blob([analyticsCsv(a)], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a'); link.href = url; link.download = analyticsFilename(days); document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+  }
 
   const busiest = a && a.perDay.length > 0 ? a.perDay.reduce((m, d) => (d.n > m.n ? d : m)) : null;
   return (
@@ -41,6 +48,7 @@ export function AnalyticsPanel({ api }: { api: Api }) {
             </tbody></table>
             {a.perDay.length > 1 && <p className="small">Visits per day: {a.perDay.map(d => `${d.day.slice(5)} ${d.n}`).join(', ')}</p>}
             {a.byUrgency.length > 0 && <p className="small">By priority: {a.byUrgency.map(u => { const t = tierOfUrgency(u.urgency); return `${t ? TIER_WORD[t] : u.urgency} ${u.n}`; }).join(', ')}</p>}
+            <div><button type="button" className="btn btn--small" onClick={download}>Download as CSV</button></div>
             {a.byScenario.length > 0 && <p className="small">By type of visit: {a.byScenario.map(s => `${scenarioLabel(s.scenario)} ${s.n}`).join(', ')}</p>}
           </>
         )}

@@ -1,6 +1,7 @@
 import pg from 'pg';
 import { RULESET_DRAFT } from '../src/triage/ruleset.draft.js';
 import { RULESET_PROPOSED } from '../src/triage/ruleset.proposed.js';
+import { RULESET_EXPANDED } from '../src/triage/ruleset.expanded.js';
 import { hashRuleSet } from '../src/triage/engine.js';
 
 export const DEMO_CITATION =
@@ -8,7 +9,7 @@ export const DEMO_CITATION =
   'danger signs and RCP NEWS2 (2017). NOT verified against the primary documents. NOT clinically validated. ' +
   'Synthetic data only. Not for use with real patients.';
 
-const RS = process.argv.includes('--proposed') ? RULESET_PROPOSED : RULESET_DRAFT;
+const RS = process.argv.includes('--expanded') ? RULESET_EXPANDED : process.argv.includes('--proposed') ? RULESET_PROPOSED : RULESET_DRAFT;
 const confirm = process.argv.includes('--confirm');
 const retire = process.argv.includes('--retire');
 

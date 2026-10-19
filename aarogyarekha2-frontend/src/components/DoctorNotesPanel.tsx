@@ -3,10 +3,9 @@ import { formatTime } from '../lib/format';
 import type { Api, ReviewerNote } from '../lib/types';
 import { Banner } from './Provenance';
 
-const SIGNED_OFF = ['reviewed', 'referred', 'closed'];
 const MAX = 2000;
 
-export function DoctorNotesPanel({ api, encounterId, status, canWrite, disabled }: { api: Api; encounterId: string; status: string; canWrite: boolean; disabled?: boolean }) {
+export function DoctorNotesPanel({ api, encounterId, signedOff, canWrite, disabled }: { api: Api; encounterId: string; signedOff: boolean; canWrite: boolean; disabled?: boolean }) {
   const [notes, setNotes] = useState<ReviewerNote[] | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [text, setText] = useState('');
@@ -18,7 +17,6 @@ export function DoctorNotesPanel({ api, encounterId, status, canWrite, disabled 
   }, [api, encounterId]);
   useEffect(() => { void load(); }, [load]);
 
-  const signedOff = SIGNED_OFF.includes(status);
   async function add(e: FormEvent) {
     e.preventDefault();
     if (!text.trim()) { setError(new Error('Write the doctor’s note.')); return; }

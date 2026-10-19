@@ -6,7 +6,7 @@ import type { PatientFacts, TriageContext } from '../src/intake/input.js';
 import { RuleSetUnavailable, type PersistArgs } from '../src/triage/persist.js';
 import { triage } from '../src/triage/engine.js';
 import { RULESET_DRAFT } from '../src/triage/ruleset.draft.js';
-import { RULESET_PROPOSED } from '../src/triage/ruleset.proposed.js';
+import { RULESET_EXPANDED } from '../src/triage/ruleset.expanded.js';
 import { NonDiagnosticViolation } from '../src/guard/nonDiagnostic.js';
 
 const P = '11111111-1111-4111-8111-111111111111';
@@ -384,12 +384,12 @@ describe('AI second opinion on priority', () => {
 });
 
 describe('questions that fit the patient', () => {
-  const PROPA = { ...RULESET_PROPOSED, status: 'approved' as const };
+  const PROPA = { ...RULESET_EXPANDED, status: 'approved' as const };
   const consent = { id: 'c-ai', purpose: 'care_triage', granted_at: '2025-01-01T00:00:00Z', revoked_at: null, expires_at: null };
   let askedCandidates: string; let reply: string; let withConsent: boolean;
   beforeEach(() => {
     askedCandidates = ''; withConsent = true;
-    reply = JSON.stringify({ tier: 4, reason: 'Routine stomach pain with normal measurements.', ask: ['sudden_severe_abdominal_or_back_pain', 'persistent_vomiting', 'mental_health_crisis_NOT_A_CODE'], questions: [{ code: 'persistent_vomiting', text: 'Has the vomiting been going on since the pain started?' }, { code: 'shock_signs', text: 'Do the hands and feet feel cold, with a weak fast pulse?' }, { code: 'central_cyanosis', text: 'This is cyanosis, treat now' }] });
+    reply = JSON.stringify({ tier: 4, reason: 'Routine stomach pain with normal measurements.', ask: ['sudden_severe_abdominal_or_back_pain', 'pain_right_lower_belly', 'mental_health_crisis_NOT_A_CODE'], questions: [{ code: 'pain_right_lower_belly', text: 'Is the pain mainly low on the right side, and worse when walking?' }, { code: 'unconscious_or_convulsing_now', text: 'Is the patient unconscious, or having a fit right now?' }, { code: 'severe_respiratory_distress', text: 'This is cyanosis, treat now' }] });
     s.facts = { birth_date: '1990-01-01', age_years_reported: null, sex: 'male', pregnancyOngoing: false };
     s.encounters.set(E, encRow({ chief_complaint_original: 'stomach pain since yesterday' }));
   });
@@ -404,21 +404,21 @@ describe('questions that fit the patient', () => {
 
   it('with the AI: core emergency signs plus only what the AI picked from the offered list, not everything', async () => {
     const b = await go(await app()); const c = codes(b);
-    expect(b.questionsFrom).toBe('ai'); expect(c).toContain('sign.airway_obstructed_or_not_breathing'); expect(c).toContain('sign.sudden_severe_abdominal_or_back_pain'); expect(c).toContain('sign.persistent_vomiting');
+    expect(b.questionsFrom).toBe('ai'); expect(c).toContain('sign.severe_respiratory_distress'); expect(c).toContain('sign.unconscious_or_convulsing_now'); expect(c).toContain('sign.sudden_severe_abdominal_or_back_pain'); expect(c).toContain('sign.pain_right_lower_belly');
     expect(c).not.toContain('sign.mental_health_crisis'); expect(c).not.toContain('sign.weapon_injury'); expect(c.some(x => x.includes('NOT_A_CODE'))).toBe(false);
-    expect(c.filter(x => x.startsWith('sign.')).length).toBeLessThan(12);
+    expect(c.filter(x => x.startsWith('sign.')).length).toBeLessThanOrEqual(6);
   });
   it('the questions are worded by the AI for this patient; bad wording falls back to the rule text', async () => {
     const f = (await go(await app())).followUps as { fieldCode: string; question: string; wording: string }[];
-    expect(f.find(x => x.fieldCode === 'sign.persistent_vomiting')).toMatchObject({ question: 'Has the vomiting been going on since the pain started?', wording: 'ai' });
-    expect(f.find(x => x.fieldCode === 'sign.shock_signs')).toMatchObject({ question: 'Do the hands and feet feel cold, with a weak fast pulse?', wording: 'ai' });
-    expect(f.find(x => x.fieldCode === 'sign.central_cyanosis')).toMatchObject({ wording: 'rules' });
+    expect(f.find(x => x.fieldCode === 'sign.pain_right_lower_belly')).toMatchObject({ question: 'Is the pain mainly low on the right side, and worse when walking?', wording: 'ai' });
+    expect(f.find(x => x.fieldCode === 'sign.unconscious_or_convulsing_now')).toMatchObject({ question: 'Is the patient unconscious, or having a fit right now?', wording: 'ai' });
+    expect(f.find(x => x.fieldCode === 'sign.severe_respiratory_distress')).toMatchObject({ wording: 'rules' });
   });
   it('without the AI every question is the rule text as written', async () => {
     withConsent = false; const f = (await go(await app())).followUps as { wording: string }[]; expect(f.every(x => x.wording === 'rules')).toBe(true);
   });
   it('the AI is offered the open signs to choose from, and the core ones only to word, and is told to pick only ones that fit', async () => {
-    await go(await app()); expect(askedCandidates).toContain('Possible questions'); expect(askedCandidates).toContain('persistent_vomiting:'); const [always, possible] = askedCandidates.split('Possible questions'); expect(always).toContain('Always asked'); expect(always).toContain('central_cyanosis:'); expect(possible).not.toContain('central_cyanosis:'); expect(askedCandidates).toContain('stomach pain since yesterday');
+    await go(await app()); expect(askedCandidates).toContain('Possible questions'); expect(askedCandidates).toContain('pain_right_lower_belly:'); const [always, possible] = askedCandidates.split('Possible questions'); expect(always).toContain('Always asked'); expect(always).toContain('severe_respiratory_distress:'); expect(possible).not.toContain('severe_respiratory_distress:'); expect(possible).not.toContain('central_cyanosis:'); expect(askedCandidates).toContain('stomach pain since yesterday');
   });
   it('without an active consent it falls back to topic matching: stomach questions, no self-harm questions', async () => {
     withConsent = false; const b = await go(await app()); const c = codes(b);
@@ -442,13 +442,13 @@ describe('a new assessment supersedes old questions', () => {
   it('open questions that no longer fit are dismissed; ones still asked stay open; answered ones are untouched', async () => {
     s.facts = { birth_date: '1990-01-01', age_years_reported: null, sex: 'male', pregnancyOngoing: false };
     s.encounters.set(E, encRow({ chief_complaint_original: 'stomach pain' }));
-    s.infos.push({ fieldCode: 'sign.weapon_injury', status: 'open' }, { fieldCode: 'sign.shock_signs', status: 'open' }, { fieldCode: 'sign.mental_health_crisis', status: 'answered', answer: 'no' });
-    const PROPA = { ...RULESET_PROPOSED, status: 'approved' as const };
+    s.infos.push({ fieldCode: 'sign.weapon_injury', status: 'open' }, { fieldCode: 'sign.severe_respiratory_distress', status: 'open' }, { fieldCode: 'sign.mental_health_crisis', status: 'answered', answer: 'no' });
+    const PROPA = { ...RULESET_EXPANDED, status: 'approved' as const };
     const app = await make({ loadRuleSet: async () => PROPA, assess: async args => { const decision = triage(args.input, PROPA); return { assessmentId: 'a1', version: 1, decision, queueUrgency: decision.urgencyCode, downgradeSuggested: false, ruleSet: PROPA }; } });
     await call(app, 'POST', `/encounters/${E}/vitals`, { kind: 'temperature_c', value: 36.8 });
     await call(app, 'POST', `/encounters/${E}/assess`);
     const by = Object.fromEntries(s.infos.filter(i => i.fieldCode.startsWith('sign.')).map(i => [i.fieldCode, i.status]));
-    expect(by['sign.weapon_injury']).toBe('dismissed'); expect(by['sign.shock_signs']).toBe('open'); expect(by['sign.mental_health_crisis']).toBe('answered');
+    expect(by['sign.weapon_injury']).toBe('dismissed'); expect(by['sign.severe_respiratory_distress']).toBe('open'); expect(by['sign.mental_health_crisis']).toBe('answered');
   });
   it('with no rule list available nothing is dismissed', async () => {
     s.infos.push({ fieldCode: 'sign.weapon_injury', status: 'open' });

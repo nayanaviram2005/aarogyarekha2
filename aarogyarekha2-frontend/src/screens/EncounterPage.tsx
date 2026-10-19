@@ -323,7 +323,7 @@ function Workspace({ summary: s, onChanged }: { summary: EncounterSummary; onCha
           <>
             {api && <VisitPanel bare api={api} summary={s} canReview={canReviewAt(me, s.encounter.facility_id)} reviewedCurrent={!!currentReview} onChanged={async () => { await onChanged(); await refreshQueue(); }} />}
             {!s.queue && s.encounter.status !== 'closed' && s.encounter.status !== 'referred' && <p className="small muted">The visit starts once the patient has a draft priority and a nurse or doctor has signed it off.</p>}
-            {api && <DoctorNotesPanel api={api} encounterId={s.encounter.id} status={s.encounter.status} canWrite={canWriteDoctorNoteAt(me, s.encounter.facility_id)} disabled={s.consentActive === false} />}
+            {api && <DoctorNotesPanel api={api} encounterId={s.encounter.id} signedOff={!!currentReview || ['referred', 'closed'].includes(s.encounter.status)} canWrite={canWriteDoctorNoteAt(me, s.encounter.facility_id)} disabled={s.consentActive === false} />}
             {a && api && <HandoverButton api={api} encounterId={s.encounter.id} patientLanguage={s.patient.preferred_language} />}
             {a && api && (
               <ReferralPanel api={api} encounterId={s.encounter.id} patientId={s.patient.id} effectiveUrgency={(effUrgency ?? a.urgency_code) as UrgencyCode}

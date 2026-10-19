@@ -5,10 +5,11 @@ import { LanguageSwitcher } from '../i18n/I18n';
 import { rolesByFacility, rolesOf } from '../lib/account';
 import { useLowData } from '../lib/lowBandwidth';
 import { useMe } from './meContext';
+import { SignOutOthers } from '../components/SignOutOthers';
 
 export function SettingsPage() {
   const me = useMe();
-  const { mfa, demo } = useAuth();
+  const { mfa, demo, signOutOthers } = useAuth();
   const [lowData, setLowData] = useLowData();
   const [mfaOpen, setMfaOpen] = useState(false);
   const aal2 = me?.aal === 'aal2';
@@ -45,6 +46,7 @@ export function SettingsPage() {
 
       <section className="block" aria-label="Sessions"><div className="block__head"><h3>Sign-in session</h3></div><div className="block__body">
         <p className="small">You are signed out after {__IDLE_MINUTES__} minutes without activity. Closing the tab also ends the session.</p>
+        {!demo && <SignOutOthers signOutOthers={signOutOthers} />}
       </div></section>
 
       <section className="block" aria-label="About"><div className="block__head"><h3>About</h3></div><div className="block__body">

@@ -5,10 +5,9 @@ import type { AuditEvent, Deps, UserWriter } from '../deps.js';
 import { DbError } from '../deps.js';
 import type { EncounterRow } from '../fhir/project.js';
 import { VITALS, MMHG } from '../fhir/codes.js';
-import { RULESET_DRAFT } from '../triage/ruleset.draft.js';
-import { RULESET_PROPOSED } from '../triage/ruleset.proposed.js';
+import { RULESET_EXPANDED } from '../triage/ruleset.expanded.js';
 import { compareWithRules, secondOpinion } from './aiOpinion.js';
-import { askableFloors, CORE_SIGNS, MIN_SIGN_QUESTIONS, QUESTION_BUDGET, selectRelevantSigns } from '../triage/relevance.js';
+import { candidateFloors, QUESTION_MAX, selectRelevantSigns } from '../triage/relevance.js';
 import { triage } from '../triage/engine.js';
 import { buildTriageInput, type TriageContext } from '../intake/input.js';
 import { buildFollowUps } from '../intake/followups.js';
@@ -32,7 +31,7 @@ export interface RouteCtx {
 
 const uuid = z.string().uuid();
 const SCENARIOS = ['opd_queue', 'occupational', 'campus_fever', 'maternal_followup', 'chronic_checkin', 'health_camp', 'referral_intake', 'other'] as const;
-const SIGN_CODES = new Set([...RULESET_DRAFT.floors, ...RULESET_PROPOSED.floors].map(f => f.sign));
+const SIGN_CODES = new Set(RULESET_EXPANDED.floors.map(f => f.sign));
 const EDITABLE = new Set(['draft', 'submitted', 'in_review']);
 
 const consentBody = z.object({
@@ -218,10 +217,9 @@ export function registerIntakeRoutes(c: RouteCtx): RouteHelpers {
     const rs = await deps.loadRuleSet?.(c.triageRuleSet.name, c.triageRuleSet.version).catch(() => null) ?? null;
     const sum = rs ? await req.reader!.getEncounterSummary(enc.id).catch(() => null) : null;
     const wordsText = [enc.chief_complaint_translated ?? enc.chief_complaint_original ?? '', ...(sum?.symptoms ?? []).map(x => x.text_translated ?? x.text_original)].join('. ');
-    const candidates = rs ? askableFloors(input, rs).map(f => ({ code: f.sign, label: f.label, question: f.question, must: CORE_SIGNS.includes(f.sign) })) : [];
+    const candidates = rs ? candidateFloors(input, rs, wordsText).map(c => ({ code: c.floor.sign, label: c.floor.label, question: c.floor.question, must: c.must })) : [];
     const ai = await secondOpinion(deps, req, enc, input, facts.sex, candidates);
-    const nonSign = rs ? triage({ ...input, relevantSigns: [] }, rs).missing.filter(m => !m.code.startsWith('sign.')).length : 0;
-    const relevance = rs ? selectRelevantSigns(input, rs, wordsText, ai.ask, Math.max(MIN_SIGN_QUESTIONS, QUESTION_BUDGET - nonSign)) : null;
+    const relevance = rs ? selectRelevantSigns(input, rs, wordsText, ai.ask) : null;
     if (relevance) input.relevantSigns = relevance.signs;
     if (ai.tier != null) input.externalHints = [{ code: 'ai_second_opinion', tier: ai.tier, source: 'external_secondary' }];
 
@@ -241,7 +239,7 @@ export function registerIntakeRoutes(c: RouteCtx): RouteHelpers {
       return fail(reply, 502, 'transient', 'The assessment could not be completed. Try again.');
     }
 
-    const MAX_QUESTIONS = QUESTION_BUDGET + 3;
+    const MAX_QUESTIONS = QUESTION_MAX + 4;
     const followUps = buildFollowUps(result.decision.missing, result.ruleSet, relevance ? MAX_QUESTIONS : undefined, ai.phrasing);
     let followUpsSaved = true;
     try {

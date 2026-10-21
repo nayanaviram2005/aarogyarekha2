@@ -16,3 +16,6 @@ docs/
 *.pub
 intro-video/
 skills-lock.json
+
+# Desktop app source stays out of this repository; only its installer is shared
+aarogyarekha-desktop/

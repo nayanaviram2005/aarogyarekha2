@@ -18,6 +18,7 @@ export const AiEnv = z.object({
   OPENAI_API_KEY: z.string().optional(), OPENAI_MODEL: z.string().optional(),
   OPENROUTER_API_KEY: z.string().optional(), OPENROUTER_MODEL: z.string().optional(),
   SARVAM_API_KEY: z.string().optional(), SARVAM_MODEL: z.string().optional(),
+  SARVAM_BASE_URL: z.preprocess(v => (v === '' ? undefined : v), z.string().url().refine(u => u.startsWith('https://'), 'must start with https://').optional()),
   AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),
   AI_FALLBACK_MODEL: z.string().optional(),
   AI_FALLBACK_PROVIDER: OptProvider,

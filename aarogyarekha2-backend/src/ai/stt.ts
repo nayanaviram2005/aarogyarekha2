@@ -20,6 +20,7 @@ const SARVAM_CODE: Record<SttLanguage, string> = { en: 'en-IN', hi: 'hi-IN', or:
 const FROM_SARVAM: Record<string, string> = { 'en-IN': 'en', 'hi-IN': 'hi', 'od-IN': 'or' };
 const AUDIO_EXT: Record<AudioMime, string> = { 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/wav': 'wav', 'audio/mp4': 'mp4' };
 export const SARVAM_DEFAULT_MODEL = 'saaras:v4';
+export const SARVAM_DEFAULT_BASE_URL = 'https://api.sarvam.ai';
 const Reply = z.object({ text: z.string(), language: z.string().nullable().optional() });
 const clean = (s: string) => s.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 2000);
 
@@ -77,7 +78,7 @@ export function makeTranscriber(env: Partial<AiEnvValues> & { OPENAI_STT_MODEL?:
       const fd = new FormData();
       fd.append('file', new Blob([new Uint8Array(bytes)], { type: mime }), `audio.${AUDIO_EXT[mime]}`);
       fd.append('model', model); fd.append('language_code', language ? SARVAM_CODE[language] : 'unknown');
-      const j = await post(fetchImpl, 'https://api.sarvam.ai/speech-to-text', { 'api-subscription-key': key }, fd, Math.max(timeout, 30000)) as { transcript?: unknown; language_code?: unknown };
+      const j = await post(fetchImpl, `${(env.SARVAM_BASE_URL?.trim() || SARVAM_DEFAULT_BASE_URL).replace(/\/+$/, '')}/speech-to-text`, { 'api-subscription-key': key }, fd, Math.max(timeout, 30000)) as { transcript?: unknown; language_code?: unknown };
       const text = clean(String(j.transcript ?? ''));
       if (!text) throw bad();
       const heard = typeof j.language_code === 'string' ? FROM_SARVAM[j.language_code] ?? 'other' : null;

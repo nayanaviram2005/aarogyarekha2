@@ -34,6 +34,11 @@ describe('Sarvam speech to text', () => {
     expect((await mk({ transcript: 'x', language_code: null }).transcribe({ bytes, mime: 'audio/webm', language: 'hi' })).language).toBe('hi');
     expect((await mk({ transcript: 'x' }).transcribe({ bytes, mime: 'audio/webm' })).language).toBeNull();
   });
+  it('uses another address when one is set, and trims a trailing slash', async () => {
+    const f = vi.fn().mockImplementation(() => reply({ transcript: 'x' }));
+    await makeTranscriber({ ...env, SARVAM_BASE_URL: 'https://example.sarvam.test/' }, f as never).transcribe({ bytes, mime: 'audio/webm' });
+    expect(f.mock.calls[0]![0]).toBe('https://example.sarvam.test/speech-to-text');
+  });
   it('uses the model from the settings when one is given', async () => {
     const f = vi.fn().mockImplementation(() => reply({ transcript: 'x' }));
     const t = makeTranscriber({ ...env, SARVAM_MODEL: 'saaras:v3' }, f as never); await t.transcribe({ bytes, mime: 'audio/webm' });
@@ -64,5 +69,6 @@ describe('Sarvam as a provider for the other jobs', () => {
     expect(envForTask(e, 'TRANSLATE')).toMatchObject({ AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'g' });
     const t = makeTranscriber(envForTask(e, 'STT')); expect(t).toMatchObject({ name: 'sarvam', model: 'saaras:v4', supported: true });
   });
-  it('is accepted by the configuration', () => { expect(AiEnv.parse({ AI_STT_PROVIDER: 'sarvam', SARVAM_API_KEY: 'k' })).toMatchObject({ AI_STT_PROVIDER: 'sarvam', SARVAM_API_KEY: 'k' }); expect(() => AiEnv.parse({ AI_STT_PROVIDER: 'nope' })).toThrow(); });
+  it('is accepted by the configuration', () => { expect(AiEnv.parse({ AI_STT_PROVIDER: 'sarvam', SARVAM_API_KEY: 'k' })).toMatchObject({ AI_STT_PROVIDER: 'sarvam', SARVAM_API_KEY: 'k' }); expect(() => AiEnv.parse({ AI_STT_PROVIDER: 'nope' })).toThrow();
+    expect(AiEnv.parse({ SARVAM_BASE_URL: '' }).SARVAM_BASE_URL).toBeUndefined(); expect(() => AiEnv.parse({ SARVAM_BASE_URL: 'http://api.sarvam.ai' })).toThrow(); expect(() => AiEnv.parse({ SARVAM_BASE_URL: 'not a url' })).toThrow(); });
 });

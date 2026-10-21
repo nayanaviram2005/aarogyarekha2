@@ -31,7 +31,7 @@ describe('what the AI says about who a record is about', () => {
 describe('POST /intake/records/read with photos read by AI', () => {
   const png = () => { const p = new PNG({ width: 40, height: 40 }); p.data.fill(255); return PNG.sync.write(p); };
   let audits: AuditEvent[]; let sent: number; let localCalls: number;
-  const make = async (mode: 'local' | 'ai' | 'ai_then_local', fail = false) => {
+  const make = async (mode: 'local' | 'ai' | 'ai_then_local', fail = false, aiReaderConsent: 'required' | 'skip' = 'required') => {
     const reader = { getMe: async () => ({ displayName: 'N', memberships: [{ facilityId: 'f', facilityName: 'x', facilityType: 'phc', role: 'nurse' }] }) } as unknown as UserReader;
     const deps = {
       verifyToken: async (t: string) => (t === 'clinician' ? { userId: 'u' } : null), userReader: () => reader, userWriter: () => ({}) as UserWriter,
@@ -39,7 +39,7 @@ describe('POST /intake/records/read with photos read by AI', () => {
       vision: { name: 'gemini', model: 'm', supported: true, accepts: () => true, read: async () => { sent++; if (fail) throw new Error('down'); return { rows: [{ name: 'ESR', value: '30', unit: null, referenceRange: null, flag: null }], provider: 'gemini', model: 'm', dropped: 0, identity: { fullName: 'Asha Rao', ageYears: 27, sex: 'female' as const } }; } },
       audit: async (e: AuditEvent) => { audits.push(e); },
     } as unknown as Deps;
-    return buildApp({ allowedOrigins: [], ocrPhotos: mode }, deps);
+    return buildApp({ allowedOrigins: [], ocrPhotos: mode, aiReaderConsent }, deps);
   };
   const upload = (app: Awaited<ReturnType<typeof make>>, fields: Record<string, string> = {}) => {
     const B = '----t7MA4YWx'; const parts: Buffer[] = [];
@@ -52,6 +52,11 @@ describe('POST /intake/records/read with photos read by AI', () => {
   it('asks for the patient\'s agreement first and sends nothing without it', async () => {
     reset(); const r = await upload(await make('ai'));
     expect(r.statusCode).toBe(200); expect(r.json()).toMatchObject({ needsAiConsent: true, readable: false }); expect(sent).toBe(0); expect(localCalls).toBe(0);
+  });
+  it('with the consent step switched off the AI reads the photo straight away, and the audit entry still holds no name', async () => {
+    reset(); const r = await upload(await make('ai', false, 'skip'));
+    expect(r.json()).toMatchObject({ readable: true, readBy: 'ai', identity: { fullName: 'Asha Rao' } }); expect(r.json().needsAiConsent).toBeUndefined(); expect(sent).toBe(1);
+    expect(JSON.stringify(audits.find(x => x.entityType === 'record_preview_ai'))).not.toMatch(/Asha/);
   });
   it('with the agreement the AI reads who it is about, and the audit entry holds no name', async () => {
     reset(); const r = await upload(await make('ai'), { aiConsent: 'yes' });

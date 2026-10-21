@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AiEnv, envForTask, makeProvider } from '../src/ai/provider.js';
-import { makeTranscriber } from '../src/ai/stt.js';
+import { makeTranscriber, STT_LANGUAGE_NAMES } from '../src/ai/stt.js';
 import { makeVision } from '../src/ai/vision.js';
 
 const bytes = Buffer.from('fake-audio');
@@ -28,11 +28,22 @@ describe('Sarvam speech to text', () => {
     const en = makeTranscriber(env, vi.fn().mockImplementation(() => reply({ transcript: 'fever', language_code: 'en-IN' })) as never);
     expect((await en.transcribe({ bytes, mime: 'audio/wav', language: 'en' })).language).toBe('en');
   });
-  it('reports the language Sarvam heard, "other" for one the app does not use, and falls back to the requested one when none came back', async () => {
+  it('reports the language Sarvam heard, "other" for one the app does not know, and falls back to the requested one when none came back', async () => {
     const mk = (body: unknown) => makeTranscriber(env, vi.fn().mockImplementation(() => reply(body)) as never);
-    expect((await mk({ transcript: 'x', language_code: 'ta-IN' }).transcribe({ bytes, mime: 'audio/webm' })).language).toBe('other');
+    expect((await mk({ transcript: 'x', language_code: 'xx-IN' }).transcribe({ bytes, mime: 'audio/webm' })).language).toBe('other');
+    expect((await mk({ transcript: 'x', language_code: 'ta-IN' }).transcribe({ bytes, mime: 'audio/webm' })).language).toBe('ta');
     expect((await mk({ transcript: 'x', language_code: null }).transcribe({ bytes, mime: 'audio/webm', language: 'hi' })).language).toBe('hi');
     expect((await mk({ transcript: 'x' }).transcribe({ bytes, mime: 'audio/webm' })).language).toBeNull();
+  });
+  it('sends the right Sarvam code for every spoken language it offers, and detects the language for auto', async () => {
+    const sent: string[] = [];
+    const t = makeTranscriber(env, vi.fn().mockImplementation((_u: string, init: { body: FormData }) => { sent.push(String(init.body.get('language_code'))); return reply({ transcript: 'x' }); }) as never);
+    const all = Object.keys(STT_LANGUAGE_NAMES) as (keyof typeof STT_LANGUAGE_NAMES)[];
+    for (const l of all) await t.transcribe({ bytes, mime: 'audio/webm', language: l });
+    await t.transcribe({ bytes, mime: 'audio/webm', language: 'auto' });
+    expect(all).toHaveLength(23);
+    expect(sent).toEqual([...all.map(l => (l === 'or' ? 'od-IN' : `${l}-IN`)), 'unknown']);
+    expect(sent).toEqual(expect.arrayContaining(['hi-IN', 'od-IN', 'en-IN', 'ta-IN', 'te-IN', 'bn-IN', 'kok-IN', 'sat-IN', 'mni-IN']));
   });
   it('uses another address when one is set, and trims a trailing slash', async () => {
     const f = vi.fn().mockImplementation(() => reply({ transcript: 'x' }));

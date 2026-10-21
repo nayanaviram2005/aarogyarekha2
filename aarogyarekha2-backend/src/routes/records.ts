@@ -35,7 +35,7 @@ export function registerRecordRoutes(c: RouteCtx, h: RouteHelpers): void {
     if (!me.memberships.some(m => CLINICAL.includes(m.role))) return fail(reply, 403, 'forbidden', 'Only clinical staff at a facility can register patients from records.');
     if (!req.isMultipart()) return fail(reply, 415, 'not-supported', 'Send the file as multipart form data.');
 
-    let buf: Buffer | null = null; let claimed: string | undefined; let language: 'en' | 'hi' | 'or' | undefined; let truncated = false; let aiConsent = false;
+    let buf: Buffer | null = null; let claimed: string | undefined; let language: 'en' | 'hi' | 'or' | undefined; let truncated = false; let aiConsent = c.skipAiReaderConsent;
     try {
       for await (const part of req.parts()) {
         if (part.type === 'field') { if (part.fieldname === 'language') { const l = lang.safeParse(String(part.value)); if (l.success) language = l.data; } else if (part.fieldname === 'aiConsent') aiConsent = String(part.value) === 'yes'; }

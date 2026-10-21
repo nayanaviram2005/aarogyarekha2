@@ -8,7 +8,7 @@ export type SecondReadStatus = 'ok' | 'not_set_up' | 'no_consent' | 'unsupported
 export interface SecondRead { status: SecondReadStatus; rows: VisionRow[]; provider: string | null; model: string | null }
 const none = (status: SecondReadStatus): SecondRead => ({ status, rows: [], provider: null, model: null });
 
-export async function secondRead(deps: Deps, req: FastifyRequest, d: DocumentRow, bytes: Buffer): Promise<SecondRead> {
+export async function secondRead(deps: Deps, req: FastifyRequest, d: DocumentRow, bytes: Buffer, skipConsent = false): Promise<SecondRead> {
   const v = deps.vision;
   if (!v || !v.supported || v.name === 'mock') return none('not_set_up');
   if (!v.accepts(d.mime_type)) return none('unsupported_type');
@@ -17,17 +17,20 @@ export async function secondRead(deps: Deps, req: FastifyRequest, d: DocumentRow
   try {
     const consents = await req.reader!.getConsents(d.patient_id);
     const ai = consents.filter(x => x.purpose === 'external_ai_processing' && isConsentActive([x]))[0];
-    if (!ai?.id) return none('no_consent');
-    const log = (status: 'ok' | 'error' | 'timeout' | 'rejected') => deps.logExternalRun({ encounterId: d.encounter_id!, consentId: ai.id!, provider: v.name, model: v.model, items: 1, chars: bytes.length, status, purpose: 'vision_extraction' });
+    if (!ai?.id && !skipConsent) return none('no_consent');
+    const consentId = ai?.id;
+    const log = (status: 'ok' | 'error' | 'timeout' | 'rejected', provider: string, model: string) => consentId
+      ? deps.logExternalRun({ encounterId: d.encounter_id!, consentId, provider, model, items: 1, chars: bytes.length, status, purpose: 'vision_extraction' })
+      : Promise.resolve();
     let read;
     try { read = await v.read({ bytes, mime: d.mime_type as VisionMime }); }
     catch (err) {
       const status = err instanceof AiError ? (err.kind === 'timeout' ? 'timeout' : err.kind === 'rejected' ? 'rejected' : 'error') : 'error';
-      if (err instanceof AiError && err.kind !== 'not_configured') await log(status).catch(() => {});
+      if (err instanceof AiError && err.kind !== 'not_configured') await log(status, v.name, v.model).catch(() => {});
       req.log.warn({ reqId: req.id, kind: err instanceof AiError ? err.kind : 'unknown' }, 'AI second read unavailable');
       return none(err instanceof AiError && err.kind === 'not_configured' ? 'not_set_up' : 'unavailable');
     }
-    try { await deps.logExternalRun({ encounterId: d.encounter_id!, consentId: ai.id!, provider: read.provider, model: read.model, items: 1, chars: bytes.length, status: 'ok', purpose: 'vision_extraction' }); } catch { req.log.error({ reqId: req.id }, 'external run could not be logged; AI second read not used'); return none('unavailable'); }
+    try { await log('ok', read.provider, read.model); } catch { req.log.error({ reqId: req.id }, 'external run could not be logged; AI second read not used'); return none('unavailable'); }
     return { status: 'ok', rows: read.rows, provider: read.provider, model: read.model };
   } catch (err) {
     req.log.warn({ reqId: req.id, err: (err as Error).message }, 'AI second read could not run');

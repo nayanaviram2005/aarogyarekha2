@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { useI18n } from '../i18n/I18n';
 import { AI_NOTICE_VERSION, ConsentForm } from '../components/ConsentForm';
 import { useMe } from './meContext';
+import { ComplaintVoice } from '../components/ComplaintVoice';
 import { RecordsPicker } from '../components/RecordsPicker';
 import { buildRegistration, RegisterPatientForm } from '../components/RegisterPatientForm';
 import { TemplateFields } from '../components/TemplateFields';
@@ -240,6 +241,7 @@ function Intake() {
           {api && <RecordsPicker api={api} files={recordFiles} setFiles={setRecordFiles} language={language} disabled={busy || !!done.current.encounterId} />}
           {fresh && !busy && !savedId && <Banner kind="info" title={`${patient.full_name} is registered`}>Enter the main complaint to put them in the queue. You can add symptoms and measurements too. For a routine check-up, write "Routine".</Banner>}
           <div className="field"><label htmlFor="cc">{t('intake.complaint')} (required)</label><textarea id="cc" autoFocus required aria-required="true" aria-describedby="cc-hint" className="textarea" lang={language} value={complaint} onChange={e => setComplaint(e.target.value)} maxLength={2000} disabled={busy} /><span id="cc-hint" className="hint">For a routine check-up, write "Routine".</span></div>
+          {api && <ComplaintVoice api={api} patientId={patient.id} patientName={patient.full_name} language={language} disabled={busy || !!done.current.encounterId} onText={text => setComplaint(cur => (cur.trim() ? `${cur.trim()} ${text}` : text).slice(0, 2000))} />}
           <TextHints text={complaint} language={language} onPickLanguage={setLanguage} />
 
           <fieldset style={{ border: 0, padding: 0, margin: 0 }} disabled={busy}>

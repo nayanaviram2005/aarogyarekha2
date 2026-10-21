@@ -12,6 +12,7 @@ const schema = z.object({
   UPLOAD_MAX_MB: z.coerce.number().int().min(1).max(20).default(10),
   OCR_PROVIDER: z.enum(['local', 'mock']).default('local'),
   OCR_PHOTOS: z.enum(['local', 'ai', 'ai_then_local']).default('ai'),
+  AI_READER_CONSENT: z.preprocess(v => (v === '' ? undefined : v), z.enum(['required', 'skip']).default('required')),
   TRAINING_EXPORT: z.enum(['on', 'off']).default('on'),
   TRAINING_PSEUDONYM_KEY: z.preprocess(v => (v === '' ? undefined : v), z.string().min(32, 'at least 32 characters').optional()),
   TESSDATA_PATH: z.string().optional(),
@@ -27,7 +28,7 @@ const schema = z.object({
   TRIAGE_RULESET_VERSION: z.string().optional(),
 });
 
-export type Config = z.infer<typeof schema> & { databaseUrl: string; allowedOrigins: string[]; uploadMaxMb: number; requireMfa: boolean; rateLimitPerMinute: number; accessBudgetPerHour: number; ocrPhotos: 'local' | 'ai' | 'ai_then_local'; sms: { provider: 'mock' | 'twilio'; accountSid?: string; authToken?: string; from?: string; messagingServiceSid?: string; defaultCountry: string; webhookUrl?: string }; triageRuleSet?: { name: string; version: string }; ai: AiEnvValues };
+export type Config = z.infer<typeof schema> & { databaseUrl: string; allowedOrigins: string[]; uploadMaxMb: number; requireMfa: boolean; rateLimitPerMinute: number; accessBudgetPerHour: number; ocrPhotos: 'local' | 'ai' | 'ai_then_local'; aiReaderConsent: 'required' | 'skip'; sms: { provider: 'mock' | 'twilio'; accountSid?: string; authToken?: string; from?: string; messagingServiceSid?: string; defaultCountry: string; webhookUrl?: string }; triageRuleSet?: { name: string; version: string }; ai: AiEnvValues };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = schema.safeParse(env);
@@ -50,6 +51,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     rateLimitPerMinute: c.RATE_LIMIT_PER_MINUTE,
     accessBudgetPerHour: c.ACCESS_BUDGET_PATIENTS_PER_HOUR,
     ocrPhotos: c.OCR_PHOTOS,
+    aiReaderConsent: c.AI_READER_CONSENT,
     sms: { provider: c.SMS_PROVIDER, accountSid: c.TWILIO_ACCOUNT_SID?.trim() || undefined, authToken: c.TWILIO_AUTH_TOKEN?.trim() || undefined, from: c.TWILIO_FROM?.trim() || undefined,
            messagingServiceSid: c.TWILIO_MESSAGING_SERVICE_SID?.trim() || undefined, defaultCountry: c.SMS_DEFAULT_COUNTRY_CODE, webhookUrl: c.SMS_WEBHOOK_URL?.trim() || undefined },
     ai: ai.data,

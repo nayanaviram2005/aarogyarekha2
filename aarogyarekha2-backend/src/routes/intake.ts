@@ -26,6 +26,7 @@ export interface RouteCtx {
   requireMfa: (req: FastifyRequest, reply: FastifyReply, what: string) => Promise<boolean>;
   mfaRequired: boolean;
   ocrPhotos: 'local' | 'ai' | 'ai_then_local';
+  skipAiReaderConsent: boolean;
   jobs: import('../jobs/queue.js').JobQueue;
 }
 

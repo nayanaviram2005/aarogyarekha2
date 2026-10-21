@@ -13,13 +13,13 @@ const encRow = (over: Partial<EncounterRow> = {}): EncounterRow => ({ id: E, pat
 const consent = (purpose: string, over: Partial<ConsentBrief> = {}): ConsentBrief => ({ id: 'c-' + purpose, purpose, granted_at: '2026-10-01T08:00:00Z', revoked_at: null, expires_at: null, ...over });
 const WEBM = Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 1, 2, 3, 4]);
 
-interface World { enc: EncounterRow; consents: ConsentBrief[]; triageConsent: boolean; transcribe: Transcribe; calls: { bytes: number; mime: string; language?: string }[]; runs: { status: string; chars: number; purpose?: string }[]; runFails: boolean; audits: AuditEvent[]; supported: boolean; noTranscriber: boolean }
+interface World { enc: EncounterRow; consents: ConsentBrief[]; triageConsent: boolean; transcribe: Transcribe; calls: { bytes: number; mime: string; language?: string }[]; runs: { status: string; chars: number; purpose?: string }[]; runFails: boolean; audits: AuditEvent[]; supported: boolean; noTranscriber: boolean; roles: string[] }
 let w: World;
 
 const make = async () => {
   const reader = (t: string): UserReader => ({
     getPatient: async () => (t === 'clinician' ? patient : null), getIdentifiers: async () => [], getEncounter: async id => (t === 'clinician' && id === E ? w.enc : null), getVitals: async () => [], listPatients: async () => [], getQueue: async () => [],
-    getEncounterSummary: async () => null, getMe: async () => ({ displayName: null, memberships: [] }), listFacilities: async () => [], getFacility: async () => null, getReferral: async () => null, listReferrals: async () => [], getConsents: async () => w.consents, getNames: async () => ({}),
+    getEncounterSummary: async () => null, getMe: async () => ({ displayName: null, memberships: w.roles.map(role => ({ facilityId: F, facilityName: null, facilityType: null, role })) }), listFacilities: async () => [], getFacility: async () => null, getReferral: async () => null, listReferrals: async () => [], getConsents: async () => w.consents, getNames: async () => ({}),
     listDocuments: async () => [], getDocument: async () => null, getExtraction: async () => null,
   });
   const impl: Partial<UserWriter> = { hasActiveConsent: async () => w.triageConsent };
@@ -51,7 +51,42 @@ const post = (app: App, file: Buffer | null = WEBM, fields: Record<string, strin
 
 beforeEach(() => {
   w = { enc: encRow(), consents: [consent('care_triage'), consent('external_ai_processing')], triageConsent: true, transcribe: async () => ({ text: 'bukhar teen din se', language: 'hi', provider: 'gemini', model: 'gemini-x' }),
-    calls: [], runs: [], runFails: false, audits: [], supported: true, noTranscriber: false };
+    calls: [], runs: [], runFails: false, audits: [], supported: true, noTranscriber: false, roles: ['nurse'] };
+});
+
+const postPatient = (app: App, file: Buffer | null = WEBM, fields: Record<string, string> = {}, token: string | null = 'clinician', id = P) => {
+  const f = form(file, fields);
+  return app.inject({ method: 'POST', url: `/patients/${id}/transcribe`, payload: f.payload, headers: { ...f.headers, ...(token ? { authorization: `Bearer ${token}` } : {}) } });
+};
+
+describe('voice at intake, before an encounter exists', () => {
+  it('turns a recording into a draft transcript, needs no encounter, and records the use in the audit trail without the words', async () => {
+    const r = await postPatient(await make(), WEBM, { language: 'or' });
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toEqual({ text: 'bukhar teen din se', language: 'hi', provider: 'gemini', model: 'gemini-x', machineTranscript: true });
+    expect(w.calls).toEqual([{ bytes: WEBM.length, mime: 'audio/webm', language: 'or' }]);
+    expect(w.runs).toHaveLength(0);
+    const a = w.audits.find(x => x.entityType === 'transcription')!;
+    expect(a.patientId).toBe(P); expect(JSON.stringify(a)).not.toContain('bukhar');
+  });
+  it('never sends the recording without the patient\'s consent to outside AI', async () => {
+    w.consents = [consent('care_triage')];
+    const r = await postPatient(await make());
+    expect(r.statusCode).toBe(403); expect(r.json().issue[0].details.text).toMatch(/hearing their voice/); expect(w.calls).toHaveLength(0);
+  });
+  it('is for clinical staff only, a stranger gets 404, a bad id 400, no login 401', async () => {
+    const app = await make();
+    w.roles = ['facility_admin']; expect((await postPatient(app)).statusCode).toBe(403); w.roles = ['nurse'];
+    expect((await postPatient(app, WEBM, {}, 'outsider')).statusCode).toBe(404);
+    expect((await postPatient(app, WEBM, {}, 'clinician', 'nope')).statusCode).toBe(400);
+    expect((await postPatient(app, WEBM, {}, null)).statusCode).toBe(401);
+    expect(w.calls).toHaveLength(0);
+  });
+  it('refuses non-audio and not-set-up transcribers the same way as in an encounter', async () => {
+    expect((await postPatient(await make(), Buffer.from('%PDF-1.4 not audio'))).statusCode).toBe(400);
+    w.supported = false; expect((await postPatient(await make())).statusCode).toBe(503);
+    expect(w.calls).toHaveLength(0);
+  });
 });
 
 describe('consent and access', () => {
@@ -98,6 +133,11 @@ describe('the recording', () => {
     expect((await post(app, null)).statusCode).toBe(400);
     expect((await post(app, WEBM, { language: 'fr' })).statusCode).toBe(400);
     expect(w.calls).toHaveLength(0);
+  });
+  it('accepts any Sarvam language, and auto-detect', async () => {
+    const app = await make();
+    for (const language of ['ta', 'kok', 'sat', 'auto']) expect((await post(app, WEBM, { language })).statusCode).toBe(200);
+    expect(w.calls.map(c => c.language)).toEqual(['ta', 'kok', 'sat', 'auto']);
   });
   it('refuses a recording over 2 MB', async () => {
     const big = Buffer.concat([WEBM, Buffer.alloc(2 * 1024 * 1024 + 1)]);

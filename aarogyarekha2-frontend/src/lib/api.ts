@@ -69,12 +69,13 @@ export function createApi(baseUrl: string, getToken: TokenSource, fetchImpl: typ
     cancelReferral: (id, reason) => call('POST', `/referrals/${enc(id)}/cancel`, reason ? { reason } : {}),
     sendReferral: id => call('POST', `/referrals/${enc(id)}/send`),
     translate: id => call('POST', `/encounters/${enc(id)}/translate`),
-    transcribe: async (id, audio, language) => {
+    transcribe: async (target, audio, language) => {
+      const path = typeof target === 'string' ? `/encounters/${enc(target)}/transcribe` : `/patients/${enc(target.patientId)}/transcribe`;
       const token = await getToken();
       if (!token) throw new ApiError(401, FALLBACK[401]!);
       const fd = new FormData(); if (language) fd.append('language', language); fd.append('audio', audio, 'recording');
       let res: Response;
-      try { res = await fetchImpl(`${baseUrl}/encounters/${enc(id)}/transcribe`, { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: fd }); }
+      try { res = await fetchImpl(`${baseUrl}${path}`, { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: fd }); }
       catch { throw new ApiError(0, FALLBACK[0]!); }
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new ApiError(res.status, messageFromBody(res.status, json));

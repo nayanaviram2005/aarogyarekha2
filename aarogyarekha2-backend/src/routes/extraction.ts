@@ -68,7 +68,7 @@ export function registerExtractionRoutes(c: RouteCtx, h: RouteHelpers): void {
       };
       const aiPrimary = d.mime_type !== 'application/pdf' && c.ocrPhotos !== 'local';
       let { result, failure } = aiPrimary ? { result: null as Read | null, failure: null as string | null } : await local();
-      const sr = await secondRead(deps, req, d, bytes);
+      const sr = await secondRead(deps, req, d, bytes, c.skipAiReaderConsent);
       const aiRead = sr.status === 'ok' && sr.rows.length > 0;
       if (aiPrimary && !aiRead && c.ocrPhotos === 'ai_then_local') ({ result, failure } = await local());
       const parsed = result ? parseLabText(result.text, result.confidence) : { fields: [], skipped: 0 };

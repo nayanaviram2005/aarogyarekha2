@@ -526,3 +526,12 @@ html, body { overflow-x: hidden; }
   .landing__sheet-head { display: none; }
   .landing__sheet-row { grid-template-columns: minmax(0, 1fr); }
 }
+
+.mic { display: inline-flex; align-items: center; gap: var(--s2); }
+.mic svg { width: 16px; height: 16px; flex: none; }
+.mic-level { display: flex; align-items: center; gap: 2px; height: 36px; padding: 0 var(--s3); border: 1px solid var(--rule-strong); background: var(--panel); min-width: 180px; flex: 1 1 180px; max-width: 320px; }
+.mic-level__bar { width: 3px; height: 3px; background: var(--urg-red); flex: none; }
+.mic-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--urg-red); flex: none; }
+@media (prefers-reduced-motion: reduce) { .mic-dot { animation: none; } }
+@media (prefers-reduced-motion: no-preference) { .mic-dot { animation: mic-pulse 1.2s ease-in-out infinite; } }
+@keyframes mic-pulse { 50% { opacity: 0.35; } }

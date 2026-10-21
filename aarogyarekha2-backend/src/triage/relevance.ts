@@ -3,7 +3,6 @@ import type { FloorRule, RuleSet, TriageInput } from './types.js';
 
 export const QUESTION_TARGET = 6;
 export const QUESTION_MAX = 7;
-export const QUESTION_BUDGET = QUESTION_TARGET;
 export const SYSTEM_CAP = 3;
 export const CANDIDATES_FOR_AI = 24;
 

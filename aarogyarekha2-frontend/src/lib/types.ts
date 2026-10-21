@@ -208,7 +208,7 @@ export interface Api {
   downloadReferralPdf(id: string): Promise<{ filename: string; blob: Blob }>;
   downloadHandoverPdf(encounterId: string, lang: 'en' | 'hi' | 'or'): Promise<{ filename: string; blob: Blob }>;
   translate(encounterId: string): Promise<{ translated: number; rejected: number; nothingToDo?: boolean; provider: string; model: string; machineTranslation: true }>;
-  transcribe(target: string | { patientId: string }, audio: Blob, language?: string): Promise<{ text: string; language: string | null; provider: string; model: string; machineTranscript: true }>;
+  transcribe(target: string | { patientId: string }, audio: Blob, language?: string): Promise<{ text: string; language: string | null; provider: string; model: string; machineTranscript: true; translation?: { text: string; provider: string; model: string } | null }>;
   followups(encounterId: string): Promise<Followup[]>;
   createFollowup(encounterId: string, body: { kind: FollowupKind; firstDueInDays: number; cadenceDays?: number }): Promise<{ id: string; nextDueAt: string }>;
   scheduleReminder(followupId: string, body: { channel: ReminderChannel; dueAt?: string }): Promise<{ id: string; dueAt: string; channel: ReminderChannel; status: string }>;

@@ -22,7 +22,7 @@ export function sniffAudio(b: Buffer): AudioMime | null {
 
 const langName = (l: SttLanguage | undefined): string | null => (l && l !== 'auto' ? STT_LANGUAGE_NAMES[l] : null);
 const OPENAI_LANGS = new Set(['en', 'hi', 'bn', 'kn', 'ml', 'mr', 'pa', 'ta', 'te', 'gu', 'as', 'ur', 'ne', 'sa', 'sd']);
-const sarvamCode = (l: SttLanguage | undefined): string => (!l || l === 'auto' ? 'unknown' : l === 'or' ? 'od-IN' : `${l}-IN`);
+export const sarvamCode = (l: SttLanguage | undefined): string => (!l || l === 'auto' ? 'unknown' : l === 'or' ? 'od-IN' : `${l}-IN`);
 const fromSarvam = (code: string): string => { const short = code.replace(/-IN$/, ''); return short === 'od' ? 'or' : short in STT_LANGUAGE_NAMES ? short : 'other'; };
 const AUDIO_EXT: Record<AudioMime, string> = { 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/wav': 'wav', 'audio/mp4': 'mp4' };
 export const SARVAM_DEFAULT_MODEL = 'saaras:v4';
@@ -36,7 +36,7 @@ async function post(f: typeof fetch, url: string, headers: Record<string, string
   try { res = await f(url, { method: 'POST', headers, body, signal: ctl.signal }); }
   catch (e) { const timeout = (e as { name?: string }).name === 'AbortError'; throw new AiError(timeout ? 'timeout' : 'network', timeout ? 'The outside AI service took too long.' : 'The outside AI service could not be reached.'); }
   finally { clearTimeout(t); }
-  if (!res.ok) throw new AiError('rejected', 'The outside AI service refused the request.');
+  if (!res.ok) { const body = await res.text().catch(() => ''); throw new AiError('rejected', 'The outside AI service refused the request.', `HTTP ${res.status} ${body.replace(/s+/g, ' ').slice(0, 300)}`); }
   try { return await res.json(); } catch { throw new AiError('bad_response', 'The outside AI service sent a reply that could not be used.'); }
 }
 const bad = () => new AiError('bad_response', 'The outside AI service sent a reply that could not be used.');

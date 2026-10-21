@@ -13,7 +13,7 @@ const encRow = (over: Partial<EncounterRow> = {}): EncounterRow => ({ id: E, pat
 const consent = (purpose: string, over: Partial<ConsentBrief> = {}): ConsentBrief => ({ id: 'c-' + purpose, purpose, granted_at: '2026-10-01T08:00:00Z', revoked_at: null, expires_at: null, ...over });
 const WEBM = Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 1, 2, 3, 4]);
 
-interface World { enc: EncounterRow; consents: ConsentBrief[]; triageConsent: boolean; transcribe: Transcribe; calls: { bytes: number; mime: string; language?: string }[]; runs: { status: string; chars: number; purpose?: string }[]; runFails: boolean; audits: AuditEvent[]; supported: boolean; noTranscriber: boolean; roles: string[] }
+interface World { enc: EncounterRow; consents: ConsentBrief[]; triageConsent: boolean; transcribe: Transcribe; calls: { bytes: number; mime: string; language?: string }[]; runs: { status: string; chars: number; purpose?: string }[]; runFails: boolean; audits: AuditEvent[]; supported: boolean; noTranscriber: boolean; roles: string[]; sarvamTranslate: ((text: string) => Promise<string>) | null; sentToTranslator: string[] }
 let w: World;
 
 const make = async () => {
@@ -28,6 +28,7 @@ const make = async () => {
     assess: async () => { throw new Error('unused'); }, review: async () => { throw new Error('unused'); }, sendReferral: async () => { throw new Error('unused'); },
     translator: { name: 'mock', model: 'mock', generate: async () => ({ text: '{}', provider: 'mock', model: 'mock' }) },
     ...(w.noTranscriber ? {} : { transcriber: { name: 'gemini' as const, model: 'gemini-x', supported: w.supported, transcribe: async (a: Parameters<Transcribe>[0]) => { w.calls.push({ bytes: a.bytes.length, mime: a.mime, language: a.language }); return w.transcribe(a); } } }),
+    ...(w.sarvamTranslate ? { textTranslator: { name: 'sarvam' as const, model: 'sarvam-translate:v1', supported: true, translate: async ({ text }: { text: string; from: string }) => { w.sentToTranslator.push(text); return w.sarvamTranslate!(text); } } } : {}),
     saveSymptomTranslations: async () => {}, logExternalRun: async a => { if (w.runFails) throw new Error('db down'); w.runs.push({ status: a.status, chars: a.chars, purpose: a.purpose }); },
     readText: async () => ({ engine: 'mock', engineVersion: null, text: '', confidence: 1, language: null }), finishUpload: async () => {}, failUpload: async () => {}, saveExtraction: async () => ({ extractionId: 'x' }),
     audit: async e => { w.audits.push(e); },
@@ -51,7 +52,7 @@ const post = (app: App, file: Buffer | null = WEBM, fields: Record<string, strin
 
 beforeEach(() => {
   w = { enc: encRow(), consents: [consent('care_triage'), consent('external_ai_processing')], triageConsent: true, transcribe: async () => ({ text: 'bukhar teen din se', language: 'hi', provider: 'gemini', model: 'gemini-x' }),
-    calls: [], runs: [], runFails: false, audits: [], supported: true, noTranscriber: false, roles: ['nurse'] };
+    calls: [], runs: [], runFails: false, audits: [], supported: true, noTranscriber: false, roles: ['nurse'], sarvamTranslate: null, sentToTranslator: [] };
 });
 
 const postPatient = (app: App, file: Buffer | null = WEBM, fields: Record<string, string> = {}, token: string | null = 'clinician', id = P) => {
@@ -63,7 +64,7 @@ describe('voice at intake, before an encounter exists', () => {
   it('turns a recording into a draft transcript, needs no encounter, and records the use in the audit trail without the words', async () => {
     const r = await postPatient(await make(), WEBM, { language: 'or' });
     expect(r.statusCode).toBe(200);
-    expect(r.json()).toEqual({ text: 'bukhar teen din se', language: 'hi', provider: 'gemini', model: 'gemini-x', machineTranscript: true });
+    expect(r.json()).toEqual({ text: 'bukhar teen din se', language: 'hi', provider: 'gemini', model: 'gemini-x', machineTranscript: true, translation: null });
     expect(w.calls).toEqual([{ bytes: WEBM.length, mime: 'audio/webm', language: 'or' }]);
     expect(w.runs).toHaveLength(0);
     const a = w.audits.find(x => x.entityType === 'transcription')!;
@@ -117,7 +118,7 @@ describe('the recording', () => {
   it('sends real audio with the chosen language, returns a draft transcript marked as machine output, and logs size only', async () => {
     const r = await post(await make(), WEBM, { language: 'hi' });
     expect(r.statusCode).toBe(200);
-    expect(r.json()).toEqual({ text: 'bukhar teen din se', language: 'hi', provider: 'gemini', model: 'gemini-x', machineTranscript: true });
+    expect(r.json()).toEqual({ text: 'bukhar teen din se', language: 'hi', provider: 'gemini', model: 'gemini-x', machineTranscript: true, translation: null });
     expect(w.calls).toEqual([{ bytes: WEBM.length, mime: 'audio/webm', language: 'hi' }]);
     expect(w.runs).toEqual([{ status: 'ok', chars: WEBM.length, purpose: 'transcription' }]);
     const a = w.audits.find(x => x.entityType === 'transcription')!;
@@ -170,5 +171,39 @@ describe('failures are plain and leave nothing behind', () => {
     w.runFails = true;
     const r = await post(await make());
     expect(r.statusCode).toBe(503); expect(JSON.stringify(r.json())).not.toContain('bukhar');
+  });
+});
+
+describe('English translation of the transcript', () => {
+  it('returns an English version when the speech was not English, without the patient name leaving', async () => {
+    w.transcribe = async () => ({ text: 'Anita Rao ko bukhar hai', language: 'hi', provider: 'sarvam', model: 'm' });
+    w.sarvamTranslate = async () => '[[NAME_1]] has a fever';
+    const r = await postPatient(await make(), WEBM, { language: 'hi' });
+    expect(r.statusCode).toBe(200);
+    expect(r.json().translation).toEqual({ text: 'Anita Rao has a fever', provider: 'sarvam', model: 'sarvam-translate:v1' });
+    expect(w.sentToTranslator[0]).not.toContain('Anita');
+    const a = w.audits.find(x => x.entityType === 'transcription')!;
+    expect(a.details).toMatchObject({ translatedBy: 'sarvam' }); expect(JSON.stringify(a)).not.toContain('fever');
+  });
+  it('translates from the language that was heard, not only the one chosen', async () => {
+    w.transcribe = async () => ({ text: 'jwara', language: 'or', provider: 'sarvam', model: 'm' });
+    w.sarvamTranslate = async () => 'fever';
+    const r = await postPatient(await make(), WEBM, { language: 'auto' });
+    expect(r.json().translation).toMatchObject({ text: 'fever' });
+  });
+  it('gives no translation for English speech, and the transcript still comes back when translating fails', async () => {
+    w.transcribe = async () => ({ text: 'fever', language: 'en', provider: 'sarvam', model: 'm' });
+    w.sarvamTranslate = async () => 'x';
+    expect((await postPatient(await make(), WEBM, { language: 'en' })).json().translation).toBeNull();
+    expect(w.sentToTranslator).toHaveLength(0);
+    w.transcribe = async () => ({ text: 'bukhar', language: 'hi', provider: 'sarvam', model: 'm' });
+    w.sarvamTranslate = async () => { throw new AiError('timeout', 'x'); };
+    const r = await postPatient(await make(), WEBM, { language: 'hi' });
+    expect(r.statusCode).toBe(200); expect(r.json().text).toBe('bukhar'); expect(r.json().translation).toBeNull();
+  });
+  it('works from inside an encounter too', async () => {
+    w.transcribe = async () => ({ text: 'bukhar', language: 'hi', provider: 'sarvam', model: 'm' });
+    w.sarvamTranslate = async () => 'fever';
+    expect((await post(await make(), WEBM, { language: 'hi' })).json().translation).toMatchObject({ text: 'fever' });
   });
 });

@@ -283,6 +283,7 @@ export interface Deps {
   triageAi?: { name: ProviderName; model: string; generate: Generate };
   trainingStore?: TrainingStore;
   vision?: Vision;
+  textTranslator?: import('./ai/sarvamTranslate.js').TextTranslator;
   transcriber?: { name: ProviderName; model: string; supported: boolean; transcribe: Transcribe };
   readText: ReadText;
   finishUpload(a: { documentId: string; sha256: string; sizeBytes: number }): Promise<void>;

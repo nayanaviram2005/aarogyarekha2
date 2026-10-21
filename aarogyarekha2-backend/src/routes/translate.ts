@@ -2,6 +2,7 @@ import type { RouteCtx, RouteHelpers } from './intake.js';
 import { AiError } from '../ai/provider.js';
 import { PiiLeak } from '../ai/redact.js';
 import { translateToEnglish, type SourceLanguage, type TranslateItem } from '../ai/translate.js';
+import { translateItemsWithSarvam } from '../ai/sarvamTranslate.js';
 import { isConsentActive } from '../intake/consent.js';
 
 const isSource = (l: string | null | undefined): l is SourceLanguage => l === 'hi' || l === 'or';
@@ -28,7 +29,8 @@ export function registerTranslateRoutes(c: RouteCtx, h: RouteHelpers): void {
     const todo = byLang.hi.length + byLang.or.length;
     if (todo === 0) return reply.send({ translated: 0, rejected: 0, nothingToDo: true, provider: deps.translator.name, model: deps.translator.model, machineTranslation: true });
 
-    let served: { provider: string; model: string } = { provider: deps.translator.name, model: deps.translator.model };
+    const sarvam = deps.textTranslator?.supported ? deps.textTranslator : null;
+    let served: { provider: string; model: string } = sarvam ? { provider: sarvam.name, model: sarvam.model } : { provider: deps.translator.name, model: deps.translator.model };
     const generate: typeof deps.translator.generate = async q => { const x = await deps.translator.generate(q); served = { provider: x.provider, model: x.model }; return x; };
     const known = { names: [patient.full_name], identifiers: [patient.public_ref, patient.phone] };
     let translated = 0; let rejected = 0; let status: 'ok' | 'error' | 'timeout' | 'rejected' = 'ok'; let sentItems = 0; let sentChars = 0;
@@ -36,7 +38,7 @@ export function registerTranslateRoutes(c: RouteCtx, h: RouteHelpers): void {
     try {
       for (const lang of ['hi', 'or'] as const) {
         const items = byLang[lang]; if (items.length === 0) continue;
-        const o = await translateToEnglish(generate, items, lang, known);
+        const o = sarvam ? await translateItemsWithSarvam(sarvam, items, lang, known) : await translateToEnglish(generate, items, lang, known);
         sentItems += o.sentItems; sentChars += o.sentChars; rejected += o.rejected.length;
         for (const [id, text] of o.translated) { translated++; if (id === 'complaint') complaintOut = text; else symptomOut.push({ id, text }); }
       }

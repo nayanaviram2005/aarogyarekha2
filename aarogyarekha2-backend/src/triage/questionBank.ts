@@ -381,4 +381,3 @@ export const orderOf = (sign: string): number => ORDER.get(sign) ?? 9999;
 
 export const metaOf = (sign: string): Meta | undefined => META[sign];
 export const systemOf = (sign: string): System => META[sign]?.system ?? 'general';
-export const knownSigns = (): string[] => Object.keys(META);

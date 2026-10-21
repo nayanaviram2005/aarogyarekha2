@@ -51,7 +51,8 @@ function LevelMeter({ rec }: { rec: Recording | null }) {
   );
 }
 
-export function ComplaintVoice({ api, patientId, patientName, language, disabled, onText }: { api: Api; patientId: string; patientName: string; language: string; disabled?: boolean; onText: (text: string) => void }) {
+export function ComplaintVoice({ api, patientId, patientName, language, disabled, onText }: { api: Api; patientId: string; patientName: string; language: string; disabled?: boolean; onText: (text: string, heard: string | null) => void }) {
+  const [english, setEnglish] = useState<string | null>(null);
   const [spoken, setSpoken] = useState(language === 'hi' || language === 'or' ? language : 'en');
   const [phase, setPhase] = useState<'idle' | 'recording' | 'sending'>('idle');
   const [seconds, setSeconds] = useState(0);
@@ -72,7 +73,7 @@ export function ComplaintVoice({ api, patientId, patientName, language, disabled
     try {
       const r = await api.transcribe({ patientId }, blob, spoken);
       pending.current = null; setNeedConsent(false);
-      if (r.text.trim()) { onText(r.text.trim()); setAdded(true); }
+      if (r.text.trim()) { onText(r.text.trim(), r.language); setAdded(true); setEnglish(r.translation?.text?.trim() || null); }
       else setError(new Error('Nothing could be heard. Try again, or type the complaint.'));
     } catch (e) {
       if (e instanceof ApiError && e.status === 403 && /outside AI/i.test(e.message)) { pending.current = blob; setNeedConsent(true); }
@@ -81,7 +82,7 @@ export function ComplaintVoice({ api, patientId, patientName, language, disabled
   }
 
   async function start() {
-    setError(null); setAdded(false); setNeedConsent(false); setSeconds(0);
+    setError(null); setAdded(false); setEnglish(null); setNeedConsent(false); setSeconds(0);
     try { rec.current = await startRecording(); } catch (e) { setError(e as Error); return; }
     setLive(rec.current); setPhase('recording');
     timer.current = setInterval(() => setSeconds(s => { if (s + 1 >= MAX_SECONDS) void finish(); return s + 1; }), 1000);
@@ -112,6 +113,13 @@ export function ComplaintVoice({ api, patientId, patientName, language, disabled
       </div>
       <p className="tiny muted">Spoken language: {spokenLabel(spoken)}. The recording is sent to an outside speech service and is not kept. The text is a machine transcript and is not checked. Read it in the box above and correct it.</p>
       {added && <p className="small" role="status">Transcript added to the complaint. Check it before continuing.</p>}
+      {english && (
+        <div className="field">
+          <label htmlFor="voice-english">English translation, machine-made and not checked</label>
+          <textarea id="voice-english" className="textarea" lang="en" value={english} readOnly rows={2} />
+          <span className="hint">Preview. For Hindi and Odia the English version is also saved with the visit.</span>
+        </div>
+      )}
       {error && <Banner kind="error" title="Voice input">{error.message}</Banner>}
       {needConsent && (
         <ConsentForm api={api} patientId={patientId} purpose="external_ai_processing" dialog onCancel={() => setNeedConsent(false)} intro={<Banner kind="warn" title="The patient has not agreed to this yet">An outside service would hear {patientName}'s voice. Ask for their separate consent first, or type the complaint.</Banner>} onRecorded={() => { setNeedConsent(false); if (pending.current) void send(pending.current); }} />

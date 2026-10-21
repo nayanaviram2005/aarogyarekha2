@@ -20,7 +20,7 @@ describe('ComplaintVoice', () => {
   it('sends the recording for the patient in the chosen language and hands back the trimmed text without saving anything', async () => {
     const a = api(vi.fn().mockResolvedValue(ok)); const onText = view(a);
     await speak();
-    await waitFor(() => expect(onText).toHaveBeenCalledWith('bukhar teen din se'));
+    await waitFor(() => expect(onText).toHaveBeenCalledWith('bukhar teen din se', 'hi'));
     expect(a.transcribe).toHaveBeenCalledWith({ patientId: 'p1' }, blob, 'hi');
     expect(await screen.findByText(/Transcript added to the complaint/)).toBeInTheDocument();
   });
@@ -47,6 +47,20 @@ describe('ComplaintVoice', () => {
     level = 0;
     await waitFor(() => expect(bars().at(-1)).toBe(3));
   });
+  it('shows the English translation as a read-only preview and passes on the language that was heard', async () => {
+    const withEnglish = { ...ok, translation: { text: ' Fever for three days ', provider: 'sarvam', model: 'm' } };
+    const onText = view(api(vi.fn().mockResolvedValue(withEnglish))); await speak();
+    const box = await screen.findByLabelText(/English translation, machine-made and not checked/);
+    expect(box).toHaveValue('Fever for three days'); expect(box).toHaveAttribute('readonly');
+    expect(onText).toHaveBeenCalledWith('bukhar teen din se', 'hi');
+  });
+  it('shows no English box when there is no translation, and clears it on the next recording', async () => {
+    const transcribe = vi.fn().mockResolvedValueOnce({ ...ok, translation: { text: 'Fever', provider: 'sarvam', model: 'm' } }).mockResolvedValue({ ...ok, translation: null });
+    view(api(transcribe)); await speak();
+    expect(await screen.findByLabelText(/English translation/)).toBeInTheDocument();
+    await speak();
+    await waitFor(() => expect(screen.queryByLabelText(/English translation/)).not.toBeInTheDocument());
+  });
   it('says the recording is not kept and the text is unchecked', () => {
     view(api(vi.fn()));
     expect(screen.getByText(/not kept/)).toBeInTheDocument(); expect(screen.getByText(/not checked/)).toBeInTheDocument();
@@ -71,7 +85,7 @@ describe('ComplaintVoice', () => {
     await userEvent.type(screen.getByLabelText('Witness name'), 'A. Witness');
     await userEvent.click(screen.getByRole('button', { name: 'Record consent' }));
     await waitFor(() => expect(a.recordConsent).toHaveBeenCalledWith('p1', expect.objectContaining({ purpose: 'external_ai_processing' })));
-    await waitFor(() => expect(onText).toHaveBeenCalledWith('bukhar teen din se'));
+    await waitFor(() => expect(onText).toHaveBeenCalledWith('bukhar teen din se', 'hi'));
     expect(transcribe).toHaveBeenCalledTimes(2); expect(transcribe.mock.calls[1]![1]).toBe(blob);
   });
   it('other failures are shown in plain words with no consent form', async () => {

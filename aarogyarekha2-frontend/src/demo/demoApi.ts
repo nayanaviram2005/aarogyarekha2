@@ -220,7 +220,7 @@ export function createDemoApi(opts: { rulesApproved: boolean }): Api {
       return wait({ id: 'rm', dueAt: due, channel: b.channel, status: 'scheduled' });
     },
     stopFollowup: async fid => { const f = Object.values(fups).flat().find(x => x.id === fid); if (f) f.active = false; return wait({ id: fid, active: false as const }); },
-    transcribe: async (_id, _audio, language) => wait({ text: language === 'hi' ? 'Bukhar teen din se, khansi bhi hai (demo)' : 'Fever for three days with a cough (demo)', language: language ?? 'en', provider: 'demo', model: 'demo', machineTranscript: true as const }),
+    transcribe: async (_id, _audio, language) => wait({ text: language === 'hi' ? 'Bukhar teen din se, khansi bhi hai (demo)' : 'Fever for three days with a cough (demo)', language: language ?? 'en', provider: 'demo', model: 'demo', machineTranscript: true as const, translation: language && language !== 'en' ? { text: 'Fever for three days with a cough (demo translation)', provider: 'demo', model: 'demo' } : null }),
     uploadDocument: async (id, file, kind) => {
       if (file.size > 10 * 1024 * 1024) throw new ApiError(413, 'The file is larger than 10 MB.');
       if (!/\.(pdf|jpe?g|png)$/i.test(file.name)) throw new ApiError(400, 'Only PDF, JPEG and PNG files are accepted.');

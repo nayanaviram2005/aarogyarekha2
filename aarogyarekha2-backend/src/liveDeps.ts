@@ -22,6 +22,7 @@ import { makeHistoryStore } from './history/store.js';
 import { makeNotesStore } from './notes/store.js';
 import { envForTask, makeProvider } from './ai/provider.js';
 import { makeVision } from './ai/vision.js';
+import { makeSarvamTranslator } from './ai/sarvamTranslate.js';
 import { makeTranscriber } from './ai/stt.js';
 import type { FollowupStore, FollowupView } from './deps.js';
 import { makeDbStore } from './training/store.js';
@@ -400,6 +401,7 @@ export function makeLiveDeps(config: Config, pool: pg.Pool): Deps {
     sendReferral: args => sendReferral(poolLike, args),
     readText: chooseReader(config.OCR_PROVIDER, { langPath: config.TESSDATA_PATH }),
     translator: makeProvider(envForTask(config.ai, 'TRANSLATE')),
+    textTranslator: makeSarvamTranslator(envForTask(config.ai, 'TRANSLATE')),
     loadRuleSet: async (name, version) => (await loadRuleSet(pool, name, version)).ruleSet,
     triageAi: makeProvider(envForTask(config.ai, 'TRIAGE')),
     ...(config.TRAINING_EXPORT === 'on' && config.TRAINING_PSEUDONYM_KEY ? { trainingStore: makeDbStore(pool, config.TRAINING_PSEUDONYM_KEY) } : {}),

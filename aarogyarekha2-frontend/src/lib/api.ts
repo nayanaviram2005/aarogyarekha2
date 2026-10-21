@@ -79,7 +79,7 @@ export function createApi(baseUrl: string, getToken: TokenSource, fetchImpl: typ
       catch { throw new ApiError(0, FALLBACK[0]!); }
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new ApiError(res.status, messageFromBody(res.status, json));
-      return json as { text: string; language: string | null; provider: string; model: string; machineTranscript: true };
+      return json as { text: string; language: string | null; provider: string; model: string; machineTranscript: true; translation?: { text: string; provider: string; model: string } | null };
     },
     auditFlags: hours => call('GET', `/admin/audit/flags${hours ? `?hours=${hours}` : ''}`),
     auditChain: () => call('GET', '/admin/audit/chain'),

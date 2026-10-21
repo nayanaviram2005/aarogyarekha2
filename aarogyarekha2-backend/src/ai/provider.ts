@@ -6,7 +6,7 @@ export interface AiResponse { text: string; provider: ProviderName; model: strin
 export type Generate = (req: AiRequest) => Promise<AiResponse>;
 
 export class AiError extends Error {
-  constructor(public readonly kind: 'not_configured' | 'timeout' | 'rejected' | 'bad_response' | 'network' | 'busy', message: string) { super(message); this.name = 'AiError'; }
+  constructor(public readonly kind: 'not_configured' | 'timeout' | 'rejected' | 'bad_response' | 'network' | 'busy', message: string, public readonly detail?: string) { super(message); this.name = 'AiError'; }
 }
 
 const ProviderEnum = z.enum(['mock', 'gemini', 'claude', 'openai', 'openrouter', 'sarvam']);

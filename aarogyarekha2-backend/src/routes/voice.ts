@@ -4,6 +4,7 @@ import type { RouteCtx, RouteHelpers } from './intake.js';
 import { AiError } from '../ai/provider.js';
 import { MAX_AUDIO_BYTES, STT_LANGUAGES, sniffAudio, type SttLanguage } from '../ai/stt.js';
 import { isConsentActive } from '../intake/consent.js';
+import { translateTranscript } from '../ai/transcriptTranslate.js';
 
 const uuid = z.string().uuid();
 const CLINICAL = ['health_worker', 'nurse', 'doctor', 'medical_officer'];
@@ -53,15 +54,19 @@ export function registerVoiceRoutes(c: RouteCtx, h: RouteHelpers): void {
       const status = err instanceof AiError ? (err.kind === 'timeout' ? 'timeout' : err.kind === 'rejected' ? 'rejected' : 'error') : 'error';
       if (err instanceof AiError && err.kind !== 'not_configured') await ledger(status).catch(() => {});
       if (err instanceof AiError && err.kind === 'not_configured') return fail(reply, 503, 'not-supported', 'Voice input is not set up. Type the complaint instead.');
-      req.log.error({ reqId: req.id, kind: err instanceof AiError ? err.kind : 'unknown' }, 'transcription failed');
+      req.log.error({ reqId: req.id, kind: err instanceof AiError ? err.kind : 'unknown', detail: err instanceof AiError ? err.detail : undefined }, 'transcription failed');
       return fail(reply, 502, 'transient', 'The recording could not be turned into text. Type the complaint instead, or try again.');
     }
 
     try { await ledger('ok'); }
     catch (err) { req.log.error({ reqId: req.id, err: (err as Error).message }, 'external run could not be logged'); return fail(reply, 503, 'transient', 'The outside service call could not be recorded, so the text was dropped. Try again.'); }
 
-    await h.note(req, { action: 'create', entityType: 'transcription', entityId: t.encounterId ?? t.patientId, patientId: t.patientId, facilityId: t.facilityId, outcome: 'success', details: { bytes: buf.length, provider: stt.name, model: stt.model, atIntake: !t.encounterId } });
-    return reply.send({ text, language, provider: stt.name, model: stt.model, machineTranscript: true });
+    const from = language && language !== 'other' ? language : langRaw && langRaw !== 'auto' ? langRaw : '';
+    const patient = from && from !== 'en' ? await req.reader!.getPatient(t.patientId).catch(() => null) : null;
+    const translation = patient ? await translateTranscript(deps, text, from, { names: [patient.full_name], identifiers: [patient.public_ref, patient.phone] }) : null;
+
+    await h.note(req, { action: 'create', entityType: 'transcription', entityId: t.encounterId ?? t.patientId, patientId: t.patientId, facilityId: t.facilityId, outcome: 'success', details: { bytes: buf.length, provider: stt.name, model: stt.model, atIntake: !t.encounterId, translatedBy: translation ? translation.provider : null } });
+    return reply.send({ text, language, provider: stt.name, model: stt.model, machineTranscript: true, translation });
   }
 
   app.post('/encounters/:id/transcribe', { preHandler: authenticate, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {

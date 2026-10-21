@@ -151,6 +151,7 @@ function Intake() {
       { key: 'encounter', label: 'Start the encounter', go: async () => { const r = await api.createEncounter({ patientId: pt.id, scenario, language, chiefComplaint: complaint.trim() }); done.current.encounterId = r.id; } },
       ...v.symptomRows.map((s, i) => ({ key: `sym${i}`, label: `Save symptom: ${s.text}`, go: () => api.addSymptom(done.current.encounterId!, s) })),
       ...v.vitalValues.map(([kind, value]) => ({ key: `vit-${kind}`, label: `Save ${VITAL_ROWS.find(r => r.kind === kind)!.label.split(' (')[0]!.toLowerCase()}`, go: () => api.addVital(done.current.encounterId!, { kind, value }) })),
+      ...(language === 'hi' || language === 'or' ? [{ key: 'translate', label: 'Translate the complaint to English', go: async () => { try { await api.translate(done.current.encounterId!); } catch { } } }] : []),
       ...(consciousness || oxygen ? [{ key: 'inputs', label: 'Save responsiveness and oxygen', go: () => api.saveInputs(done.current.encounterId!, { ...(consciousness ? { consciousness: consciousness as never } : {}), ...(oxygen ? { onSupplementalOxygen: oxygen === 'yes' } : {}) }) }] : []),
       ...(recordFiles.some(r => r.aiConsent) && staffName ? [{ key: 'ai-consent', label: 'Record the patient’s agreement to the outside AI reader', go: () => api.recordConsent(pt.id, { purpose: 'external_ai_processing', givenBy: 'self', method: 'verbal_witnessed', noticeVersion: AI_NOTICE_VERSION, witnessName: staffName }) }] : []),
       ...recordFiles.flatMap(r => [
@@ -241,7 +242,7 @@ function Intake() {
           {api && <RecordsPicker api={api} files={recordFiles} setFiles={setRecordFiles} language={language} disabled={busy || !!done.current.encounterId} />}
           {fresh && !busy && !savedId && <Banner kind="info" title={`${patient.full_name} is registered`}>Enter the main complaint to put them in the queue. You can add symptoms and measurements too. For a routine check-up, write "Routine".</Banner>}
           <div className="field"><label htmlFor="cc">{t('intake.complaint')} (required)</label><textarea id="cc" autoFocus required aria-required="true" aria-describedby="cc-hint" className="textarea" lang={language} value={complaint} onChange={e => setComplaint(e.target.value)} maxLength={2000} disabled={busy} /><span id="cc-hint" className="hint">For a routine check-up, write "Routine".</span></div>
-          {api && <ComplaintVoice api={api} patientId={patient.id} patientName={patient.full_name} language={language} disabled={busy || !!done.current.encounterId} onText={text => setComplaint(cur => (cur.trim() ? `${cur.trim()} ${text}` : text).slice(0, 2000))} />}
+          {api && <ComplaintVoice api={api} patientId={patient.id} patientName={patient.full_name} language={language} disabled={busy || !!done.current.encounterId} onText={(text, heard) => { if (heard === 'hi' || heard === 'or') setLanguage(heard); setComplaint(cur => (cur.trim() ? `${cur.trim()} ${text}` : text).slice(0, 2000)); }} />}
           <TextHints text={complaint} language={language} onPickLanguage={setLanguage} />
 
           <fieldset style={{ border: 0, padding: 0, margin: 0 }} disabled={busy}>
